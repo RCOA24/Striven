@@ -1,5 +1,5 @@
 import React from 'react';
-import { Footprints, Flame, Clock, Target, Activity } from 'lucide-react';
+import { Footprints, Flame, Clock, Target, Activity, Check } from 'lucide-react';
 
 // Step Counter Component with Circular Progress
 const StepCounter = ({ steps }) => {
@@ -63,17 +63,19 @@ const MetricCard = ({ icon: Icon, label, value, gradient }) => (
 );
 
 // Control Button Component
-const ControlButton = ({ onClick, children, variant = 'primary', icon: Icon }) => {
+const ControlButton = ({ onClick, children, variant = 'primary', icon: Icon, disabled }) => {
   const variants = {
     primary: "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-xl shadow-green-500/40 hover:shadow-2xl hover:shadow-green-500/50",
     secondary: "bg-white/10 hover:bg-white/20 text-white backdrop-blur-xl border border-white/20 hover:border-white/30",
-    danger: "bg-gradient-to-r from-red-500/20 to-pink-500/20 hover:from-red-500/30 hover:to-pink-500/30 text-red-100 backdrop-blur-xl border border-red-400/30 hover:border-red-400/50"
+    danger: "bg-gradient-to-r from-red-500/20 to-pink-500/20 hover:from-red-500/30 hover:to-pink-500/30 text-red-100 backdrop-blur-xl border border-red-400/30 hover:border-red-400/50",
+    success: "bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-xl shadow-blue-500/40 hover:shadow-2xl hover:shadow-blue-500/50"
   };
 
   return (
     <button
       onClick={onClick}
-      className={`flex-1 py-4 rounded-2xl font-semibold text-base transition-all duration-300 flex items-center justify-center space-x-2 transform hover:scale-105 active:scale-95 ${variants[variant]}`}
+      disabled={disabled}
+      className={`flex-1 py-4 rounded-2xl font-semibold text-base transition-all duration-300 flex items-center justify-center space-x-2 transform hover:scale-105 active:scale-95 ${variants[variant]} ${disabled ? 'opacity-50 cursor-not-allowed hover:scale-100' : ''}`}
     >
       {Icon && <Icon className="w-5 h-5" />}
       <span>{children}</span>
@@ -83,7 +85,7 @@ const ControlButton = ({ onClick, children, variant = 'primary', icon: Icon }) =
 
 const Dashboard = ({ 
   steps, isTracking, isPaused, distance, calories, formattedTime,
-  startTracking, pauseTracking, resumeTracking, reset 
+  startTracking, pauseTracking, resumeTracking, reset, stopAndSave 
 }) => {
   return (
     <div className="w-full max-w-2xl mx-auto">
@@ -125,6 +127,9 @@ const Dashboard = ({
               <ControlButton onClick={resumeTracking} variant="primary" icon={Footprints}>
                 Resume
               </ControlButton>
+              <ControlButton onClick={stopAndSave} variant="success" icon={Check} disabled={steps === 0}>
+                Finish
+              </ControlButton>
               <ControlButton onClick={reset} variant="danger" icon={Activity}>
                 Reset
               </ControlButton>
@@ -133,6 +138,9 @@ const Dashboard = ({
             <>
               <ControlButton onClick={pauseTracking} variant="secondary" icon={Clock}>
                 Pause
+              </ControlButton>
+              <ControlButton onClick={stopAndSave} variant="success" icon={Check} disabled={steps === 0}>
+                Finish
               </ControlButton>
               <ControlButton onClick={reset} variant="danger" icon={Activity}>
                 Reset

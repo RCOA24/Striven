@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Activity } from 'lucide-react';
 import useStriven from './hooks/useStriven';
+import useNotifications from './hooks/useNotifications';
 import MainLayout from './components/MainLayout';
 import Dashboard from './pages/Dashboard';
 import ActivityPage from './pages/ActivityPage';
 import StatsPage from './pages/StatsPage';
 import ProfilePage from './pages/ProfilePage';
+import Notification from './components/Notifications';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
@@ -26,6 +28,38 @@ function App() {
     reset,
     stopAndSave,
   } = useStriven();
+
+  const { notification, showNotification, hideNotification } = useNotifications();
+
+  // Handle finish button with beautiful notification
+  const handleFinish = () => {
+    if (steps > 0) {
+      stopAndSave();
+      
+      showNotification({
+        type: 'success',
+        title: 'Activity Saved! 🎉',
+        message: `${steps.toLocaleString()} steps • ${distance.toFixed(2)} km • ${Math.round(calories)} kcal`,
+        duration: 5000
+      });
+
+      // Optional: Navigate to activity page after a delay
+      setTimeout(() => {
+        setCurrentPage('activity');
+      }, 1500);
+    }
+  };
+
+  // Handle start with notification
+  const handleStart = () => {
+    startTracking();
+    showNotification({
+      type: 'info',
+      title: 'Tracking Started',
+      message: 'Keep your phone with you while walking',
+      duration: 3000
+    });
+  };
 
   if (!sensorSupported) {
     return (
@@ -54,11 +88,11 @@ function App() {
             distance={distance}
             calories={calories}
             formattedTime={formattedTime}
-            startTracking={startTracking}
+            startTracking={handleStart}
             pauseTracking={pauseTracking}
             resumeTracking={resumeTracking}
             reset={reset}
-            stopAndSave={stopAndSave}
+            stopAndSave={handleFinish}
           />
         );
       case 'activity':
@@ -76,20 +110,32 @@ function App() {
             distance={distance}
             calories={calories}
             formattedTime={formattedTime}
-            startTracking={startTracking}
+            startTracking={handleStart}
             pauseTracking={pauseTracking}
             resumeTracking={resumeTracking}
             reset={reset}
-            stopAndSave={stopAndSave}
+            stopAndSave={handleFinish}
           />
         );
     }
   };
 
   return (
-    <MainLayout currentPage={currentPage} onNavigate={setCurrentPage}>
-      {renderPage()}
-    </MainLayout>
+    <>
+      {/* Notification Component */}
+      <Notification
+        type={notification.type}
+        title={notification.title}
+        message={notification.message}
+        isVisible={notification.isVisible}
+        onClose={hideNotification}
+        duration={notification.duration}
+      />
+
+      <MainLayout currentPage={currentPage} onNavigate={setCurrentPage}>
+        {renderPage()}
+      </MainLayout>
+    </>
   );
 }
 
