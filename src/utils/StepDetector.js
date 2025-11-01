@@ -1,4 +1,4 @@
-class StepDetection {
+class StepDetector {
   constructor(onStep, threshold = 12) {
     this.onStep = onStep;
     this.threshold = threshold;
@@ -187,4 +187,4 @@ class StepDetection {
   }
 }
 
-export default StepDetection;
+export default StepDetector;
