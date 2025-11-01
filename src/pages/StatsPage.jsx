@@ -7,7 +7,7 @@ const StatCard = ({ icon: Icon, label, value, change, gradient }) => (
       <div className={`bg-gradient-to-br ${gradient} p-3 rounded-xl shadow-lg`}>
         <Icon className="w-6 h-6 text-white" />
       </div>
-      {change && (
+      {change !== undefined && (
         <div className={`flex items-center space-x-1 px-2 py-1 rounded-full ${
           change > 0 ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'
         }`}>
@@ -40,7 +40,17 @@ const ProgressBar = ({ label, current, goal, color }) => {
   );
 };
 
-const StatsPage = () => {
+const StatsPage = ({ weeklyStats = {}, activities = [] }) => {
+  const { totalSteps = 0, totalDistance = 0, totalCalories = 0, activeDays = 0 } = weeklyStats;
+
+  // Calculate personal bests
+  const personalBests = {
+    mostSteps: activities.length > 0 ? Math.max(...activities.map(a => a.steps)) : 0,
+    longestDistance: activities.length > 0 ? Math.max(...activities.map(a => a.distance)) : 0,
+    mostStepsDate: activities.length > 0 ? activities.reduce((max, a) => a.steps > max.steps ? a : max, activities[0])?.date : 'N/A',
+    longestDistanceDate: activities.length > 0 ? activities.reduce((max, a) => a.distance > max.distance ? a : max, activities[0])?.date : 'N/A',
+  };
+
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6">
       {/* Header */}
@@ -64,28 +74,25 @@ const StatsPage = () => {
           <StatCard
             icon={Target}
             label="Total Steps"
-            value="45.2K"
-            change={12}
+            value={totalSteps >= 1000 ? `${(totalSteps / 1000).toFixed(1)}K` : totalSteps}
             gradient="from-green-500 to-emerald-600"
           />
           <StatCard
             icon={TrendingUp}
             label="Distance"
-            value="34.5 km"
-            change={8}
+            value={`${totalDistance.toFixed(1)} km`}
             gradient="from-blue-500 to-cyan-600"
           />
           <StatCard
             icon={Zap}
             label="Calories"
-            value="1,808"
-            change={15}
+            value={totalCalories.toLocaleString()}
             gradient="from-orange-500 to-red-600"
           />
           <StatCard
             icon={Award}
             label="Active Days"
-            value="5/7"
+            value={`${activeDays}/7`}
             gradient="from-purple-500 to-pink-600"
           />
         </div>
@@ -99,55 +106,22 @@ const StatsPage = () => {
         </div>
         <ProgressBar 
           label="Steps Goal"
-          current={45234}
+          current={totalSteps}
           goal={70000}
           color="from-green-500 to-emerald-600"
         />
         <ProgressBar 
           label="Distance Goal"
-          current={34.5}
+          current={totalDistance}
           goal={50}
           color="from-blue-500 to-cyan-600"
         />
         <ProgressBar 
           label="Calories Goal"
-          current={1808}
+          current={totalCalories}
           goal={2500}
           color="from-orange-500 to-red-600"
         />
-      </div>
-
-      {/* Achievements */}
-      <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-6 border border-white/20">
-        <div className="flex items-center space-x-2 mb-6">
-          <Award className="w-5 h-5 text-yellow-400" />
-          <h2 className="text-xl font-bold text-white">Recent Achievements</h2>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-2xl p-4 border border-yellow-400/30">
-            <div className="flex items-center space-x-3">
-              <div className="bg-yellow-500/30 p-3 rounded-xl">
-                <Award className="w-6 h-6 text-yellow-300" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-white">10K Master</h3>
-                <p className="text-sm text-white/70">Reached 10,000 steps 5 times</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-2xl p-4 border border-blue-400/30">
-            <div className="flex items-center space-x-3">
-              <div className="bg-blue-500/30 p-3 rounded-xl">
-                <TrendingUp className="w-6 h-6 text-blue-300" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-white">Marathon Walker</h3>
-                <p className="text-sm text-white/70">Walked over 30km this week</p>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Personal Bests */}
@@ -156,21 +130,16 @@ const StatsPage = () => {
           <Zap className="w-5 h-5 text-purple-400" />
           <h2 className="text-xl font-bold text-white">Personal Bests</h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="text-center">
-            <div className="text-3xl font-bold text-white mb-1">15,432</div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="text-center bg-white/5 rounded-xl p-4">
+            <div className="text-3xl font-bold text-white mb-1">{personalBests.mostSteps.toLocaleString()}</div>
             <div className="text-sm text-white/60">Most Steps (Single Day)</div>
-            <div className="text-xs text-green-400 mt-1">Nov 25, 2024</div>
+            <div className="text-xs text-green-400 mt-1">{personalBests.mostStepsDate}</div>
           </div>
-          <div className="text-center">
-            <div className="text-3xl font-bold text-white mb-1">12.8 km</div>
+          <div className="text-center bg-white/5 rounded-xl p-4">
+            <div className="text-3xl font-bold text-white mb-1">{personalBests.longestDistance.toFixed(2)} km</div>
             <div className="text-sm text-white/60">Longest Distance</div>
-            <div className="text-xs text-green-400 mt-1">Nov 22, 2024</div>
-          </div>
-          <div className="text-center">
-            <div className="text-3xl font-bold text-white mb-1">7 days</div>
-            <div className="text-sm text-white/60">Longest Streak</div>
-            <div className="text-xs text-green-400 mt-1">Current!</div>
+            <div className="text-xs text-green-400 mt-1">{personalBests.longestDistanceDate}</div>
           </div>
         </div>
       </div>
