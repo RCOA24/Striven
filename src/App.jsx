@@ -8,9 +8,11 @@ import ActivityPage from './pages/ActivityPage';
 import StatsPage from './pages/StatsPage';
 import ProfilePage from './pages/ProfilePage';
 import Notification from './components/Notifications';
+import Intro from './components/Intro';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
+  const [showIntro, setShowIntro] = useState(true);
   
   const {
     steps,
@@ -30,6 +32,11 @@ function App() {
   } = useStriven();
 
   const { notification, showNotification, hideNotification } = useNotifications();
+
+  // Handle intro completion
+  const handleIntroComplete = () => {
+    setShowIntro(false);
+  };
 
   // Handle finish button with beautiful notification
   const handleFinish = () => {
@@ -60,6 +67,11 @@ function App() {
       duration: 3000
     });
   };
+
+  // Show intro screen if showIntro is true
+  if (showIntro) {
+    return <Intro onComplete={handleIntroComplete} />;
+  }
 
   if (!sensorSupported) {
     return (
