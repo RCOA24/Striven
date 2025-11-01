@@ -23,6 +23,9 @@ class StepDetector {
     this.isCalibrated = false;
     this.calibrationCount = 0;
     this.maxCalibrationSamples = 50;
+    
+    // FIXED: Add idle tracking
+    this.lastProcessTime = 0;
   }
 
   // Auto-calibration for device-specific sensitivity
@@ -50,9 +53,9 @@ class StepDetector {
     return previous + alpha * (current - previous);
   }
 
-  // Detect if motion pattern matches walking/running
+  // FIXED: Detect if motion pattern matches walking/running - more lenient
   isValidStepPattern() {
-    if (this.accelerationHistory.length < 5) return false;
+    if (this.accelerationHistory.length < 5) return true; // Allow if not enough history yet
     
     const recent = this.accelerationHistory.slice(-5);
     const variations = [];
@@ -64,10 +67,20 @@ class StepDetector {
     const avgVariation = variations.reduce((a, b) => a + b, 0) / variations.length;
     
     // Valid steps have consistent variation (not random noise or no movement)
-    return avgVariation > 0.5 && avgVariation < 8;
+    // Made more lenient: 0.3 (was 0.5) to 10 (was 8)
+    return avgVariation > 0.3 && avgVariation < 10;
   }
 
   processAcceleration(x, y, z) {
+    const now = Date.now();
+    
+    // FIXED: Clear history if device was idle (no processing for a while)
+    if (this.lastProcessTime > 0 && now - this.lastProcessTime > this.maxStepTimeout) {
+      console.log('Idle period detected, clearing acceleration history for fresh detection');
+      this.accelerationHistory = [];
+    }
+    this.lastProcessTime = now;
+    
     // Auto-calibrate on first samples
     if (!this.isCalibrated && this.calibrationCount < this.maxCalibrationSamples) {
       this.calibrate(x, y, z);
@@ -108,12 +121,15 @@ class StepDetector {
                    previous > this.threshold;
 
     if (isPeak) {
-      const now = Date.now();
       const timeSinceLastStep = now - this.lastStepTime;
+      
+      // FIXED: More lenient timing for first step or after idle
+      const isFirstStep = this.lastStepTime === 0;
+      const isAfterIdle = !this.isWalking;
       
       // Validate timing (not too fast, not too slow)
       const isValidTiming = timeSinceLastStep > this.stepTimeout && 
-                           (timeSinceLastStep < this.maxStepTimeout || this.lastStepTime === 0);
+                           (timeSinceLastStep < this.maxStepTimeout || isFirstStep || isAfterIdle);
       
       // Validate motion pattern
       const isValidPattern = this.isValidStepPattern();
@@ -123,14 +139,24 @@ class StepDetector {
         this.consecutivePeaks++;
         this.isWalking = true;
         this.onStep();
+        console.log(`Step detected! Mag: ${previous.toFixed(2)}, TimeSince: ${timeSinceLastStep}ms, Walking: ${this.isWalking}`);
+      } else {
+        // Debug why step was rejected
+        if (!isValidTiming) {
+          console.log(`Step rejected: timing (${timeSinceLastStep}ms)`);
+        }
+        if (!isValidPattern) {
+          console.log(`Step rejected: pattern validation failed`);
+        }
       }
     }
 
     // Reset walking state if no steps for a while
-    const now = Date.now();
     if (now - this.lastStepTime > this.maxStepTimeout && this.isWalking) {
+      console.log('Walking state reset due to inactivity');
       this.isWalking = false;
       this.consecutivePeaks = 0;
+      // FIXED: Don't clear history here - it's cleared at start of processAcceleration
     }
   }
 
@@ -157,6 +183,7 @@ class StepDetector {
         this.stepTimeout = 250;
         this.maxStepTimeout = 2000;
     }
+    
   }
 
   // Get current detection statistics
@@ -166,7 +193,8 @@ class StepDetector {
       threshold: this.threshold.toFixed(2),
       baseline: this.baselineAcceleration.toFixed(2),
       isWalking: this.isWalking,
-      consecutivePeaks: this.consecutivePeaks
+      consecutivePeaks: this.consecutivePeaks,
+      historyLength: this.accelerationHistory.length
     };
   }
 
@@ -175,6 +203,7 @@ class StepDetector {
     this.lastStepTime = 0;
     this.consecutivePeaks = 0;
     this.isWalking = false;
+    this.lastProcessTime = 0;
     // Keep calibration data
   }
 

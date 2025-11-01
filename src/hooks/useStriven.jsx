@@ -20,9 +20,9 @@ const useStriven = () => {
 
   const stepDetectorRef = useRef(null);
   const timerRef = useRef(null);
-  const startTimeRef = useRef(null);
-  const pausedDurationRef = useRef(0); // FIXED: Track total paused duration
-  const pauseStartRef = useRef(null); // FIXED: Track when pause started
+  const sessionStartTimeRef = useRef(null); // When session actually started
+  const totalPausedTimeRef = useRef(0); // Total time spent paused
+  const lastPauseTimeRef = useRef(null); // When current pause started
   const sessionStartRef = useRef(null);
   const accelerometerRef = useRef(null);
   const motionHandlerRef = useRef(null);
@@ -167,17 +167,19 @@ const useStriven = () => {
     }
   }, [sensorSupported, handleStep]);
 
-  // FIXED: Timer for active time tracking
+  // FIXED: Timer for active time tracking - simpler logic
   useEffect(() => {
     if (isTracking && !isPaused) {
       timerRef.current = setInterval(() => {
-        if (startTimeRef.current) {
-          // Calculate elapsed time minus any paused duration
-          const totalElapsed = Date.now() - startTimeRef.current;
-          const activeElapsed = totalElapsed - pausedDurationRef.current;
-          setActiveTime(Math.floor(activeElapsed / 1000));
+        if (sessionStartTimeRef.current !== null) {
+          // Simple calculation: current time - session start - total paused time
+          const now = Date.now();
+          const totalElapsed = now - sessionStartTimeRef.current;
+          const activeElapsed = totalElapsed - totalPausedTimeRef.current;
+          const seconds = Math.max(0, Math.floor(activeElapsed / 1000)); // Ensure never negative
+          setActiveTime(seconds);
         }
-      }, 1000);
+      }, 100); // Update more frequently for smoother display
     } else {
       if (timerRef.current) {
         clearInterval(timerRef.current);
@@ -295,12 +297,15 @@ const useStriven = () => {
       return;
     }
 
+    // Reset all timing variables
+    const now = Date.now();
+    sessionStartTimeRef.current = now;
+    sessionStartRef.current = now;
+    totalPausedTimeRef.current = 0;
+    lastPauseTimeRef.current = null;
+
     setIsTracking(true);
     setIsPaused(false);
-    startTimeRef.current = Date.now();
-    sessionStartRef.current = Date.now();
-    pausedDurationRef.current = 0; // FIXED: Reset paused duration
-    pauseStartRef.current = null; // FIXED: Reset pause start
 
     if ('Accelerometer' in window) {
       const started = startAccelerometer();
@@ -314,27 +319,32 @@ const useStriven = () => {
     console.log('Tracking started');
   }, [sensorSupported, requestMotionPermission, startAccelerometer, startDeviceMotion]);
 
-  // FIXED: Pause tracking
+  // FIXED: Pause tracking - just record when pause started
   const pauseTracking = useCallback(() => {
     console.log('Pausing tracking...');
+    
+    // Record when we paused
+    lastPauseTimeRef.current = Date.now();
+    
     setIsPaused(true);
-    pauseStartRef.current = Date.now(); // Record when pause started
-
     stopAllSensors();
   }, [stopAllSensors]);
 
-  // FIXED: Resume tracking
+  // FIXED: Resume tracking - add paused duration to total
   const resumeTracking = useCallback(() => {
     console.log('Resuming tracking...');
     
-    // Add the paused duration to total
-    if (pauseStartRef.current) {
-      pausedDurationRef.current += Date.now() - pauseStartRef.current;
-      pauseStartRef.current = null;
+    // Calculate how long we were paused and add to total
+    if (lastPauseTimeRef.current !== null) {
+      const pauseDuration = Date.now() - lastPauseTimeRef.current;
+      totalPausedTimeRef.current += pauseDuration;
+      lastPauseTimeRef.current = null;
+      console.log(`Added ${pauseDuration}ms to paused time. Total: ${totalPausedTimeRef.current}ms`);
     }
 
     setIsPaused(false);
     
+    // Restart sensors
     if ('Accelerometer' in window) {
       const started = startAccelerometer();
       if (!started) {
@@ -369,9 +379,9 @@ const useStriven = () => {
     setDistance(0);
     setCalories(0);
     setActiveTime(0);
-    startTimeRef.current = null;
-    pausedDurationRef.current = 0; // FIXED: Reset
-    pauseStartRef.current = null; // FIXED: Reset
+    sessionStartTimeRef.current = null;
+    totalPausedTimeRef.current = 0;
+    lastPauseTimeRef.current = null;
     sessionStartRef.current = null;
 
     if (stepDetectorRef.current) {
@@ -391,9 +401,9 @@ const useStriven = () => {
     setDistance(0);
     setCalories(0);
     setActiveTime(0);
-    startTimeRef.current = null;
-    pausedDurationRef.current = 0; // FIXED: Reset
-    pauseStartRef.current = null; // FIXED: Reset
+    sessionStartTimeRef.current = null;
+    totalPausedTimeRef.current = 0;
+    lastPauseTimeRef.current = null;
     sessionStartRef.current = null;
 
     if (stepDetectorRef.current) {
