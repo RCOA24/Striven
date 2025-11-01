@@ -9,16 +9,106 @@ const useStriven = () => {
   const [calories, setCalories] = useState(0);
   const [activeTime, setActiveTime] = useState(0);
   const [sensorSupported, setSensorSupported] = useState(false);
+  const [activities, setActivities] = useState([]);
+  const [weeklyStats, setWeeklyStats] = useState({
+    totalSteps: 0,
+    totalDistance: 0,
+    totalCalories: 0,
+    activeDays: 0
+  });
 
   const stepDetectorRef = useRef(null);
   const timerRef = useRef(null);
   const startTimeRef = useRef(null);
   const pausedTimeRef = useRef(0);
+  const sessionStartRef = useRef(null);
 
   // Configuration
   const STEP_LENGTH = 0.762; // Average step length in meters (2.5 feet)
   const CALORIES_PER_STEP = 0.04; // Average calories burned per step
   const SENSOR_FREQUENCY = 50; // Hz
+
+  // Load data from localStorage on mount
+  useEffect(() => {
+    const loadData = () => {
+      try {
+        const savedActivities = localStorage.getItem('striven_activities');
+        if (savedActivities) {
+          setActivities(JSON.parse(savedActivities));
+        }
+
+        const savedStats = localStorage.getItem('striven_weekly_stats');
+        if (savedStats) {
+          setWeeklyStats(JSON.parse(savedStats));
+        }
+      } catch (error) {
+        console.error('Error loading data:', error);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  // Save activities to localStorage whenever they change
+  useEffect(() => {
+    if (activities.length > 0) {
+      localStorage.setItem('striven_activities', JSON.stringify(activities));
+    }
+  }, [activities]);
+
+  // Save weekly stats to localStorage
+  useEffect(() => {
+    localStorage.setItem('striven_weekly_stats', JSON.stringify(weeklyStats));
+  }, [weeklyStats]);
+
+  // Calculate weekly stats from activities
+  const calculateWeeklyStats = useCallback((activityList) => {
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+    const weeklyActivities = activityList.filter(activity => 
+      new Date(activity.timestamp) >= oneWeekAgo
+    );
+
+    const totalSteps = weeklyActivities.reduce((sum, a) => sum + a.steps, 0);
+    const totalDistance = weeklyActivities.reduce((sum, a) => sum + a.distance, 0);
+    const totalCalories = weeklyActivities.reduce((sum, a) => sum + a.calories, 0);
+    
+    // Count unique days with activities
+    const uniqueDays = new Set(
+      weeklyActivities.map(a => new Date(a.timestamp).toDateString())
+    );
+
+    return {
+      totalSteps,
+      totalDistance: parseFloat(totalDistance.toFixed(2)),
+      totalCalories: Math.round(totalCalories),
+      activeDays: uniqueDays.size
+    };
+  }, []);
+
+  // Save completed session
+  const saveActivity = useCallback((sessionData) => {
+    const newActivity = {
+      id: Date.now(),
+      timestamp: sessionStartRef.current || Date.now(),
+      date: new Date(sessionStartRef.current || Date.now()).toLocaleString(),
+      steps: sessionData.steps,
+      distance: parseFloat(sessionData.distance.toFixed(2)),
+      calories: Math.round(sessionData.calories),
+      duration: sessionData.duration,
+      type: 'walking'
+    };
+
+    const updatedActivities = [newActivity, ...activities];
+    setActivities(updatedActivities);
+
+    // Update weekly stats
+    const newWeeklyStats = calculateWeeklyStats(updatedActivities);
+    setWeeklyStats(newWeeklyStats);
+
+    return newActivity;
+  }, [activities, calculateWeeklyStats]);
 
   // Check sensor support
   useEffect(() => {
@@ -54,9 +144,6 @@ const useStriven = () => {
   useEffect(() => {
     if (sensorSupported && !stepDetectorRef.current) {
       stepDetectorRef.current = new StepDetector(handleStep);
-      
-      // Optional: Set activity mode
-      // stepDetectorRef.current.setActivityMode('walking');
     }
   }, [sensorSupported, handleStep]);
 
@@ -89,6 +176,7 @@ const useStriven = () => {
     setIsTracking(true);
     setIsPaused(false);
     startTimeRef.current = Date.now();
+    sessionStartRef.current = Date.now();
     pausedTimeRef.current = 0;
 
     // Try to use Accelerometer API (modern browsers)
@@ -108,20 +196,16 @@ const useStriven = () => {
 
         accelerometer.addEventListener('error', (event) => {
           console.error('Accelerometer error:', event.error.name);
-          // Fallback to DeviceMotion
           startDeviceMotion();
         });
 
         accelerometer.start();
-        
-        // Store reference for cleanup
         stepDetectorRef.current.accelerometer = accelerometer;
       } catch (error) {
         console.error('Accelerometer initialization error:', error);
         startDeviceMotion();
       }
     } else {
-      // Fallback to DeviceMotion API (iOS and older browsers)
       startDeviceMotion();
     }
   }, [sensorSupported, isTracking, isPaused]);
@@ -137,7 +221,6 @@ const useStriven = () => {
       }
     };
 
-    // Request permission on iOS 13+
     if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
       DeviceMotionEvent.requestPermission()
         .then(permissionState => {
@@ -152,7 +235,6 @@ const useStriven = () => {
       window.addEventListener('devicemotion', handleMotion);
     }
 
-    // Store reference for cleanup
     stepDetectorRef.current.deviceMotionHandler = handleMotion;
   }, [isTracking, isPaused]);
 
@@ -164,7 +246,6 @@ const useStriven = () => {
       pausedTimeRef.current += Date.now() - startTimeRef.current;
     }
 
-    // Stop sensors
     if (stepDetectorRef.current?.accelerometer) {
       stepDetectorRef.current.accelerometer.stop();
     }
@@ -179,7 +260,6 @@ const useStriven = () => {
     setIsPaused(false);
     startTimeRef.current = Date.now();
     
-    // Restart sensors
     if (stepDetectorRef.current?.accelerometer) {
       stepDetectorRef.current.accelerometer.start();
     } else {
@@ -187,16 +267,19 @@ const useStriven = () => {
     }
   }, [startDeviceMotion]);
 
-  // Reset everything
-  const reset = useCallback(() => {
-    setIsTracking(false);
-    setIsPaused(false);
-    setSteps(0);
-    setDistance(0);
-    setCalories(0);
-    setActiveTime(0);
-    startTimeRef.current = null;
-    pausedTimeRef.current = 0;
+  // Stop and save session
+  const stopAndSave = useCallback(() => {
+    if (steps > 0) {
+      const sessionData = {
+        steps,
+        distance,
+        calories,
+        duration: formatTime(activeTime)
+      };
+      
+      const savedActivity = saveActivity(sessionData);
+      console.log('Activity saved:', savedActivity);
+    }
 
     // Stop sensors
     if (stepDetectorRef.current?.accelerometer) {
@@ -207,7 +290,42 @@ const useStriven = () => {
       window.removeEventListener('devicemotion', stepDetectorRef.current.deviceMotionHandler);
     }
 
-    // Reset step detector
+    // Reset tracking state
+    setIsTracking(false);
+    setIsPaused(false);
+    setSteps(0);
+    setDistance(0);
+    setCalories(0);
+    setActiveTime(0);
+    startTimeRef.current = null;
+    pausedTimeRef.current = 0;
+    sessionStartRef.current = null;
+
+    if (stepDetectorRef.current) {
+      stepDetectorRef.current.reset();
+    }
+  }, [steps, distance, calories, activeTime, saveActivity]);
+
+  // Reset without saving
+  const reset = useCallback(() => {
+    setIsTracking(false);
+    setIsPaused(false);
+    setSteps(0);
+    setDistance(0);
+    setCalories(0);
+    setActiveTime(0);
+    startTimeRef.current = null;
+    pausedTimeRef.current = 0;
+    sessionStartRef.current = null;
+
+    if (stepDetectorRef.current?.accelerometer) {
+      stepDetectorRef.current.accelerometer.stop();
+    }
+    
+    if (stepDetectorRef.current?.deviceMotionHandler) {
+      window.removeEventListener('devicemotion', stepDetectorRef.current.deviceMotionHandler);
+    }
+
     if (stepDetectorRef.current) {
       stepDetectorRef.current.reset();
     }
@@ -251,10 +369,13 @@ const useStriven = () => {
     activeTime,
     formattedTime: formatTime(activeTime),
     sensorSupported,
+    activities,
+    weeklyStats,
     startTracking,
     pauseTracking,
     resumeTracking,
     reset,
+    stopAndSave,
   };
 };
 

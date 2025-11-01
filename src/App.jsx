@@ -18,10 +18,13 @@ function App() {
     calories,
     formattedTime,
     sensorSupported,
+    activities,
+    weeklyStats,
     startTracking,
     pauseTracking,
     resumeTracking,
     reset,
+    stopAndSave,
   } = useStriven();
 
   if (!sensorSupported) {
@@ -55,14 +58,15 @@ function App() {
             pauseTracking={pauseTracking}
             resumeTracking={resumeTracking}
             reset={reset}
+            stopAndSave={stopAndSave}
           />
         );
       case 'activity':
-        return <ActivityPage />;
+        return <ActivityPage activities={activities} />;
       case 'stats':
-        return <StatsPage />;
+        return <StatsPage weeklyStats={weeklyStats} activities={activities} />;
       case 'profile':
-        return <ProfilePage />;
+        return <ProfilePage activities={activities} weeklyStats={weeklyStats} />;
       default:
         return (
           <Dashboard
@@ -76,6 +80,7 @@ function App() {
             pauseTracking={pauseTracking}
             resumeTracking={resumeTracking}
             reset={reset}
+            stopAndSave={stopAndSave}
           />
         );
     }

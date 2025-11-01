@@ -160,7 +160,7 @@ const Dashboard = ({
       {/* Footer */}
       <div className="text-center mt-6">
         <p className="text-white/50 text-sm">
-          Stay active, stay healthy 💚
+          Developed by Rodney Austria
         </p>
       </div>
     </div>
