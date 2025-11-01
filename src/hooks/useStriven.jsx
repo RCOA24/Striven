@@ -21,7 +21,8 @@ const useStriven = () => {
   const stepDetectorRef = useRef(null);
   const timerRef = useRef(null);
   const startTimeRef = useRef(null);
-  const pausedTimeRef = useRef(0);
+  const pausedDurationRef = useRef(0); // FIXED: Track total paused duration
+  const pauseStartRef = useRef(null); // FIXED: Track when pause started
   const sessionStartRef = useRef(null);
   const accelerometerRef = useRef(null);
   const motionHandlerRef = useRef(null);
@@ -44,11 +45,10 @@ const useStriven = () => {
     isPausedRef.current = isPaused;
   }, [isPaused]);
 
-  // Load data on mount (use state instead of localStorage)
+  // Load data on mount
   useEffect(() => {
     const loadData = () => {
       try {
-        // Initialize with empty data - localStorage not used
         setActivities([]);
         setWeeklyStats({
           totalSteps: 0,
@@ -116,10 +116,8 @@ const useStriven = () => {
     const checkSensorSupport = async () => {
       setSensorError(null);
       
-      // Check for Accelerometer API
       if ('Accelerometer' in window) {
         try {
-          // Try to query permissions
           if ('permissions' in navigator) {
             const result = await navigator.permissions.query({ name: 'accelerometer' });
             console.log('Accelerometer permission:', result.state);
@@ -132,7 +130,6 @@ const useStriven = () => {
         }
       }
       
-      // Check for DeviceMotion
       if ('DeviceMotionEvent' in window) {
         setSensorSupported(true);
         console.log('DeviceMotion API supported');
@@ -170,13 +167,15 @@ const useStriven = () => {
     }
   }, [sensorSupported, handleStep]);
 
-  // Timer for active time tracking
+  // FIXED: Timer for active time tracking
   useEffect(() => {
     if (isTracking && !isPaused) {
       timerRef.current = setInterval(() => {
         if (startTimeRef.current) {
-          const elapsed = Date.now() - startTimeRef.current - pausedTimeRef.current;
-          setActiveTime(Math.floor(elapsed / 1000));
+          // Calculate elapsed time minus any paused duration
+          const totalElapsed = Date.now() - startTimeRef.current;
+          const activeElapsed = totalElapsed - pausedDurationRef.current;
+          setActiveTime(Math.floor(activeElapsed / 1000));
         }
       }, 1000);
     } else {
@@ -209,7 +208,7 @@ const useStriven = () => {
         return false;
       }
     }
-    return true; // No permission needed on non-iOS devices
+    return true;
   }, []);
 
   // Start tracking with Accelerometer API
@@ -218,7 +217,6 @@ const useStriven = () => {
       const accelerometer = new window.Accelerometer({ frequency: SENSOR_FREQUENCY });
       
       accelerometer.addEventListener('reading', () => {
-        // Use refs to get current state
         if (isTrackingRef.current && !isPausedRef.current && stepDetectorRef.current) {
           stepDetectorRef.current.processAcceleration(
             accelerometer.x,
@@ -231,7 +229,6 @@ const useStriven = () => {
       accelerometer.addEventListener('error', (event) => {
         console.error('Accelerometer error:', event.error);
         setSensorError(`Accelerometer error: ${event.error.message}`);
-        // Try DeviceMotion fallback
         startDeviceMotion();
       });
 
@@ -249,7 +246,6 @@ const useStriven = () => {
   // DeviceMotion fallback
   const startDeviceMotion = useCallback(() => {
     const handleMotion = (event) => {
-      // Use refs to get current state
       if (!isTrackingRef.current || isPausedRef.current || !stepDetectorRef.current) {
         return;
       }
@@ -294,7 +290,6 @@ const useStriven = () => {
     setSensorError(null);
     console.log('Starting tracking...');
 
-    // Request permission first (important for iOS)
     const hasPermission = await requestMotionPermission();
     if (!hasPermission) {
       return;
@@ -304,42 +299,42 @@ const useStriven = () => {
     setIsPaused(false);
     startTimeRef.current = Date.now();
     sessionStartRef.current = Date.now();
-    pausedTimeRef.current = 0;
+    pausedDurationRef.current = 0; // FIXED: Reset paused duration
+    pauseStartRef.current = null; // FIXED: Reset pause start
 
-    // Try Accelerometer API first
     if ('Accelerometer' in window) {
       const started = startAccelerometer();
       if (!started) {
-        // Fallback to DeviceMotion
         startDeviceMotion();
       }
     } else {
-      // Use DeviceMotion directly
       startDeviceMotion();
     }
 
     console.log('Tracking started');
   }, [sensorSupported, requestMotionPermission, startAccelerometer, startDeviceMotion]);
 
-  // Pause tracking
+  // FIXED: Pause tracking
   const pauseTracking = useCallback(() => {
     console.log('Pausing tracking...');
     setIsPaused(true);
-    
-    if (startTimeRef.current) {
-      pausedTimeRef.current += Date.now() - startTimeRef.current;
-    }
+    pauseStartRef.current = Date.now(); // Record when pause started
 
     stopAllSensors();
   }, [stopAllSensors]);
 
-  // Resume tracking
-  const resumeTracking = useCallback(async () => {
+  // FIXED: Resume tracking
+  const resumeTracking = useCallback(() => {
     console.log('Resuming tracking...');
-    setIsPaused(false);
-    startTimeRef.current = Date.now();
     
-    // Restart sensors
+    // Add the paused duration to total
+    if (pauseStartRef.current) {
+      pausedDurationRef.current += Date.now() - pauseStartRef.current;
+      pauseStartRef.current = null;
+    }
+
+    setIsPaused(false);
+    
     if ('Accelerometer' in window) {
       const started = startAccelerometer();
       if (!started) {
@@ -375,7 +370,8 @@ const useStriven = () => {
     setCalories(0);
     setActiveTime(0);
     startTimeRef.current = null;
-    pausedTimeRef.current = 0;
+    pausedDurationRef.current = 0; // FIXED: Reset
+    pauseStartRef.current = null; // FIXED: Reset
     sessionStartRef.current = null;
 
     if (stepDetectorRef.current) {
@@ -396,7 +392,8 @@ const useStriven = () => {
     setCalories(0);
     setActiveTime(0);
     startTimeRef.current = null;
-    pausedTimeRef.current = 0;
+    pausedDurationRef.current = 0; // FIXED: Reset
+    pauseStartRef.current = null; // FIXED: Reset
     sessionStartRef.current = null;
 
     if (stepDetectorRef.current) {
