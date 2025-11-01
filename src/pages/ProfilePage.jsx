@@ -43,7 +43,7 @@ const ProfilePage = () => {
           <User className="w-12 h-12 text-white" />
         </div>
         <h2 className="text-2xl font-bold text-white mb-1">Active Walker</h2>
-        <p className="text-white/60 mb-4">Member since Nov 2024</p>
+        <p className="text-white/60 mb-4">Member since Nov 2025</p>
         
         <div className="grid grid-cols-3 gap-4 mt-6">
           <div className="bg-white/5 rounded-xl p-3">
