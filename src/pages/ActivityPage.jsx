@@ -54,15 +54,7 @@ const ActivityCard = ({ date, steps, distance, calories, duration }) => (
   </div>
 );
 
-const ActivityPage = () => {
-  // Sample data - in real app, this would come from stored activity history
-  const activities = [
-    { date: 'Today, 2:30 PM', steps: 8543, distance: '6.51', calories: 342, duration: '45 min' },
-    { date: 'Yesterday, 9:15 AM', steps: 10234, distance: '7.80', calories: 409, duration: '52 min' },
-    { date: 'Nov 29, 5:00 PM', steps: 7821, distance: '5.96', calories: 313, duration: '38 min' },
-    { date: 'Nov 28, 11:45 AM', steps: 12456, distance: '9.49', calories: 498, duration: '1h 4min' },
-  ];
-
+const ActivityPage = ({ activities = [] }) => {
   return (
     <div className="w-full max-w-4xl mx-auto">
       {/* Header */}
@@ -77,14 +69,14 @@ const ActivityPage = () => {
       </div>
 
       {/* Activity List */}
-      <div className="space-y-4">
-        {activities.map((activity, index) => (
-          <ActivityCard key={index} {...activity} />
-        ))}
-      </div>
-
-      {/* Empty State (show if no activities) */}
-      {activities.length === 0 && (
+      {activities.length > 0 ? (
+        <div className="space-y-4">
+          {activities.map((activity) => (
+            <ActivityCard key={activity.id} {...activity} />
+          ))}
+        </div>
+      ) : (
+        /* Empty State */
         <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-12 text-center border border-white/20">
           <div className="bg-white/5 p-6 rounded-full w-fit mx-auto mb-4">
             <Calendar className="w-12 h-12 text-white/40" />
