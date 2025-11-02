@@ -228,7 +228,7 @@ const ProfilePage = ({ activities = [], weeklyStats = {} }) => {
           <div className="flex items-start space-x-3">
             <AlertTriangle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
             <div className="text-sm text-yellow-200/80">
-              <strong>Tip:</strong> Export your data regularly to keep a backup. This ensures you won't lose your progress if you clear your browser data.
+              <strong>Tip:</strong> Export your data regularly to keep a backup. This ensures you won't lose your progress if you clear your data.
             </div>
           </div>
         </div>

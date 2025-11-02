@@ -34,6 +34,27 @@ function App() {
 
   const { notification, showNotification, hideNotification } = useNotifications();
 
+  // Handle deleting an activity
+  const handleDeleteActivity = async (activityId) => {
+    try {
+      await deleteActivity(activityId);
+      showNotification({
+        type: 'success',
+        title: 'Activity Deleted',
+        message: 'The activity has been removed from your history',
+        duration: 3000
+      });
+    } catch (error) {
+      console.error('Error deleting activity:', error);
+      showNotification({
+        type: 'error',
+        title: 'Delete Failed',
+        message: 'Could not delete the activity. Please try again.',
+        duration: 3000
+      });
+    }
+  };
+
   // Handle intro completion
   const handleIntroComplete = () => {
     setShowIntro(false);
@@ -109,7 +130,12 @@ function App() {
           />
         );
       case 'activity':
-        return <ActivityPage activities={activities} />;
+        return (
+          <ActivityPage 
+            activities={activities}
+            onDeleteActivity={handleDeleteActivity}
+          />
+        );
       case 'stats':
         return <StatsPage weeklyStats={weeklyStats} activities={activities} />;
       case 'profile':
