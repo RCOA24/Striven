@@ -163,13 +163,38 @@ const DeleteGoalModal = ({ goal, onConfirm, onClose }) => {
   );
 };
 
-const StatsPage = ({ weeklyStats = {}, activities = [] }) => {
-  const { 
-    totalSteps = 0, 
-    totalDistance = 0, 
-    totalCalories = 0, 
-    activeDays = 0 
-  } = weeklyStats;
+const StatsPage = () => {
+  // Use useLiveQuery to get real-time updates from database
+  const activities = useLiveQuery(() => db.activities.toArray(), []) || [];
+  const goalsFromDb = useLiveQuery(() => db.goals.toArray(), []) || [];
+
+  // State for modals
+  const [editingGoal, setEditingGoal] = useState(null);
+  const [deletingGoal, setDeletingGoal] = useState(null);
+
+  // Calculate weekly stats in real-time from activities
+  const weeklyStats = React.useMemo(() => {
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay()); // Start of week (Sunday)
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const weekActivities = activities.filter(activity => {
+      const activityDate = new Date(activity.date);
+      return activityDate >= startOfWeek;
+    });
+
+    const uniqueDays = new Set(
+      weekActivities.map(a => new Date(a.date).toDateString())
+    ).size;
+
+    return {
+      totalSteps: weekActivities.reduce((sum, a) => sum + (a.steps || 0), 0),
+      totalDistance: weekActivities.reduce((sum, a) => sum + (a.distance || 0), 0),
+      totalCalories: weekActivities.reduce((sum, a) => sum + (a.calories || 0), 0),
+      activeDays: uniqueDays
+    };
+  }, [activities]);
 
   // Default goals
   const defaultGoals = {
@@ -178,26 +203,15 @@ const StatsPage = ({ weeklyStats = {}, activities = [] }) => {
     calories: 2500
   };
 
-  // Real-time goals from Dexie using useLiveQuery
-  const goalsFromDb = useLiveQuery(
-    () => db.goals.toArray(),
-    []
-  );
-
-  // State for modals
-  const [editingGoal, setEditingGoal] = useState(null);
-  const [deletingGoal, setDeletingGoal] = useState(null);
-
   // Get goal value by type
   const getGoalValue = (type) => {
-    if (!goalsFromDb) return defaultGoals[type];
     const goal = goalsFromDb.find(g => g.type === type);
     return goal ? goal.target : defaultGoals[type];
   };
 
   // Handle goal edit
   const handleEditGoal = (goalType, label, color) => {
-    const existingGoal = goalsFromDb?.find(g => g.type === goalType);
+    const existingGoal = goalsFromDb.find(g => g.type === goalType);
     setEditingGoal({
       id: existingGoal?.id,
       type: goalType,
@@ -211,13 +225,11 @@ const StatsPage = ({ weeklyStats = {}, activities = [] }) => {
   const handleSaveGoal = async (goal) => {
     try {
       if (goal.id) {
-        // Update existing goal
         await db.goals.update(goal.id, { 
           target: goal.target,
           date: new Date().toISOString()
         });
       } else {
-        // Create new goal
         await db.goals.add({
           type: goal.type,
           target: goal.target,
@@ -233,9 +245,9 @@ const StatsPage = ({ weeklyStats = {}, activities = [] }) => {
     }
   };
 
- // Handle goal delete
+  // Handle goal delete
   const handleDeleteGoal = (goalType, label) => {
-    const existingGoal = goalsFromDb?.find(g => g.type === goalType);
+    const existingGoal = goalsFromDb.find(g => g.type === goalType);
     if (existingGoal) {
       setDeletingGoal({ 
         id: existingGoal.id, 
@@ -298,6 +310,8 @@ const StatsPage = ({ weeklyStats = {}, activities = [] }) => {
     distance: getGoalValue('distance'),
     calories: getGoalValue('calories')
   };
+
+  const { totalSteps, totalDistance, totalCalories, activeDays } = weeklyStats;
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6">
