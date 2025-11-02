@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Award, TrendingUp, Zap, Download, Upload, Trash2, AlertTriangle } from 'lucide-react';
+import { User, Award, TrendingUp, Zap, Download, Upload, Trash2, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 import { exportData, importData, clearAllData } from '../utils/db';
 
 const StatCard = ({ icon: Icon, label, value, gradient }) => (
@@ -20,6 +20,13 @@ const ProfilePage = ({ activities = [], weeklyStats = {} }) => {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [notification, setNotification] = useState(null); // { type: 'success' | 'error', message: string }
+
+  // Show notification
+  const showNotification = (type, message) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 3000);
+  };
 
   // Calculate lifetime stats
   const lifetimeStats = {
@@ -52,10 +59,10 @@ const ProfilePage = ({ activities = [], weeklyStats = {} }) => {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
       
-      alert('✅ Data exported successfully!');
+      showNotification('success', 'Data exported successfully!');
     } catch (error) {
       console.error('Export failed:', error);
-      alert('❌ Failed to export data. Please try again.');
+      showNotification('error', 'Failed to export data. Please try again.');
     } finally {
       setIsExporting(false);
     }
@@ -77,11 +84,11 @@ const ProfilePage = ({ activities = [], weeklyStats = {} }) => {
       }
 
       await importData(data);
-      alert('✅ Data imported successfully! Reloading page...');
-      window.location.reload();
+      showNotification('success', 'Data imported successfully! Reloading...');
+      setTimeout(() => window.location.reload(), 1500);
     } catch (error) {
       console.error('Import failed:', error);
-      alert('❌ Failed to import data. Please check the file and try again.');
+      showNotification('error', 'Failed to import data. Please check the file.');
     } finally {
       setIsImporting(false);
     }
@@ -92,11 +99,11 @@ const ProfilePage = ({ activities = [], weeklyStats = {} }) => {
     try {
       await clearAllData();
       setShowClearConfirm(false);
-      alert('✅ All data cleared successfully! Reloading page...');
-      window.location.reload();
+      showNotification('success', 'All data cleared! Reloading...');
+      setTimeout(() => window.location.reload(), 1500);
     } catch (error) {
       console.error('Clear all failed:', error);
-      alert('❌ Failed to clear data. Please try again.');
+      showNotification('error', 'Failed to clear data. Please try again.');
     }
   };
 
@@ -289,6 +296,28 @@ const ProfilePage = ({ activities = [], weeklyStats = {} }) => {
           Version 1.0.0
         </div>
       </div>
+
+      {/* Notification Toast */}
+      {notification && (
+        <div className="fixed top-4 right-4 z-50 animate-slide-in">
+          <div className={`flex items-center space-x-3 px-6 py-4 rounded-2xl shadow-2xl border backdrop-blur-xl ${
+            notification.type === 'success'
+              ? 'bg-green-500/20 border-green-500/30'
+              : 'bg-red-500/20 border-red-500/30'
+          }`}>
+            {notification.type === 'success' ? (
+              <CheckCircle className="w-6 h-6 text-green-400 flex-shrink-0" />
+            ) : (
+              <XCircle className="w-6 h-6 text-red-400 flex-shrink-0" />
+            )}
+            <p className={`font-medium ${
+              notification.type === 'success' ? 'text-green-100' : 'text-red-100'
+            }`}>
+              {notification.message}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

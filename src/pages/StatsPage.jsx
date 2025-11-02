@@ -233,7 +233,7 @@ const StatsPage = ({ weeklyStats = {}, activities = [] }) => {
     }
   };
 
-  // Handle goal delete
+ // Handle goal delete
   const handleDeleteGoal = (goalType, label) => {
     const existingGoal = goalsFromDb?.find(g => g.type === goalType);
     if (existingGoal) {
@@ -247,12 +247,13 @@ const StatsPage = ({ weeklyStats = {}, activities = [] }) => {
 
   // Confirm goal deletion
   const confirmDeleteGoal = async () => {
-    if (deletingGoal && deletingGoal.id) {
+    if (deletingGoal?.id) {
       try {
         await db.goals.delete(deletingGoal.id);
-        setDeletingGoal(null);
       } catch (error) {
         console.error('Error deleting goal:', error);
+      } finally {
+        setDeletingGoal(null);
       }
     }
   };
