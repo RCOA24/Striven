@@ -30,6 +30,7 @@ function App() {
     resumeTracking,
     reset,
     stopAndSave,
+    refreshActivities,
   } = useStriven();
 
   const { notification, showNotification, hideNotification } = useNotifications();

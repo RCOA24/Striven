@@ -1,12 +1,12 @@
 // src/hooks/useStriven.jsx
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import StepDetector from '../utils/StepDetector';
 import { 
   addActivity, 
-  getActivities, 
   getWeeklyStats, 
   updateWeeklyStats,
-  getAllWeeklyStats 
+  db
 } from '../utils/db';
 
 const useStriven = () => {
@@ -17,7 +17,6 @@ const useStriven = () => {
   const [calories, setCalories] = useState(0);
   const [duration, setDuration] = useState(0);
   const [sensorSupported, setSensorSupported] = useState(true);
-  const [activities, setActivities] = useState([]);
   const [weeklyStats, setWeeklyStats] = useState({
     totalSteps: 0,
     totalDistance: 0,
@@ -35,6 +34,12 @@ const useStriven = () => {
   const STEP_LENGTH_KM = 0.000762; // Average step length in km
   const CALORIES_PER_STEP = 0.04; // Average calories per step
 
+  // Real-time activities using useLiveQuery - automatically updates when database changes!
+  const activities = useLiveQuery(
+    () => db.activities.orderBy('date').reverse().limit(50).toArray(),
+    []
+  ) || [];
+
   // Format time helper
   const formatTime = (seconds) => {
     const hrs = Math.floor(seconds / 3600);
@@ -43,11 +48,11 @@ const useStriven = () => {
     return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Load activities from Dexie.js
+  // Load activities manually (for force refresh if needed)
   const loadActivities = useCallback(async () => {
     try {
-      const loadedActivities = await getActivities(50);
-      setActivities(loadedActivities);
+      // useLiveQuery handles this automatically, but we keep this for compatibility
+      await db.activities.toArray();
     } catch (error) {
       console.error('Failed to load activities:', error);
     }
@@ -109,11 +114,7 @@ const useStriven = () => {
     }
   }, [activities]);
 
-  // Initialize - Load data on mount
-  useEffect(() => {
-    loadActivities();
-  }, [loadActivities]);
-
+  // Update weekly stats when activities change
   useEffect(() => {
     if (activities.length > 0) {
       loadWeeklyStats();
@@ -263,8 +264,7 @@ const useStriven = () => {
       const activityId = await addActivity(activity);
       console.log('Activity saved with ID:', activityId);
       
-      // Reload activities
-      await loadActivities();
+      // useLiveQuery will automatically update the activities list!
 
       // Update weekly stats
       const now = new Date();
@@ -297,7 +297,7 @@ const useStriven = () => {
       console.error('Failed to save activity:', error);
       throw error;
     }
-  }, [steps, distance, calories, duration, loadActivities, reset]);
+  }, [steps, distance, calories, duration, reset]);
 
   return {
     steps,
