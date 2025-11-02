@@ -69,11 +69,11 @@ const ProgressBar = ({ label, current, goal, color, onEdit, onDelete }) => {
 };
 
 const GoalEditModal = ({ goal, onSave, onClose }) => {
-  const [value, setValue] = useState(goal.value);
+  const [value, setValue] = useState(goal.target);
 
   const handleSave = () => {
     if (value > 0) {
-      onSave({ ...goal, value: Number(value) });
+      onSave({ ...goal, target: Number(value) });
     }
   };
 
@@ -188,38 +188,42 @@ const StatsPage = ({ weeklyStats = {}, activities = [] }) => {
   const [editingGoal, setEditingGoal] = useState(null);
   const [deletingGoal, setDeletingGoal] = useState(null);
 
-  // Get goal value by key
-  const getGoalValue = (key) => {
-    if (!goalsFromDb) return defaultGoals[key];
-    const goal = goalsFromDb.find(g => g.key === key);
-    return goal ? goal.value : defaultGoals[key];
+  // Get goal value by type
+  const getGoalValue = (type) => {
+    if (!goalsFromDb) return defaultGoals[type];
+    const goal = goalsFromDb.find(g => g.type === type);
+    return goal ? goal.target : defaultGoals[type];
   };
 
   // Handle goal edit
-  const handleEditGoal = (goalKey, label, color) => {
+  const handleEditGoal = (goalType, label, color) => {
+    const existingGoal = goalsFromDb?.find(g => g.type === goalType);
     setEditingGoal({
-      key: goalKey,
+      id: existingGoal?.id,
+      type: goalType,
       label,
       color,
-      value: getGoalValue(goalKey)
+      target: getGoalValue(goalType)
     });
   };
 
   // Handle goal save
   const handleSaveGoal = async (goal) => {
     try {
-      // Check if goal exists
-      const existingGoal = await db.goals.where('key').equals(goal.key).first();
-      
-      if (existingGoal) {
+      if (goal.id) {
         // Update existing goal
-        await db.goals.update(existingGoal.id, { value: goal.value });
+        await db.goals.update(goal.id, { 
+          target: goal.target,
+          date: new Date().toISOString()
+        });
       } else {
         // Create new goal
         await db.goals.add({
-          key: goal.key,
-          value: goal.value,
-          createdAt: new Date().toISOString()
+          type: goal.type,
+          target: goal.target,
+          current: 0,
+          date: new Date().toISOString(),
+          completed: false
         });
       }
       
@@ -230,18 +234,22 @@ const StatsPage = ({ weeklyStats = {}, activities = [] }) => {
   };
 
   // Handle goal delete
-  const handleDeleteGoal = (goalKey, label) => {
-    setDeletingGoal({ key: goalKey, label });
+  const handleDeleteGoal = (goalType, label) => {
+    const existingGoal = goalsFromDb?.find(g => g.type === goalType);
+    if (existingGoal) {
+      setDeletingGoal({ 
+        id: existingGoal.id, 
+        type: goalType, 
+        label 
+      });
+    }
   };
 
   // Confirm goal deletion
   const confirmDeleteGoal = async () => {
-    if (deletingGoal) {
+    if (deletingGoal && deletingGoal.id) {
       try {
-        const goalToDelete = await db.goals.where('key').equals(deletingGoal.key).first();
-        if (goalToDelete) {
-          await db.goals.delete(goalToDelete.id);
-        }
+        await db.goals.delete(deletingGoal.id);
         setDeletingGoal(null);
       } catch (error) {
         console.error('Error deleting goal:', error);
