@@ -41,15 +41,46 @@ const ProgressBar = ({ label, current, goal, color }) => {
 };
 
 const StatsPage = ({ weeklyStats = {}, activities = [] }) => {
-  const { totalSteps = 0, totalDistance = 0, totalCalories = 0, activeDays = 0 } = weeklyStats;
+  const { 
+    totalSteps = 0, 
+    totalDistance = 0, 
+    totalCalories = 0, 
+    activeDays = 0 
+  } = weeklyStats;
+
+  // Format date helper
+  const formatDate = (dateString) => {
+    if (!dateString || dateString === 'N/A') return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
 
   // Calculate personal bests
-  const personalBests = {
-    mostSteps: activities.length > 0 ? Math.max(...activities.map(a => a.steps)) : 0,
-    longestDistance: activities.length > 0 ? Math.max(...activities.map(a => a.distance)) : 0,
-    mostStepsDate: activities.length > 0 ? activities.reduce((max, a) => a.steps > max.steps ? a : max, activities[0])?.date : 'N/A',
-    longestDistanceDate: activities.length > 0 ? activities.reduce((max, a) => a.distance > max.distance ? a : max, activities[0])?.date : 'N/A',
-  };
+  const personalBests = React.useMemo(() => {
+    if (activities.length === 0) {
+      return {
+        mostSteps: 0,
+        longestDistance: 0,
+        mostStepsDate: 'N/A',
+        longestDistanceDate: 'N/A',
+      };
+    }
+
+    const mostStepsActivity = activities.reduce((max, a) => 
+      (a.steps || 0) > (max.steps || 0) ? a : max
+    , activities[0]);
+
+    const longestDistanceActivity = activities.reduce((max, a) => 
+      (a.distance || 0) > (max.distance || 0) ? a : max
+    , activities[0]);
+
+    return {
+      mostSteps: mostStepsActivity.steps || 0,
+      longestDistance: longestDistanceActivity.distance || 0,
+      mostStepsDate: formatDate(mostStepsActivity.date),
+      longestDistanceDate: formatDate(longestDistanceActivity.date),
+    };
+  }, [activities]);
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6">
@@ -86,7 +117,7 @@ const StatsPage = ({ weeklyStats = {}, activities = [] }) => {
           <StatCard
             icon={Zap}
             label="Calories"
-            value={totalCalories.toLocaleString()}
+            value={Math.round(totalCalories).toLocaleString()}
             gradient="from-orange-500 to-red-600"
           />
           <StatCard
@@ -106,19 +137,19 @@ const StatsPage = ({ weeklyStats = {}, activities = [] }) => {
         </div>
         <ProgressBar 
           label="Steps Goal"
-          current={totalSteps}
+          current={Math.round(totalSteps)}
           goal={70000}
           color="from-green-500 to-emerald-600"
         />
         <ProgressBar 
-          label="Distance Goal"
-          current={totalDistance}
+          label="Distance Goal (km)"
+          current={parseFloat(totalDistance.toFixed(1))}
           goal={50}
           color="from-blue-500 to-cyan-600"
         />
         <ProgressBar 
           label="Calories Goal"
-          current={totalCalories}
+          current={Math.round(totalCalories)}
           goal={2500}
           color="from-orange-500 to-red-600"
         />
@@ -130,19 +161,31 @@ const StatsPage = ({ weeklyStats = {}, activities = [] }) => {
           <Zap className="w-5 h-5 text-purple-400" />
           <h2 className="text-xl font-bold text-white">Personal Bests</h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="text-center bg-white/5 rounded-xl p-4">
-            <div className="text-3xl font-bold text-white mb-1">{personalBests.mostSteps.toLocaleString()}</div>
-            <div className="text-sm text-white/60">Most Steps (Single Day)</div>
-            <div className="text-xs text-green-400 mt-1">{personalBests.mostStepsDate}</div>
+        {activities.length === 0 ? (
+          <div className="text-center py-8 text-white/50">
+            <p>Complete your first activity to see personal bests!</p>
           </div>
-          <div className="text-center bg-white/5 rounded-xl p-4">
-            <div className="text-3xl font-bold text-white mb-1">{personalBests.longestDistance.toFixed(2)} km</div>
-            <div className="text-sm text-white/60">Longest Distance</div>
-            <div className="text-xs text-green-400 mt-1">{personalBests.longestDistanceDate}</div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="text-center bg-white/5 rounded-xl p-4">
+              <div className="text-3xl font-bold text-white mb-1">
+                {personalBests.mostSteps.toLocaleString()}
+              </div>
+              <div className="text-sm text-white/60">Most Steps (Single Day)</div>
+              <div className="text-xs text-green-400 mt-1">{personalBests.mostStepsDate}</div>
+            </div>
+            <div className="text-center bg-white/5 rounded-xl p-4">
+              <div className="text-3xl font-bold text-white mb-1">
+                {personalBests.longestDistance.toFixed(2)} km
+              </div>
+              <div className="text-sm text-white/60">Longest Distance</div>
+              <div className="text-xs text-green-400 mt-1">{personalBests.longestDistanceDate}</div>
+            </div>
           </div>
-        </div>
+        )}
       </div>
+
+
     </div>
   );
 };

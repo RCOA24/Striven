@@ -59,6 +59,7 @@ const useStriven = () => {
       // Get last 7 days of activities
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      sevenDaysAgo.setHours(0, 0, 0, 0);
       
       const recentActivities = activities.filter(activity => 
         new Date(activity.date) >= sevenDaysAgo
@@ -84,19 +85,25 @@ const useStriven = () => {
           steps: dayActivities.reduce((sum, a) => sum + (a.steps || 0), 0),
           distance: dayActivities.reduce((sum, a) => sum + (a.distance || 0), 0),
           calories: dayActivities.reduce((sum, a) => sum + (a.calories || 0), 0),
-          date: date.toISOString()
+          date: date.toISOString(),
+          hasActivity: dayActivities.length > 0
         };
       });
+
+      // Calculate active days (days with at least one activity)
+      const activeDays = days.filter(d => d.hasActivity).length;
 
       const weekStats = {
         totalSteps: days.reduce((sum, d) => sum + d.steps, 0),
         totalDistance: days.reduce((sum, d) => sum + d.distance, 0),
         totalCalories: days.reduce((sum, d) => sum + d.calories, 0),
         totalDuration: recentActivities.reduce((sum, a) => sum + (a.duration || 0), 0),
+        activeDays: activeDays,
         days
       };
 
       setWeeklyStats(weekStats);
+      console.log('Weekly stats loaded:', weekStats);
     } catch (error) {
       console.error('Failed to load weekly stats:', error);
     }
