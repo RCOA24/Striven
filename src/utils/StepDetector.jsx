@@ -1,3 +1,4 @@
+// src/utils/StepDetector.jsx
 class StepDetector {
   constructor(onStep, threshold = 12) {
     this.onStep = onStep;
@@ -24,8 +25,116 @@ class StepDetector {
     this.calibrationCount = 0;
     this.maxCalibrationSamples = 50;
     
-    // FIXED: Add idle tracking
+    // Idle tracking
     this.lastProcessTime = 0;
+    
+    // Sensor references
+    this.sensor = null;
+    this.isRunning = false;
+    this.handleMotion = this.handleMotion.bind(this);
+  }
+
+  // Handle motion events from DeviceMotion API
+  handleMotion(event) {
+    if (!this.isRunning) return;
+
+    const acc = event.accelerationIncludingGravity;
+    if (acc && acc.x !== null && acc.y !== null && acc.z !== null) {
+      this.processAcceleration(acc.x, acc.y, acc.z);
+    }
+  }
+
+  // Start step detection
+  async start() {
+    if (this.isRunning) {
+      console.log('Step detector already running');
+      return;
+    }
+
+    try {
+      // Try Generic Sensor API first (better for Android)
+      if ('Accelerometer' in window) {
+        console.log('Using Accelerometer API');
+        this.sensor = new window.Accelerometer({ frequency: 60 });
+        
+        this.sensor.addEventListener('reading', () => {
+          if (this.isRunning && this.sensor) {
+            this.processAcceleration(
+              this.sensor.x || 0,
+              this.sensor.y || 0,
+              this.sensor.z || 0
+            );
+          }
+        });
+
+        this.sensor.addEventListener('error', (event) => {
+          console.error('Accelerometer error:', event.error);
+          this.fallbackToDeviceMotion();
+        });
+
+        await this.sensor.start();
+        this.isRunning = true;
+        console.log('Step detector started with Accelerometer API');
+      } 
+      // Fallback to DeviceMotion API (iOS and older browsers)
+      else if (window.DeviceMotionEvent) {
+        this.fallbackToDeviceMotion();
+      } else {
+        throw new Error('No motion sensors available');
+      }
+    } catch (error) {
+      console.error('Failed to start step detector:', error);
+      // Try DeviceMotion as fallback
+      if (window.DeviceMotionEvent) {
+        this.fallbackToDeviceMotion();
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  // Fallback to DeviceMotion API
+  fallbackToDeviceMotion() {
+    console.log('Using DeviceMotion API');
+    
+    // Request permission on iOS 13+
+    if (typeof DeviceMotionEvent !== 'undefined' && 
+        typeof DeviceMotionEvent.requestPermission === 'function') {
+      DeviceMotionEvent.requestPermission()
+        .then(permissionState => {
+          if (permissionState === 'granted') {
+            window.addEventListener('devicemotion', this.handleMotion);
+            this.isRunning = true;
+            console.log('Step detector started with DeviceMotion API (iOS)');
+          } else {
+            console.error('Motion permission denied');
+          }
+        })
+        .catch(console.error);
+    } else {
+      // No permission needed (Android, older iOS)
+      window.addEventListener('devicemotion', this.handleMotion);
+      this.isRunning = true;
+      console.log('Step detector started with DeviceMotion API');
+    }
+  }
+
+  // Stop step detection
+  stop() {
+    if (!this.isRunning) return;
+
+    if (this.sensor) {
+      try {
+        this.sensor.stop();
+        this.sensor = null;
+      } catch (error) {
+        console.error('Error stopping sensor:', error);
+      }
+    }
+
+    window.removeEventListener('devicemotion', this.handleMotion);
+    this.isRunning = false;
+    console.log('Step detector stopped');
   }
 
   // Auto-calibration for device-specific sensitivity
@@ -53,7 +162,7 @@ class StepDetector {
     return previous + alpha * (current - previous);
   }
 
-  // FIXED: Detect if motion pattern matches walking/running - more lenient
+  // Detect if motion pattern matches walking/running - more lenient
   isValidStepPattern() {
     if (this.accelerationHistory.length < 5) return true; // Allow if not enough history yet
     
@@ -67,14 +176,13 @@ class StepDetector {
     const avgVariation = variations.reduce((a, b) => a + b, 0) / variations.length;
     
     // Valid steps have consistent variation (not random noise or no movement)
-    // Made more lenient: 0.3 (was 0.5) to 10 (was 8)
     return avgVariation > 0.3 && avgVariation < 10;
   }
 
   processAcceleration(x, y, z) {
     const now = Date.now();
     
-    // FIXED: Clear history if device was idle (no processing for a while)
+    // Clear history if device was idle (no processing for a while)
     if (this.lastProcessTime > 0 && now - this.lastProcessTime > this.maxStepTimeout) {
       console.log('Idle period detected, clearing acceleration history for fresh detection');
       this.accelerationHistory = [];
@@ -123,7 +231,7 @@ class StepDetector {
     if (isPeak) {
       const timeSinceLastStep = now - this.lastStepTime;
       
-      // FIXED: More lenient timing for first step or after idle
+      // More lenient timing for first step or after idle
       const isFirstStep = this.lastStepTime === 0;
       const isAfterIdle = !this.isWalking;
       
@@ -138,16 +246,8 @@ class StepDetector {
         this.lastStepTime = now;
         this.consecutivePeaks++;
         this.isWalking = true;
-        this.onStep();
-        console.log(`Step detected! Mag: ${previous.toFixed(2)}, TimeSince: ${timeSinceLastStep}ms, Walking: ${this.isWalking}`);
-      } else {
-        // Debug why step was rejected
-        if (!isValidTiming) {
-          console.log(`Step rejected: timing (${timeSinceLastStep}ms)`);
-        }
-        if (!isValidPattern) {
-          console.log(`Step rejected: pattern validation failed`);
-        }
+        this.onStep(1); // Pass step count
+        console.log(`Step detected! Mag: ${previous.toFixed(2)}, TimeSince: ${timeSinceLastStep}ms`);
       }
     }
 
@@ -156,7 +256,6 @@ class StepDetector {
       console.log('Walking state reset due to inactivity');
       this.isWalking = false;
       this.consecutivePeaks = 0;
-      // FIXED: Don't clear history here - it's cleared at start of processAcceleration
     }
   }
 
@@ -183,7 +282,6 @@ class StepDetector {
         this.stepTimeout = 250;
         this.maxStepTimeout = 2000;
     }
-    
   }
 
   // Get current detection statistics
@@ -194,7 +292,8 @@ class StepDetector {
       baseline: this.baselineAcceleration.toFixed(2),
       isWalking: this.isWalking,
       consecutivePeaks: this.consecutivePeaks,
-      historyLength: this.accelerationHistory.length
+      historyLength: this.accelerationHistory.length,
+      isRunning: this.isRunning
     };
   }
 

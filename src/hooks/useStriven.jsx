@@ -29,6 +29,7 @@ const useStriven = () => {
   const stepDetectorRef = useRef(null);
   const startTimeRef = useRef(null);
   const timerRef = useRef(null);
+  const pausedTimeRef = useRef(0);
 
   // Constants for calculations
   const STEP_LENGTH_KM = 0.000762; // Average step length in km
@@ -55,14 +56,6 @@ const useStriven = () => {
   // Load weekly stats from Dexie.js
   const loadWeeklyStats = useCallback(async () => {
     try {
-      const allStats = await getAllWeeklyStats();
-      
-      // Calculate current week stats
-      const now = new Date();
-      const startOfWeek = new Date(now);
-      startOfWeek.setDate(now.getDate() - now.getDay());
-      startOfWeek.setHours(0, 0, 0, 0);
-
       // Get last 7 days of activities
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -72,6 +65,11 @@ const useStriven = () => {
       );
 
       // Calculate daily stats for the week
+      const now = new Date();
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - now.getDay());
+      startOfWeek.setHours(0, 0, 0, 0);
+
       const days = Array.from({ length: 7 }, (_, i) => {
         const date = new Date(startOfWeek);
         date.setDate(startOfWeek.getDate() + i);
@@ -104,14 +102,16 @@ const useStriven = () => {
     }
   }, [activities]);
 
-  // Initialize
+  // Initialize - Load data on mount
   useEffect(() => {
     loadActivities();
   }, [loadActivities]);
 
   useEffect(() => {
-    loadWeeklyStats();
-  }, [loadWeeklyStats, activities]);
+    if (activities.length > 0) {
+      loadWeeklyStats();
+    }
+  }, [activities, loadWeeklyStats]);
 
   // Check sensor support
   useEffect(() => {
@@ -128,7 +128,12 @@ const useStriven = () => {
           setSensorSupported(false);
         }
       } catch (error) {
-        setSensorSupported(false);
+        // Still might work with DeviceMotion
+        if (window.DeviceMotionEvent) {
+          setSensorSupported(true);
+        } else {
+          setSensorSupported(false);
+        }
       }
     };
 
@@ -139,7 +144,7 @@ const useStriven = () => {
   useEffect(() => {
     if (isTracking && !isPaused) {
       timerRef.current = setInterval(() => {
-        const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+        const elapsed = Math.floor((Date.now() - startTimeRef.current - pausedTimeRef.current) / 1000);
         setDuration(elapsed);
       }, 1000);
     } else {
@@ -164,17 +169,21 @@ const useStriven = () => {
   const startTracking = useCallback(async () => {
     try {
       if (!stepDetectorRef.current) {
-        stepDetectorRef.current = new StepDetector((newSteps) => {
-          setSteps(prev => prev + newSteps);
+        // Create step detector with callback that increments steps
+        stepDetectorRef.current = new StepDetector((stepCount = 1) => {
+          setSteps(prev => prev + stepCount);
         });
       }
 
       await stepDetectorRef.current.start();
       startTimeRef.current = Date.now();
+      pausedTimeRef.current = 0;
       setIsTracking(true);
       setIsPaused(false);
+      console.log('Tracking started successfully');
     } catch (error) {
       console.error('Failed to start tracking:', error);
+      alert('Failed to start step tracking. Please check sensor permissions.');
     }
   }, []);
 
@@ -182,15 +191,25 @@ const useStriven = () => {
     if (stepDetectorRef.current) {
       stepDetectorRef.current.stop();
     }
+    
+    // Track paused time
+    pausedTimeRef.current += Date.now() - startTimeRef.current - duration * 1000;
+    
     setIsPaused(true);
-  }, []);
+    console.log('Tracking paused');
+  }, [duration]);
 
   const resumeTracking = useCallback(async () => {
     try {
       if (stepDetectorRef.current) {
         await stepDetectorRef.current.start();
       }
+      
+      // Resume timer from where it was paused
+      startTimeRef.current = Date.now();
+      
       setIsPaused(false);
+      console.log('Tracking resumed');
     } catch (error) {
       console.error('Failed to resume tracking:', error);
     }
@@ -199,6 +218,7 @@ const useStriven = () => {
   const reset = useCallback(() => {
     if (stepDetectorRef.current) {
       stepDetectorRef.current.stop();
+      stepDetectorRef.current.reset();
     }
     setSteps(0);
     setDistance(0);
@@ -207,12 +227,21 @@ const useStriven = () => {
     setIsTracking(false);
     setIsPaused(false);
     startTimeRef.current = null;
+    pausedTimeRef.current = 0;
+    console.log('Tracking reset');
   }, []);
 
   const stopAndSave = useCallback(async () => {
     try {
       if (stepDetectorRef.current) {
         stepDetectorRef.current.stop();
+      }
+
+      // Only save if there are steps
+      if (steps === 0) {
+        console.log('No steps to save');
+        reset();
+        return null;
       }
 
       // Save activity to Dexie.js
@@ -224,7 +253,8 @@ const useStriven = () => {
         date: new Date().toISOString()
       };
 
-      await addActivity(activity);
+      const activityId = await addActivity(activity);
+      console.log('Activity saved with ID:', activityId);
       
       // Reload activities
       await loadActivities();
@@ -253,13 +283,14 @@ const useStriven = () => {
       setIsTracking(false);
       setIsPaused(false);
       startTimeRef.current = null;
+      pausedTimeRef.current = 0;
 
       return activity;
     } catch (error) {
       console.error('Failed to save activity:', error);
       throw error;
     }
-  }, [steps, distance, calories, duration, loadActivities]);
+  }, [steps, distance, calories, duration, loadActivities, reset]);
 
   return {
     steps,
