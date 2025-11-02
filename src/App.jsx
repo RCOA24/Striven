@@ -9,6 +9,7 @@ import StatsPage from './pages/StatsPage';
 import ProfilePage from './pages/ProfilePage';
 import Notification from './components/Notifications';
 import Intro from './components/Intro';
+import { deleteActivity } from './utils/db';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
