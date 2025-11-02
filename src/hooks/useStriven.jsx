@@ -315,6 +315,7 @@ const useStriven = () => {
     resumeTracking,
     reset,
     stopAndSave,
+    refreshActivities: loadActivities,
   };
 };
 
