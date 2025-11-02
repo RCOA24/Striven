@@ -1,9 +1,10 @@
 import React from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { Footprints, Flame, Clock, Target, Activity, Check } from 'lucide-react';
+import { db } from '../utils/db';
 
 // Step Counter Component with Circular Progress
-const StepCounter = ({ steps }) => {
-  const goal = 10000;
+const StepCounter = ({ steps, goal }) => {
   const percentage = Math.min((steps / goal) * 100, 100);
   const radius = 140;
   const circumference = 2 * Math.PI * radius;
@@ -40,7 +41,7 @@ const StepCounter = ({ steps }) => {
         <div className="flex items-center space-x-2 bg-white/10 backdrop-blur-md rounded-full px-3 sm:px-4 py-1 sm:py-1.5">
           <Target className="w-3 h-3 sm:w-4 sm:h-4 text-green-400" />
           <span className="text-xs sm:text-sm text-white/70 font-medium">
-            {percentage.toFixed(0)}% of 10K goal
+            {percentage.toFixed(0)}% of {goal >= 1000 ? `${(goal / 1000).toFixed(0)}K` : goal} goal
           </span>
         </div>
       </div>
@@ -87,12 +88,36 @@ const Dashboard = ({
   steps, isTracking, isPaused, distance, calories, formattedTime,
   startTracking, pauseTracking, resumeTracking, reset, stopAndSave 
 }) => {
+  // Default daily goal (will be overridden by weekly goal / 7)
+  const defaultDailyGoal = 10000;
+
+  // Fetch goals from Dexie in real-time
+  const goalsFromDb = useLiveQuery(
+    () => db.goals.toArray(),
+    []
+  );
+
+  // Get the steps goal and calculate daily target
+  const getDailyStepsGoal = () => {
+    if (!goalsFromDb) return defaultDailyGoal;
+    
+    const stepsGoal = goalsFromDb.find(g => g.type === 'steps');
+    if (stepsGoal && stepsGoal.target) {
+      // Weekly goal divided by 7 for daily target
+      return Math.round(stepsGoal.target / 7);
+    }
+    
+    return defaultDailyGoal;
+  };
+
+  const dailyStepsGoal = getDailyStepsGoal();
+
   return (
     <div className="w-full max-w-2xl mx-auto">
       {/* Main Card */}
       <div className="bg-white/10 backdrop-blur-2xl rounded-3xl shadow-2xl p-6 sm:p-8 border border-white/20">
         {/* Step Counter with Circular Progress */}
-        <StepCounter steps={steps} />
+        <StepCounter steps={steps} goal={dailyStepsGoal} />
 
         {/* Metrics Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
