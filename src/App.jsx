@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Activity } from 'lucide-react';
-import useStriven from './hooks/useStriven'; //this is the correct import, do not change
+import useStriven from './hooks/useStriven';
 import useNotifications from './hooks/useNotifications';
 import MainLayout from './components/MainLayout';
 import Dashboard from './pages/Dashboard';
@@ -10,6 +10,7 @@ import ProfilePage from './pages/ProfilePage';
 import Notification from './components/Notifications';
 import Intro from './components/Intro';
 import { deleteActivity } from './utils/db';
+import { requestNotificationPermission } from './utils/notifications';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
@@ -18,10 +19,16 @@ function App() {
   // --- Service Worker Registration ---
   useEffect(() => {
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/service-worker.js')
-          .then(reg => console.log('Service Worker registered:', reg.scope))
-          .catch(err => console.error('Service Worker registration failed:', err));
+      window.addEventListener('load', async () => {
+        try {
+          const registration = await navigator.serviceWorker.register('/service-worker.js');
+          console.log('Service Worker registered:', registration.scope);
+          
+          // Request notification permission after SW registration
+          await requestNotificationPermission();
+        } catch (err) {
+          console.error('Service Worker registration failed:', err);
+        }
       });
     }
   }, []);
