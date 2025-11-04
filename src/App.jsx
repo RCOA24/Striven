@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Activity } from 'lucide-react';
-import useStriven from './hooks/useStriven';
+import useStriven from './hooks/useStriven'; //this is the correct import, do not change
 import useNotifications from './hooks/useNotifications';
 import MainLayout from './components/MainLayout';
 import Dashboard from './pages/Dashboard';
@@ -89,7 +89,7 @@ function App() {
     }
   };
 
-  // Handle start with notification
+  // Handle start with notification for web app
   const handleStart = () => {
     startTracking();
     showNotification({
