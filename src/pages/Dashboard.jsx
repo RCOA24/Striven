@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Footprints, Flame, Clock, Target, Activity, Check } from 'lucide-react';
 import { db } from '../utils/db';
@@ -84,9 +84,9 @@ const ControlButton = ({ onClick, children, variant = 'primary', icon: Icon, dis
   );
 };
 
-const Dashboard = ({
+const Dashboard = ({ 
   steps, isTracking, isPaused, distance, calories, formattedTime,
-  startTracking, pauseTracking, resumeTracking, reset, stopAndSave
+  startTracking, pauseTracking, resumeTracking, reset, stopAndSave 
 }) => {
   // Default daily goal (will be overridden by weekly goal / 7)
   const defaultDailyGoal = 10000;
@@ -100,24 +100,17 @@ const Dashboard = ({
   // Get the steps goal and calculate daily target
   const getDailyStepsGoal = () => {
     if (!goalsFromDb) return defaultDailyGoal;
-
+    
     const stepsGoal = goalsFromDb.find(g => g.type === 'steps');
     if (stepsGoal && stepsGoal.target) {
       // Weekly goal divided by 7 for daily target
       return Math.round(stepsGoal.target / 7);
     }
-
+    
     return defaultDailyGoal;
   };
 
   const dailyStepsGoal = getDailyStepsGoal();
-
-  // Send real-time stats to service worker for notification
-  useEffect(() => {
-    if (isTracking && !isPaused) {
-      sendTrackingNotification({ steps, distance, calories, formattedTime });
-    }
-  }, [steps, distance, calories, formattedTime, isTracking, isPaused]);
 
   return (
     <div className="w-full max-w-2xl mx-auto">
@@ -128,21 +121,21 @@ const Dashboard = ({
 
         {/* Metrics Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-          <MetricCard
-            icon={Footprints}
-            label="Distance"
+          <MetricCard 
+            icon={Footprints} 
+            label="Distance" 
             value={`${distance.toFixed(2)} km`}
             gradient="from-blue-500 to-cyan-600"
           />
-          <MetricCard
-            icon={Flame}
-            label="Calories"
+          <MetricCard 
+            icon={Flame} 
+            label="Calories" 
             value={`${calories.toFixed(0)}`}
             gradient="from-orange-500 to-red-600"
           />
-          <MetricCard
-            icon={Clock}
-            label="Active Time"
+          <MetricCard 
+            icon={Clock} 
+            label="Active Time" 
             value={formattedTime}
             gradient="from-purple-500 to-pink-600"
           />
@@ -185,7 +178,7 @@ const Dashboard = ({
         <div className="text-center">
           <div className="inline-flex items-center space-x-2 bg-white/5 backdrop-blur-md rounded-full px-6 py-3 border border-white/10">
             <span className={`w-3 h-3 rounded-full ${
-              isTracking && !isPaused ? 'bg-green-400 animate-pulse' :
+              isTracking && !isPaused ? 'bg-green-400 animate-pulse' : 
               isPaused ? 'bg-yellow-400' : 'bg-white/40'
             }`}></span>
             <span className="text-white/80 text-sm font-medium">
