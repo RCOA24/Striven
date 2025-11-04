@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Activity } from 'lucide-react';
-import useStriven from './hooks/useStriven';
+import useStriven from './hooks/useStriven'; //this is the correct import, do not change
 import useNotifications from './hooks/useNotifications';
 import MainLayout from './components/MainLayout';
 import Dashboard from './pages/Dashboard';
