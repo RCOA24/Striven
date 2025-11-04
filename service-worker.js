@@ -1,98 +1,67 @@
 // public/service-worker.js
 
 const CACHE_NAME = 'striven-v1';
-const urlsToCache = [
-  '/',
-  '/index.html',
-  '/icons/vite.svg'
-];
 
-// Install event - cache resources
+// Install event
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(urlsToCache))
-      .catch(err => console.log('Cache install error:', err))
-  );
+  console.log('✅ Service Worker installing...');
   self.skipWaiting();
 });
 
-// Activate event - clean up old caches
+// Activate event
 self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
-  );
-  self.clients.claim();
+  console.log('✅ Service Worker activating...');
+  event.waitUntil(self.clients.claim());
 });
 
-// Fetch event - serve from cache, fallback to network
+// Fetch event
 self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => response || fetch(event.request))
-      .catch(err => console.log('Fetch error:', err))
-  );
-});
-
-// Handle push notifications from server
-self.addEventListener('push', event => {
-  const data = event.data?.json() || {};
-  const title = data.title || 'Striven - Tracking Active';
-  const options = {
-    body: data.body || 'Your activity is being tracked',
-    icon: '/icons/vite.svg',
-    badge: '/icons/vite.svg',
-    tag: 'striven-tracking',
-    requireInteraction: false,
-    data: data
-  };
-  
-  event.waitUntil(
-    self.registration.showNotification(title, options)
-  );
+  event.respondWith(fetch(event.request));
 });
 
 // Handle local notifications from the app
 self.addEventListener('message', event => {
+  console.log('📨 Service Worker received message:', event.data);
+  
   if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
     const { title, body, icon, tag } = event.data;
     
+    console.log('🔔 Showing notification:', title);
+    
     self.registration.showNotification(title, {
       body: body,
-      icon: icon || '/icons/vite.svg',
-      badge: '/icons/vite.svg',
+      icon: icon || '/vite.svg',
+      badge: '/vite.svg',
       tag: tag || 'striven-notification',
       requireInteraction: false,
-      vibrate: [200, 100, 200]
+      vibrate: [200, 100, 200],
+      silent: false
+    }).then(() => {
+      console.log('✅ Notification shown successfully');
+    }).catch(error => {
+      console.error('❌ Error showing notification:', error);
     });
   }
 });
 
 // Handle notification clicks
 self.addEventListener('notificationclick', event => {
+  console.log('👆 Notification clicked');
   event.notification.close();
   
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true })
       .then(clientList => {
-        // If app is already open, focus it
         for (let client of clientList) {
-          if (client.url.includes(self.location.origin) && 'focus' in client) {
+          if ('focus' in client) {
             return client.focus();
           }
         }
-        // Otherwise open a new window
         if (clients.openWindow) {
           return clients.openWindow('/');
         }
       })
   );
 });
+
+console.log('✅ Service Worker script loaded');

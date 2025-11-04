@@ -10,7 +10,8 @@ import {
 } from '../utils/db';
 import { 
   sendTrackingNotification, 
-  sendMilestoneNotification 
+  sendMilestoneNotification,
+  sendTestNotification
 } from '../utils/notifications';
 
 const useStriven = () => {
@@ -175,41 +176,51 @@ const useStriven = () => {
     };
   }, [isTracking, isPaused]);
 
-  // Periodic notification effect - sends notification every 5 minutes while tracking
-  useEffect(() => {
-    if (isTracking && !isPaused && steps > 0) {
-      // Send initial notification after 1 minute
-      const initialTimeout = setTimeout(() => {
+  // Replace the periodic notification effect with this improved version:
+useEffect(() => {
+  if (isTracking && !isPaused) {
+    console.log('⏰ Setting up notification timers...');
+    
+    // Send test notification immediately when tracking starts (only first time)
+    if (steps === 0) {
+      const testTimeout = setTimeout(() => {
+        console.log('🧪 Sending initial test notification...');
+        sendTestNotification();
+      }, 3000); // Send after 3 seconds
+      
+      return () => clearTimeout(testTimeout);
+    }
+    
+    // Send first tracking notification after 30 seconds
+    const initialTimeout = setTimeout(() => {
+      console.log('📤 Sending initial tracking notification...');
+      sendTrackingNotification({
+        steps,
+        distance,
+        calories,
+        formattedTime: formatTime(duration)
+      });
+
+      // Then send notifications every 2 minutes for testing (change to 300000 for 5 min)
+      notificationIntervalRef.current = setInterval(() => {
+        console.log('📤 Sending periodic tracking notification...');
         sendTrackingNotification({
           steps,
           distance,
           calories,
           formattedTime: formatTime(duration)
         });
+      }, 120000); // 2 minutes for testing
+    }, 30000); // First notification after 30 seconds
 
-        // Then send notifications every 5 minutes
-        notificationIntervalRef.current = setInterval(() => {
-          sendTrackingNotification({
-            steps,
-            distance,
-            calories,
-            formattedTime: formatTime(duration)
-          });
-        }, NOTIFICATION_INTERVAL);
-      }, 60000); // First notification after 1 minute
-
-      return () => {
-        clearTimeout(initialTimeout);
-        if (notificationIntervalRef.current) {
-          clearInterval(notificationIntervalRef.current);
-        }
-      };
-    } else {
+    return () => {
+      clearTimeout(initialTimeout);
       if (notificationIntervalRef.current) {
         clearInterval(notificationIntervalRef.current);
       }
-    }
-  }, [isTracking, isPaused, steps, distance, calories, duration]);
+    };
+  }
+}, [isTracking, isPaused, steps, distance, calories, duration]);
 
   // Milestone notification effect - checks for step milestones
   useEffect(() => {
