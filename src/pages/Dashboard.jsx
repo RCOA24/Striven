@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { sendTrackingNotification } from '../utils/notifications';
 import { Footprints, Flame, Clock, Target, Activity, Check } from 'lucide-react';
 import { db } from '../utils/db';
 
