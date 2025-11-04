@@ -8,11 +8,6 @@ import {
   updateWeeklyStats,
   db
 } from '../utils/db';
-import { 
-  sendTrackingNotification, 
-  sendMilestoneNotification,
-  sendTestNotification
-} from '../utils/notifications';
 
 const useStriven = () => {
   const [steps, setSteps] = useState(0);
@@ -34,13 +29,10 @@ const useStriven = () => {
   const startTimeRef = useRef(null);
   const timerRef = useRef(null);
   const pausedTimeRef = useRef(0);
-  const notificationIntervalRef = useRef(null);
-  const lastMilestoneRef = useRef(0);
 
   // Constants for calculations
   const STEP_LENGTH_KM = 0.000762; // Average step length in km
   const CALORIES_PER_STEP = 0.04; // Average calories per step
-  const NOTIFICATION_INTERVAL = 300000; // 5 minutes in milliseconds
 
   // Real-time activities using useLiveQuery - automatically updates when database changes!
   const activities = useLiveQuery(
@@ -176,80 +168,6 @@ const useStriven = () => {
     };
   }, [isTracking, isPaused]);
 
-  // Replace the periodic notification effect with this improved version:
-useEffect(() => {
-  if (isTracking && !isPaused) {
-    console.log('⏰ Setting up notification timers...');
-    
-    // Send test notification immediately when tracking starts (only first time)
-    if (steps === 0) {
-      const testTimeout = setTimeout(() => {
-        console.log('🧪 Sending initial test notification...');
-        sendTestNotification();
-      }, 3000); // Send after 3 seconds
-      
-      return () => clearTimeout(testTimeout);
-    }
-    
-    // Send first tracking notification after 30 seconds
-    const initialTimeout = setTimeout(() => {
-      console.log('📤 Sending initial tracking notification...');
-      sendTrackingNotification({
-        steps,
-        distance,
-        calories,
-        formattedTime: formatTime(duration)
-      });
-
-      // Then send notifications every 2 minutes for testing (change to 300000 for 5 min)
-      notificationIntervalRef.current = setInterval(() => {
-        console.log('📤 Sending periodic tracking notification...');
-        sendTrackingNotification({
-          steps,
-          distance,
-          calories,
-          formattedTime: formatTime(duration)
-        });
-      }, 120000); // 2 minutes for testing
-    }, 30000); // First notification after 30 seconds
-
-    return () => {
-      clearTimeout(initialTimeout);
-      if (notificationIntervalRef.current) {
-        clearInterval(notificationIntervalRef.current);
-      }
-    };
-  }
-}, [isTracking, isPaused, steps, distance, calories, duration]);
-
-  // Milestone notification effect - checks for step milestones
-  useEffect(() => {
-    if (isTracking && steps > 0) {
-      // Check for every 1000 steps milestone
-      const currentMilestone = Math.floor(steps / 1000) * 1000;
-      
-      if (currentMilestone > lastMilestoneRef.current && currentMilestone >= 1000) {
-        lastMilestoneRef.current = currentMilestone;
-        sendMilestoneNotification({
-          type: 'steps',
-          value: currentMilestone
-        });
-      }
-
-      // Check for distance milestones (every 1 km)
-      const distanceMilestone = Math.floor(distance);
-      if (distanceMilestone > 0 && distanceMilestone % 1 === 0) {
-        const lastDistanceMilestone = lastMilestoneRef.current / 1000;
-        if (distanceMilestone > lastDistanceMilestone) {
-          sendMilestoneNotification({
-            type: 'distance',
-            value: distanceMilestone
-          });
-        }
-      }
-    }
-  }, [isTracking, steps, distance]);
-
   // Update metrics when steps change
   useEffect(() => {
     setDistance(steps * STEP_LENGTH_KM);
@@ -268,7 +186,6 @@ useEffect(() => {
       await stepDetectorRef.current.start();
       startTimeRef.current = Date.now();
       pausedTimeRef.current = 0;
-      lastMilestoneRef.current = 0;
       setIsTracking(true);
       setIsPaused(false);
       console.log('Tracking started successfully');
@@ -281,11 +198,6 @@ useEffect(() => {
   const pauseTracking = useCallback(() => {
     if (stepDetectorRef.current) {
       stepDetectorRef.current.stop();
-    }
-    
-    // Clear notification interval when paused
-    if (notificationIntervalRef.current) {
-      clearInterval(notificationIntervalRef.current);
     }
     
     // Track paused time
@@ -316,12 +228,6 @@ useEffect(() => {
       stepDetectorRef.current.stop();
       stepDetectorRef.current.reset();
     }
-    
-    // Clear notification interval
-    if (notificationIntervalRef.current) {
-      clearInterval(notificationIntervalRef.current);
-    }
-    
     setSteps(0);
     setDistance(0);
     setCalories(0);
@@ -330,7 +236,6 @@ useEffect(() => {
     setIsPaused(false);
     startTimeRef.current = null;
     pausedTimeRef.current = 0;
-    lastMilestoneRef.current = 0;
     console.log('Tracking reset');
   }, []);
 
@@ -338,11 +243,6 @@ useEffect(() => {
     try {
       if (stepDetectorRef.current) {
         stepDetectorRef.current.stop();
-      }
-
-      // Clear notification interval
-      if (notificationIntervalRef.current) {
-        clearInterval(notificationIntervalRef.current);
       }
 
       // Only save if there are steps
@@ -391,7 +291,6 @@ useEffect(() => {
       setIsPaused(false);
       startTimeRef.current = null;
       pausedTimeRef.current = 0;
-      lastMilestoneRef.current = 0;
 
       return activity;
     } catch (error) {

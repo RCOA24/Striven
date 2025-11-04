@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react';
 
-// Custom hook for notification state management
-const useNotifications = () => {
+const useNotification = () => {
   const [notification, setNotification] = useState({
     isVisible: false,
     type: 'success',
@@ -31,4 +30,4 @@ const useNotifications = () => {
   };
 };
 
-export default useNotifications;
+export default useNotification;

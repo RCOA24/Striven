@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Activity, Bell, BellOff } from 'lucide-react';
+import React, { useState } from 'react';
+import { Activity } from 'lucide-react';
 import useStriven from './hooks/useStriven';
 import useNotifications from './hooks/useNotifications';
 import MainLayout from './components/MainLayout';
@@ -10,37 +10,11 @@ import ProfilePage from './pages/ProfilePage';
 import Notification from './components/Notifications';
 import Intro from './components/Intro';
 import { deleteActivity } from './utils/db';
-import { requestNotificationPermission } from './utils/notifications';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [showIntro, setShowIntro] = useState(true);
-  const [notificationPermission, setNotificationPermission] = useState('default');
-
-  // --- Service Worker Registration ---
-  useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/service-worker.js')
-        .then(reg => {
-          console.log('✅ Service Worker registered:', reg.scope);
-          
-          // Wait for service worker to be ready
-          return navigator.serviceWorker.ready;
-        })
-        .then(() => {
-          console.log('✅ Service Worker is ready');
-          
-          // Check current notification permission
-          if ('Notification' in window) {
-            setNotificationPermission(Notification.permission);
-            console.log('📱 Current notification permission:', Notification.permission);
-          }
-        })
-        .catch(err => console.error('❌ Service Worker registration failed:', err));
-    }
-  }, []);
-  // --- End Service Worker Registration ---
-
+  
   const {
     steps,
     isTracking,
@@ -61,6 +35,7 @@ function App() {
 
   const { notification, showNotification, hideNotification } = useNotifications();
 
+  // Handle deleting an activity
   const handleDeleteActivity = async (activityId) => {
     try {
       await deleteActivity(activityId);
@@ -81,15 +56,16 @@ function App() {
     }
   };
 
+  // Handle intro completion
   const handleIntroComplete = () => {
     setShowIntro(false);
   };
 
-  // Handle finish button with notification
+  // Handle finish button with beautiful notification
   const handleFinish = () => {
     if (steps > 0) {
       stopAndSave();
-
+      
       showNotification({
         type: 'success',
         title: 'Activity Saved! 🎉',
@@ -97,36 +73,15 @@ function App() {
         duration: 5000
       });
 
+      // Optional: Navigate to activity page after a delay
       setTimeout(() => {
         setCurrentPage('activity');
       }, 1500);
     }
   };
 
-  // Handle start with notification permission request
-  const handleStart = async () => {
-    // Request notification permission if not granted
-    if (notificationPermission !== 'granted') {
-      const permission = await requestNotificationPermission();
-      setNotificationPermission(permission);
-      
-      if (permission === 'granted') {
-        showNotification({
-          type: 'success',
-          title: 'Notifications Enabled! 🔔',
-          message: 'You\'ll receive updates while tracking',
-          duration: 3000
-        });
-      } else {
-        showNotification({
-          type: 'warning',
-          title: 'Notifications Disabled',
-          message: 'Enable notifications in settings for background updates',
-          duration: 4000
-        });
-      }
-    }
-    
+  // Handle start with notification
+  const handleStart = () => {
     startTracking();
     showNotification({
       type: 'info',
@@ -136,28 +91,7 @@ function App() {
     });
   };
 
-  // Manual notification permission request
-  const handleRequestNotifications = async () => {
-    const permission = await requestNotificationPermission();
-    setNotificationPermission(permission);
-    
-    if (permission === 'granted') {
-      showNotification({
-        type: 'success',
-        title: 'Notifications Enabled! 🔔',
-        message: 'You\'ll receive tracking updates',
-        duration: 3000
-      });
-    } else if (permission === 'denied') {
-      showNotification({
-        type: 'error',
-        title: 'Permission Denied',
-        message: 'Please enable notifications in your browser settings',
-        duration: 4000
-      });
-    }
-  };
-
+  // Show intro screen if showIntro is true
   if (showIntro) {
     return <Intro onComplete={handleIntroComplete} />;
   }
@@ -228,28 +162,6 @@ function App() {
 
   return (
     <>
-      {/* Notification Permission Button */}
-      {notificationPermission !== 'granted' && (
-        <div className="fixed top-4 right-4 z-50">
-          <button
-            onClick={handleRequestNotifications}
-            className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2 transition-all"
-          >
-            {notificationPermission === 'denied' ? (
-              <>
-                <BellOff className="w-4 h-4" />
-                <span className="text-sm">Enable Notifications</span>
-              </>
-            ) : (
-              <>
-                <Bell className="w-4 h-4" />
-                <span className="text-sm">Enable Notifications</span>
-              </>
-            )}
-          </button>
-        </div>
-      )}
-
       {/* Notification Component */}
       <Notification
         type={notification.type}
@@ -259,6 +171,7 @@ function App() {
         onClose={hideNotification}
         duration={notification.duration}
       />
+
       <MainLayout currentPage={currentPage} onNavigate={setCurrentPage}>
         {renderPage()}
       </MainLayout>
