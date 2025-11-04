@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Activity } from 'lucide-react';
-import useStriven from './hooks/useStriven';
+import useStriven from './hooks/UseStriven';
 import useNotifications from './hooks/useNotifications';
 import MainLayout from './components/MainLayout';
 import Dashboard from './pages/Dashboard';
@@ -14,7 +14,19 @@ import { deleteActivity } from './utils/db';
 function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [showIntro, setShowIntro] = useState(true);
-  
+
+  // --- Service Worker Registration ---
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js')
+          .then(reg => console.log('Service Worker registered:', reg.scope))
+          .catch(err => console.error('Service Worker registration failed:', err));
+      });
+    }
+  }, []);
+  // --- End Service Worker Registration ---
+
   const {
     steps,
     isTracking,
@@ -35,7 +47,6 @@ function App() {
 
   const { notification, showNotification, hideNotification } = useNotifications();
 
-  // Handle deleting an activity
   const handleDeleteActivity = async (activityId) => {
     try {
       await deleteActivity(activityId);
@@ -56,16 +67,15 @@ function App() {
     }
   };
 
-  // Handle intro completion
   const handleIntroComplete = () => {
     setShowIntro(false);
   };
 
-  // Handle finish button with beautiful notification
+  // Handle finish button with notification
   const handleFinish = () => {
     if (steps > 0) {
       stopAndSave();
-      
+
       showNotification({
         type: 'success',
         title: 'Activity Saved! 🎉',
@@ -73,7 +83,6 @@ function App() {
         duration: 5000
       });
 
-      // Optional: Navigate to activity page after a delay
       setTimeout(() => {
         setCurrentPage('activity');
       }, 1500);
@@ -91,7 +100,6 @@ function App() {
     });
   };
 
-  // Show intro screen if showIntro is true
   if (showIntro) {
     return <Intro onComplete={handleIntroComplete} />;
   }
@@ -171,7 +179,6 @@ function App() {
         onClose={hideNotification}
         duration={notification.duration}
       />
-
       <MainLayout currentPage={currentPage} onNavigate={setCurrentPage}>
         {renderPage()}
       </MainLayout>
