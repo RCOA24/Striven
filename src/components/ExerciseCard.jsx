@@ -1,9 +1,26 @@
+// src/components/ExerciseCard.jsx
 import React from 'react';
 import { Play, Dumbbell, Heart, Video } from 'lucide-react';
 
+// Extract YouTube ID → get thumbnail
+const getYouTubeThumbnail = (url) => {
+  if (!url) return null;
+  const match = url.match(/(?:v=|\/)([0-9A-Za-z_-]{11})/);
+  return match ? `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg` : null;
+};
+
 export default function ExerciseCard({ exercise, onClick }) {
-  const hasVideo = exercise.hasVideo || (exercise.videos && exercise.videos.length > 0);
-  const imageUrl = exercise.previewImage || exercise.images?.[0]?.image || '/placeholder-exercise.jpg';
+  // Priority: 1. YouTube video → 2. Wger image → 3. Placeholder
+  const videoThumbnail = exercise.videos?.[0]?.video
+    ? getYouTubeThumbnail(exercise.videos[0].video)
+    : null;
+
+  const displayImage = videoThumbnail ||
+    exercise.previewImage ||
+    exercise.images?.[0]?.image ||
+    '/placeholder-exercise.jpg';
+
+  const hasMedia = !!videoThumbnail || (exercise.images?.length > 0);
 
   return (
     <div
@@ -13,34 +30,34 @@ export default function ExerciseCard({ exercise, onClick }) {
       {/* Image Container */}
       <div className="relative h-48 overflow-hidden">
         <img
-          src={imageUrl}
+          src={displayImage}
           alt={exercise.name}
           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
-          onError={(e) => { 
+          onError={(e) => {
             e.target.src = '/placeholder-exercise.jpg';
             e.target.onerror = null;
           }}
         />
-        
+
         {/* Video Badge */}
-        {hasVideo && (
+        {hasMedia && (
           <div className="absolute top-3 right-3 bg-emerald-500 text-black text-xs px-3 py-1.5 rounded-full font-bold flex items-center gap-1 shadow-lg">
             <Video className="w-3 h-3" />
-            VIDEO
+            DEMO
           </div>
         )}
 
         {/* Gradient Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-100 transition-opacity duration-300" />
 
-        {/* Play Icon Overlay */}
+        {/* Play Icon */}
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
           <div className="bg-emerald-500 p-4 rounded-full shadow-2xl transform scale-90 group-hover:scale-100 transition-transform">
             <Play className="w-8 h-8 text-black fill-current" />
           </div>
         </div>
 
-        {/* Muscle Info Overlay */}
+        {/* Muscle Info */}
         {exercise.muscles && (
           <div className="absolute bottom-3 left-3 right-3 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
             <Heart className="w-4 h-4 text-emerald-400" />
@@ -57,7 +74,7 @@ export default function ExerciseCard({ exercise, onClick }) {
 
         <div className="flex items-center justify-between mb-3">
           <span className="bg-emerald-500/20 px-3 py-1.5 rounded-full text-emerald-400 text-xs font-semibold border border-emerald-500/30">
-            {exercise.category}
+            {exercise.category || 'General'}
           </span>
           <span className="text-white/60 text-xs flex items-center gap-1.5">
             <Dumbbell className="w-3.5 h-3.5" />
@@ -65,7 +82,7 @@ export default function ExerciseCard({ exercise, onClick }) {
           </span>
         </div>
 
-        {/* Description Preview */}
+        {/* Description */}
         {exercise.description && (
           <p className="text-white/60 text-sm line-clamp-2 leading-relaxed">
             {exercise.description.replace(/<[^>]*>/g, '').substring(0, 100)}
@@ -74,7 +91,7 @@ export default function ExerciseCard({ exercise, onClick }) {
         )}
       </div>
 
-      {/* Hover Border Glow Effect */}
+      {/* Glow */}
       <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
         <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-emerald-500/20 to-green-500/20 blur-xl" />
       </div>
