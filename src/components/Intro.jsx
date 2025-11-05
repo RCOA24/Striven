@@ -18,7 +18,7 @@ const Intro = ({ onComplete }) => {
   }, [onComplete]);
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden min-h-screen bg-slate-900 flex flex-col">
+    <div className="fixed inset-0 z-50 overflow-hidden min-h-screen bg-black flex flex-col">
       {/* Animated Background Orbs */}
       <div className="absolute inset-0">
         <motion.div
@@ -99,7 +99,7 @@ const Intro = ({ onComplete }) => {
                   <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-[#39ff14]/40 to-[#ff2e63]/40 blur-2xl opacity-60" />
 
                   {/* Glass Card */}
-                  <div className="relative bg-gradient-to-br from-green-400 to-emerald-500 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-4xl overflow-hidden">
+                  <div className="relative bg-gradient-to-br from-green-400 to-emerald-500 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-xl overflow-hidden">
                     {/* Grain texture */}
                     <div
                       className="absolute inset-0 opacity-5 pointer-events-none"
@@ -185,7 +185,7 @@ const Intro = ({ onComplete }) => {
                 transition={{ delay: 0.3, duration: 0.8 }}
                 className="mt-4 text-xl md:text-2xl text-white/60 font-body tracking-wider"
               >
-                Track your journey
+                Train. Track. Transcend.
               </motion.p>
             )}
           </AnimatePresence>

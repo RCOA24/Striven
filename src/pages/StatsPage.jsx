@@ -13,23 +13,23 @@ const GOAL_TYPES = {
   steps: { 
     label: 'Steps', 
     icon: Target, 
-    color: 'from-green-500 to-emerald-600',
-    colorStart: '#10b981',
-    colorEnd: '#059669'
+    color: 'from-green-400 to-emerald-500',
+    colorStart: '#34d399',
+    colorEnd: '#10b981'
   },
   distance: { 
     label: 'Distance', 
     icon: TrendingUp, 
-    color: 'from-blue-500 to-cyan-600',
-    colorStart: '#3b82f6',
+    color: 'from-cyan-400 to-cyan-600',
+    colorStart: '#22d3ee',
     colorEnd: '#0891b2'
   },
   calories: { 
     label: 'Calories', 
     icon: Flame, 
-    color: 'from-orange-500 to-red-600',
-    colorStart: '#f97316',
-    colorEnd: '#dc2626'
+    color: 'from-orange-400 to-red-500',
+    colorStart: '#fb923c',
+    colorEnd: '#f87171'
   }
 };
 
@@ -44,10 +44,12 @@ const StatCard = ({ icon: Icon, label, value, gradient, delay = 0 }) => (
     animate={{ opacity: 1, y: 0 }}
     transition={{ delay, duration: 0.5 }}
     whileHover={{ scale: 1.03 }}
-    className="group relative bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20 hover:border-white/30 transition-all duration-300"
+    className="group relative bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10 hover:border-white/20 transition-all duration-300"
   >
-    <div className="absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-20 transition-opacity rounded-2xl blur-xl" 
-         style={{ backgroundImage: `linear-gradient(to bottom right, ${gradient.split(' ')[1]}, ${gradient.split(' ')[3]})` }}></div>
+    <div 
+      className="absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-10 transition-opacity rounded-2xl blur-xl"
+      style={{ backgroundImage: `linear-gradient(to bottom right, ${gradient.split(' ')[1]}, ${gradient.split(' ')[3]})` }}
+    />
 
     <div className="flex items-center justify-between mb-4">
       <div className={`bg-gradient-to-br ${gradient} p-3 rounded-xl shadow-lg`}>
@@ -60,7 +62,7 @@ const StatCard = ({ icon: Icon, label, value, gradient, delay = 0 }) => (
 );
 
 /* -------------------------------------------------------------------------- */
-/*                          PROGRESS RING (WHITE → COLORED)                   */
+/*                          PROGRESS RING (WHITE → GREEN)                     */
 /* -------------------------------------------------------------------------- */
 const ProgressRing = ({ progress, size = 120, stroke = 8, colorStart, colorEnd, id }) => {
   const radius = (size - stroke) / 2;
@@ -70,16 +72,16 @@ const ProgressRing = ({ progress, size = 120, stroke = 8, colorStart, colorEnd, 
   return (
     <div className="relative" style={{ width: size, height: size }}>
       <svg className="absolute inset-0 -rotate-90" width={size} height={size}>
-        {/* WHITE BACKGROUND RING - VISIBLE */}
+        {/* WHITE BASE RING */}
         <circle
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke="rgba(255, 255, 255, 0.3)"
+          stroke="rgba(255, 255, 255, 0.2)"
           strokeWidth={stroke}
           fill="none"
         />
-        {/* COLORED PROGRESS FILL */}
+        {/* GREEN PROGRESS FILL */}
         <motion.circle
           cx={size / 2}
           cy={size / 2}
@@ -129,9 +131,9 @@ const GoalCard = ({ type, current, goal, onEdit, onDelete }) => {
       layout
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="relative bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20"
+      className="relative bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10"
     >
-      {isAchieved && <Confetti width={300} height={200} recycle={false} numberOfPieces={80} gravity={0.2} />}
+      {isAchieved && <Confetti width={300} height={200} recycle={false} numberOfPieces={80} gravity={0.2} colors={['#34d399', '#10b981', '#059669']} />}
 
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-3">
@@ -146,16 +148,10 @@ const GoalCard = ({ type, current, goal, onEdit, onDelete }) => {
 
         {!isEditing ? (
           <div className="flex items-center space-x-2">
-            <button
-              onClick={() => setIsEditing(true)}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-            >
-              <Edit2 className="w-4 h-4 text-white/60 hover:text-blue-400" />
+            <button onClick={() => setIsEditing(true)} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+              <Edit2 className="w-4 h-4 text-white/60 hover:text-green-400" />
             </button>
-            <button
-              onClick={() => onDelete(type)}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-            >
+            <button onClick={() => onDelete(type)} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
               <Trash2 className="w-4 h-4 text-white/60 hover:text-red-400" />
             </button>
           </div>
@@ -179,11 +175,7 @@ const GoalCard = ({ type, current, goal, onEdit, onDelete }) => {
                 {current.toLocaleString()} <span className="text-sm text-white/50">/ {goal.toLocaleString()}</span>
               </div>
               {isAchieved && (
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className="flex items-center space-x-1 text-yellow-400 text-sm font-medium"
-                >
+                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="flex items-center space-x-1 text-green-400 text-sm font-medium">
                   <Trophy className="w-4 h-4" />
                   <span>Goal Crushed!</span>
                 </motion.div>
@@ -194,19 +186,14 @@ const GoalCard = ({ type, current, goal, onEdit, onDelete }) => {
               type="number"
               value={editValue}
               onChange={(e) => setEditValue(Number(e.target.value))}
-              className="w-full px-3 py-2 bg-white/10 border border-white/30 rounded-lg text-white text-xl font-bold focus:outline-none focus:border-blue-400"
+              className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-xl font-bold focus:outline-none focus:border-green-400"
               min="1"
             />
           )}
         </div>
 
         <div className="ml-6">
-          <ProgressRing 
-            progress={progress} 
-            colorStart={config.colorStart}
-            colorEnd={config.colorEnd}
-            id={type} 
-          />
+          <ProgressRing progress={progress} colorStart={config.colorStart} colorEnd={config.colorEnd} id={type} />
         </div>
       </div>
     </motion.div>
@@ -219,10 +206,10 @@ const GoalCard = ({ type, current, goal, onEdit, onDelete }) => {
 const PersonalBest = ({ value, label, date, icon: Icon, color }) => (
   <motion.div
     whileHover={{ scale: 1.05 }}
-    className="relative bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20 text-center overflow-hidden"
+    className="relative bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10 text-center overflow-hidden"
   >
     <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br opacity-20 blur-3xl" 
-         style={{ backgroundImage: `linear-gradient(to bottom left, ${color.split(' ')[1]}, transparent)` }}></div>
+         style={{ backgroundImage: `linear-gradient(to bottom left, ${color.split(' ')[1]}, transparent)` }} />
 
     <div className={`inline-flex p-3 rounded-xl mb-3 bg-gradient-to-br ${color}`}>
       <Icon className="w-6 h-6 text-white" />
@@ -296,13 +283,17 @@ const StatsPage = () => {
 
   return (
     <>
-      {/* FULL-SCREEN BACKGROUND */}
-      <div className="fixed inset-0 -z-10 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900" />
+      {/* FULL BLACK + GREEN GLOW BACKGROUND */}
+      <div className="fixed inset-0 -z-10 overflow-hidden">
+        <div className="absolute inset-0 bg-black" />
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-green-400/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+      </div>
 
       <div className="min-h-screen px-4 py-8 md:px-8 lg:px-12">
         <div className="max-w-5xl mx-auto space-y-8">
 
-          {/* HEADER - PURE WHITE */}
+          {/* HEADER */}
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-10">
             <h1 className="text-5xl sm:text-6xl font-bold text-white mb-2">Your Stats</h1>
             <p className="text-white/70 text-lg">Track progress. Crush goals. Become unstoppable.</p>
@@ -310,13 +301,13 @@ const StatsPage = () => {
 
           {/* WEEKLY SUMMARY */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <StatCard icon={Target} label="Steps" value={steps >= 1000 ? `${(steps/1000).toFixed(1)}K` : steps} gradient="from-green-500 to-emerald-600" delay={0.1} />
-            <StatCard icon={TrendingUp} label="Distance" value={`${distance.toFixed(1)} km`} gradient="from-blue-500 to-cyan-600" delay={0.2} />
-            <StatCard icon={Flame} label="Calories" value={Math.round(calories).toLocaleString()} gradient="from-orange-500 to-red-600" delay={0.3} />
-            <StatCard icon={Award} label="Active Days" value={`${activeDays}/7`} gradient="from-purple-500 to-pink-600" delay={0.4} />
+            <StatCard icon={Target} label="Steps" value={steps >= 1000 ? `${(steps/1000).toFixed(1)}K` : steps} gradient="from-green-400 to-emerald-500" delay={0.1} />
+            <StatCard icon={TrendingUp} label="Distance" value={`${distance.toFixed(1)} km`} gradient="from-cyan-400 to-cyan-600" delay={0.2} />
+            <StatCard icon={Flame} label="Calories" value={Math.round(calories).toLocaleString()} gradient="from-orange-400 to-red-500" delay={0.3} />
+            <StatCard icon={Award} label="Active Days" value={`${activeDays}/7`} gradient="from-purple-400 to-pink-500" delay={0.4} />
           </div>
 
-          {/* WEEKLY GOALS - PURE WHITE TITLE */}
+          {/* WEEKLY GOALS */}
           <div className="space-y-4">
             <h2 className="text-2xl font-bold text-white flex items-center space-x-2">
               <Target className="w-6 h-6 text-green-400" />
@@ -329,16 +320,16 @@ const StatsPage = () => {
             </div>
           </div>
 
-          {/* PERSONAL BESTS - PURE WHITE TITLE */}
+          {/* PERSONAL BESTS */}
           <div className="space-y-4">
             <h2 className="text-2xl font-bold text-white flex items-center space-x-2">
               <Trophy className="w-7 h-7 text-yellow-400" />
-              <span text-4xl sm:text-5xl font-bold text-white mb-1>Personal Bests</span>
+              <span>Personal Bests</span>
             </h2>
             {personalBests ? (
               <div className="grid md:grid-cols-2 gap-4">
-                <PersonalBest value={personalBests.steps.toLocaleString()} label="Most Steps in a Day" date={personalBests.stepsDate} icon={Target} color="from-green-500 to-emerald-600" />
-                <PersonalBest value={`${personalBests.distance} km`} label="Longest Distance" date={personalBests.distanceDate} icon={TrendingUp} color="from-blue-500 to-cyan-600" />
+                <PersonalBest value={personalBests.steps.toLocaleString()} label="Most Steps in a Day" date={personalBests.stepsDate} icon={Target} color="from-green-400 to-emerald-500" />
+                <PersonalBest value={`${personalBests.distance} km`} label="Longest Distance" date={personalBests.distanceDate} icon={TrendingUp} color="from-cyan-400 to-cyan-600" />
               </div>
             ) : (
               <div className="text-center py-12 bg-white/5 rounded-2xl border border-white/10">
@@ -354,8 +345,8 @@ const StatsPage = () => {
       {/* DELETE CONFIRMATION */}
       <AnimatePresence>
         {deletingGoal && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 max-w-sm w-full border border-white/20 shadow-2xl">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 max-w-sm w-full border border-white/10 shadow-2xl">
               <div className="flex items-center space-x-3 mb-4">
                 <div className="bg-red-500/20 p-3 rounded-xl">
                   <Trash2 className="w-6 h-6 text-red-400" />

@@ -11,7 +11,7 @@ const MainLayout = ({ children, currentPage, onNavigate }) => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-900 to-slate-900 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-black-900 via-black-900 to-black-900 flex flex-col">
   
       {/* Top Navigation Bar - Desktop */}
       <nav className="hidden md:block bg-white/5 backdrop-blur-xl border-b border-white/10">
