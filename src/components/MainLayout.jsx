@@ -11,29 +11,8 @@ const MainLayout = ({ children, currentPage, onNavigate }) => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex flex-col">
-      <style>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 8px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: rgba(255, 255, 255, 0.05);
-          border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: linear-gradient(180deg, rgba(34, 197, 94, 0.6), rgba(16, 185, 129, 0.6));
-          border-radius: 10px;
-          border: 2px solid rgba(255, 255, 255, 0.1);
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: linear-gradient(180deg, rgba(34, 197, 94, 0.8), rgba(16, 185, 129, 0.8));
-        }
-        .custom-scrollbar {
-          scrollbar-width: thin;
-          scrollbar-color: rgba(34, 197, 94, 0.6) rgba(255, 255, 255, 0.05);
-        }
-      `}</style>
-
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-900 to-slate-900 flex flex-col">
+  
       {/* Top Navigation Bar - Desktop */}
       <nav className="hidden md:block bg-white/5 backdrop-blur-xl border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
