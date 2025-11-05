@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Activity } from 'lucide-react';
-import useStriven from './hooks/useStriven'; //this is the correct import, do not change
+import useStriven from './hooks/useStriven'; // DO NOT CHANGE this import!
 import useNotifications from './hooks/useNotifications';
 import MainLayout from './components/MainLayout';
 import Dashboard from './pages/Dashboard';
 import ActivityPage from './pages/ActivityPage';
 import StatsPage from './pages/StatsPage';
 import ProfilePage from './pages/ProfilePage';
+import ExerciseLibrary from './pages/ExerciseLibraryVisuals';
 import Notification from './components/Notifications';
 import Intro from './components/Intro';
 import { deleteActivity } from './utils/db';
@@ -14,7 +15,7 @@ import { deleteActivity } from './utils/db';
 function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [showIntro, setShowIntro] = useState(true);
-  
+
   const {
     steps,
     isTracking,
@@ -65,15 +66,12 @@ function App() {
   const handleFinish = () => {
     if (steps > 0) {
       stopAndSave();
-      
       showNotification({
         type: 'success',
         title: 'Activity Saved! 🎉',
         message: `${steps.toLocaleString()} steps • ${distance.toFixed(2)} km • ${Math.round(calories)} kcal`,
         duration: 5000
       });
-
-      // Optional: Navigate to activity page after a delay
       setTimeout(() => {
         setCurrentPage('activity');
       }, 1500);
@@ -89,6 +87,11 @@ function App() {
       message: 'Keep your phone with you while walking',
       duration: 3000
     });
+  };
+
+  // Handle navigation to stats page
+  const handleNavigateToStats = () => {
+    setCurrentPage('stats');
   };
 
   // Show intro screen if showIntro is true
@@ -112,6 +115,7 @@ function App() {
     );
   }
 
+  // Navigation logic
   const renderPage = () => {
     switch (currentPage) {
       case 'dashboard':
@@ -128,6 +132,8 @@ function App() {
             resumeTracking={resumeTracking}
             reset={reset}
             stopAndSave={handleFinish}
+            weeklyStats={weeklyStats}
+            onNavigateToStats={handleNavigateToStats}
           />
         );
       case 'activity':
@@ -141,6 +147,8 @@ function App() {
         return <StatsPage weeklyStats={weeklyStats} activities={activities} />;
       case 'profile':
         return <ProfilePage activities={activities} weeklyStats={weeklyStats} />;
+      case 'exercises':
+        return <ExerciseLibrary />;
       default:
         return (
           <Dashboard
@@ -155,6 +163,8 @@ function App() {
             resumeTracking={resumeTracking}
             reset={reset}
             stopAndSave={handleFinish}
+            weeklyStats={weeklyStats}
+            onNavigateToStats={handleNavigateToStats}
           />
         );
     }
@@ -171,7 +181,6 @@ function App() {
         onClose={hideNotification}
         duration={notification.duration}
       />
-
       <MainLayout currentPage={currentPage} onNavigate={setCurrentPage}>
         {renderPage()}
       </MainLayout>
