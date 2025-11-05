@@ -140,7 +140,7 @@ export default function ExerciseLibraryVisuals() {
   }, [page]);
 
   return (
-    <div className="min-h-screen bg-black relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-black-900 via-black-900 to-black-900 relative overflow-hidden">
       {/* Animated Background Orbs */}
       <div className="absolute inset-0 -z-10">
         <motion.div

@@ -185,7 +185,7 @@ const Intro = ({ onComplete }) => {
                 transition={{ delay: 0.3, duration: 0.8 }}
                 className="mt-4 text-xl md:text-2xl text-white/60 font-body tracking-wider"
               >
-                Train. Track. Transcend.
+                Track your journey
               </motion.p>
             )}
           </AnimatePresence>
