@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+// src/App.jsx
+import React, { useState, createContext, useContext } from 'react';
 import { Activity } from 'lucide-react';
 import useStriven from './hooks/useStriven'; // DO NOT CHANGE this import!
 import useNotifications from './hooks/useNotifications';
@@ -8,12 +9,16 @@ import ActivityPage from './pages/ActivityPage';
 import StatsPage from './pages/StatsPage';
 import ProfilePage from './pages/ProfilePage';
 import ExerciseLibrary from './pages/ExerciseLibraryVisuals';
+import WorkoutOrganizer from './pages/WorkoutOrganizer'; // ← Workout Organizer
 import Notification from './components/Notifications';
 import Intro from './components/Intro';
 import { deleteActivity } from './utils/db';
 
+// CREATE CONTEXT
+export const AppContext = createContext();
+
 function App() {
-  const [currentPage, setCurrentPage] = useState('dashboard');
+  const [currentPage, setCurrentPage] = useState('dashboard'); // ← 'organizer' for power mode
   const [showIntro, setShowIntro] = useState(true);
 
   const {
@@ -40,6 +45,7 @@ function App() {
   const handleDeleteActivity = async (activityId) => {
     try {
       await deleteActivity(activityId);
+      await refreshActivities?.(); // Optional chain if exists
       showNotification({
         type: 'success',
         title: 'Activity Deleted',
@@ -62,7 +68,7 @@ function App() {
     setShowIntro(false);
   };
 
-  // Handle finish button with beautiful notification
+  // Handle finish with notification
   const handleFinish = () => {
     if (steps > 0) {
       stopAndSave();
@@ -78,7 +84,7 @@ function App() {
     }
   };
 
-  // Handle start with notification
+  // Handle start
   const handleStart = () => {
     startTracking();
     showNotification({
@@ -89,16 +95,17 @@ function App() {
     });
   };
 
-  // Handle navigation to stats page
+  // Navigate to stats
   const handleNavigateToStats = () => {
     setCurrentPage('stats');
   };
 
-  // Show intro screen if showIntro is true
+  // Intro screen
   if (showIntro) {
     return <Intro onComplete={handleIntroComplete} />;
   }
 
+  // Sensor not supported
   if (!sensorSupported) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-6">
@@ -115,7 +122,7 @@ function App() {
     );
   }
 
-  // Navigation logic
+  // Render correct page
   const renderPage = () => {
     switch (currentPage) {
       case 'dashboard':
@@ -137,18 +144,15 @@ function App() {
           />
         );
       case 'activity':
-        return (
-          <ActivityPage 
-            activities={activities}
-            onDeleteActivity={handleDeleteActivity}
-          />
-        );
+        return <ActivityPage activities={activities} onDeleteActivity={handleDeleteActivity} />;
       case 'stats':
         return <StatsPage weeklyStats={weeklyStats} activities={activities} />;
       case 'profile':
         return <ProfilePage activities={activities} weeklyStats={weeklyStats} />;
       case 'exercises':
         return <ExerciseLibrary />;
+      case 'organizer':
+        return <WorkoutOrganizer />;
       default:
         return (
           <Dashboard
@@ -171,8 +175,8 @@ function App() {
   };
 
   return (
-    <>
-      {/* Notification Component */}
+    <AppContext.Provider value={{ currentPage, setCurrentPage }}>
+      {/* Notification */}
       <Notification
         type={notification.type}
         title={notification.title}
@@ -181,10 +185,12 @@ function App() {
         onClose={hideNotification}
         duration={notification.duration}
       />
+
+      {/* Main Layout + Page */}
       <MainLayout currentPage={currentPage} onNavigate={setCurrentPage}>
         {renderPage()}
       </MainLayout>
-    </>
+    </AppContext.Provider>
   );
 }
 
