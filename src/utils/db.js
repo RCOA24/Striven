@@ -20,7 +20,7 @@ db.version(2).stores({
   favorites: '++id, exerciseId, name, muscles, equipment, category, gifUrl, addedAt',
   todayWorkout: '++id, exerciseId, name, sets, reps, weight, rest, notes, order, addedAt',
   workoutPlans: '++id, name, days, createdAt, isActive'
-}).upgrade(tx => {
+}).upgrade(() => {
   console.log('Upgraded to v2: Added workout features');
 });
 
@@ -34,7 +34,7 @@ db.version(3).stores({
   todayWorkout: '++id, exerciseId, name, sets, reps, weight, rest, notes, order, addedAt',
   workoutPlans: '++id, name, days, createdAt, isActive',
   exerciseLogs: '++id, exerciseId, date, set, weight, reps, oneRm' // NEW TABLE
-}).upgrade(tx => {
+}).upgrade(() => {
   console.log('Upgraded to v3: Added exerciseLogs for PRs & weight tracking');
 });
 
@@ -45,7 +45,7 @@ export const addToFavorites = async (exercise) => {
   const exists = await db.favorites.where('exerciseId').equals(exercise.id).first();
   if (exists) throw new Error('Already saved');
 
-  return await db.favorites.add({
+  const id = await db.favorites.add({
     exerciseId: exercise.id,
     name: exercise.name,
     muscles: exercise.muscles,
@@ -55,10 +55,23 @@ export const addToFavorites = async (exercise) => {
     gifUrl: exercise.previewImage || exercise.gifUrl,
     addedAt: Date.now()
   });
+  notifyChange();
+  return id;
+};
+
+const notifyChange = () => {
+  try {
+    if (typeof window !== 'undefined' && window.dispatchEvent) {
+      window.dispatchEvent(new Event('striven:data-changed'));
+    }
+  } catch {
+    // ignore
+  }
 };
 
 export const removeFromFavorites = async (exerciseId) => {
   await db.favorites.where('exerciseId').equals(exerciseId).delete();
+  notifyChange();
 };
 
 export const toggleFavorite = async (exercise) => {
@@ -89,7 +102,7 @@ export const addToTodayWorkout = async (exercise, custom = {}) => {
 
   const order = await db.todayWorkout.count();
 
-  return await db.todayWorkout.add({
+  const id = await db.todayWorkout.add({
     exerciseId: exercise.id,
     name: exercise.name,
     muscles: exercise.muscles,
@@ -104,6 +117,8 @@ export const addToTodayWorkout = async (exercise, custom = {}) => {
     order,
     addedAt: Date.now()
   });
+  notifyChange();
+  return id;
 };
 
 export const getTodayWorkout = async () => {
@@ -121,26 +136,31 @@ export const reorderTodayWorkout = async (newOrder) => {
     }
   });
   await tx;
+  notifyChange();
 };
 
 export const removeFromToday = async (id) => {
   await db.todayWorkout.delete(id);
+  notifyChange();
 };
 
 export const clearTodayWorkout = async () => {
   await db.todayWorkout.clear();
+  notifyChange();
 };
 
 /* ==================================================================
    WORKOUT PLANS
 ================================================================== */
 export const saveWorkoutPlan = async (name, days) => {
-  return await db.workoutPlans.add({
+  const id = await db.workoutPlans.add({
     name,
     days,
     createdAt: Date.now(),
     isActive: false
   });
+  notifyChange();
+  return id;
 };
 
 export const getWorkoutPlans = async () => {
@@ -154,10 +174,12 @@ export const getActivePlan = async () => {
 export const setActivePlan = async (id) => {
   await db.workoutPlans.toCollection().modify({ isActive: false });
   if (id) await db.workoutPlans.update(id, { isActive: true });
+  notifyChange();
 };
 
 export const deleteWorkoutPlan = async (id) => {
   await db.workoutPlans.delete(id);
+  notifyChange();
 };
 
 /* ==================================================================
