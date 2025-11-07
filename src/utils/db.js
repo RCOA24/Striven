@@ -168,12 +168,12 @@ export const getWorkoutPlans = async () => {
 };
 
 export const getActivePlan = async () => {
-  return await db.workoutPlans.where('isActive').equals(true).first();
+  return await db.workoutPlans.where('isActive').equals(1).first(); // ← FIXED: 1 instead of true
 };
 
 export const setActivePlan = async (id) => {
-  await db.workoutPlans.toCollection().modify({ isActive: false });
-  if (id) await db.workoutPlans.update(id, { isActive: true });
+  await db.workoutPlans.toCollection().modify({ isActive: 0 }); // ← FIXED: 0 instead of false
+  if (id) await db.workoutPlans.update(id, { isActive: 1 });     // ← FIXED: 1 instead of true
   notifyChange();
 };
 

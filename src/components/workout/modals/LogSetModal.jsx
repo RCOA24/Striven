@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
-import { Save } from 'lucide-react';
+import { Save, Trophy, Zap, Target } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export const LogSetModal = ({ loggingSet, exercise, weightInput, setWeightInput, repInput, setRepInput, saveLog, onClose }) => {
   const estimated1RM = weightInput && repInput
@@ -13,55 +14,75 @@ export const LogSetModal = ({ loggingSet, exercise, weightInput, setWeightInput,
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-2xl"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-3xl"
       onClick={onClose}
     >
       <motion.div
-        initial={{ scale: 0.9, y: 50 }}
+        initial={{ scale: 0.8, y: 100 }}
         animate={{ scale: 1, y: 0 }}
-        className="bg-gradient-to-br from-black/95 via-emerald-950/60 to-black/95 rounded-3xl p-8 max-w-md w-full border border-emerald-500/40 shadow-2xl"
+        exit={{ scale: 0.8, y: 100 }}
+        className="bg-gradient-to-br from-black via-emerald-950/80 to-black rounded-3xl p-8 max-w-lg w-full border-4 border-emerald-500/60 shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
         <div className="text-center mb-8">
-          <h3 className="text-3xl font-extrabold text-white mb-2">Log Set {loggingSet.setIndex + 1}</h3>
-          <p className="text-emerald-400 font-bold">{exercise?.name}</p>
+          <div className="text-6xl mb-4">🏋️‍♂️</div>
+          <h3 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-300 mb-2">
+            Log Set {loggingSet.setIndex + 1}
+          </h3>
+          <p className="text-2xl font-bold text-emerald-300">{exercise?.name}</p>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-8">
           <div>
-            <label className="text-sm text-white/60 ml-1">Weight (kg)</label>
+            <label className="text-lg text-emerald-300 font-bold flex items-center gap-3 mb-3">
+              <Zap className="w-7 h-7" /> Weight (kg)
+            </label>
             <input
               type="number"
-              placeholder="e.g. 100"
+              placeholder="100"
               value={weightInput}
               onChange={e => setWeightInput(e.target.value)}
-              className="w-full px-6 py-5 rounded-2xl bg-white/10 border-2 border-emerald-500/50 text-3xl text-center font-bold text-emerald-300 focus:border-emerald-400 focus:outline-none transition-all"
+              className="w-full px-8 py-6 rounded-2xl bg-white/10 border-4 border-emerald-500/50 text-5xl text-center font-black text-emerald-300 focus:border-emerald-300 focus:outline-none transition-all placeholder-white/30"
               autoFocus
             />
           </div>
+
           <div>
-            <label className="text-sm text-white/60 ml-1">Reps</label>
+            <label className="text-lg text-emerald-300 font-bold flex items-center gap-3 mb-3">
+              <Target className="w-7 h-7" /> Reps
+            </label>
             <input
               type="number"
-              placeholder="e.g. 8"
+              placeholder="8"
               value={repInput}
               onChange={e => setRepInput(e.target.value)}
-              className="w-full px-6 py-5 rounded-2xl bg-white/10 border-2 border-emerald-500/50 text-3xl text-center font-bold text-emerald-300 focus:border-emerald-400 focus:outline-none transition-all"
+              className="w-full px-8 py-6 rounded-2xl bg-white/10 border-4 border-emerald-500/50 text-5xl text-center font-black text-emerald-300 focus:border-emerald-300 focus:outline-none transition-all placeholder-white/30"
             />
           </div>
 
           {estimated1RM > 0 && (
-            <div className="bg-gradient-to-r from-amber-500/20 to-orange-600/20 rounded-2xl p-6 border border-amber-500/40">
-              <p className="text-sm text-amber-300 mb-1">Estimated 1RM</p>
-              <p className="text-5xl font-black text-white">{estimated1RM}kg</p>
-            </div>
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              className="bg-gradient-to-r from-amber-500/20 to-orange-600/20 rounded-3xl p-8 border-4 border-amber-500/60 text-center"
+            >
+              <Trophy className="w-16 h-16 text-amber-400 mx-auto mb-4" />
+              <p className="text-2xl text-amber-300 font-bold mb-2">Estimated 1RM</p>
+              <p className="text-7xl font-black text-white">{estimated1RM}kg</p>
+            </motion.div>
           )}
 
-          <div className="flex gap-4">
-            <button onClick={saveLog} className="flex-1 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 py-5 rounded-2xl font-bold text-xl text-black shadow-xl hover:shadow-emerald-500/50 transition-all">
-              <Save className="w-7 h-7 inline mr-2" /> Save Set
+          <div className="flex gap-6">
+            <button 
+              onClick={saveLog} 
+              className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 py-6 rounded-2xl font-bold text-3xl text-black shadow-2xl hover:shadow-emerald-500/80 transition-all hover:scale-105 flex items-center justify-center gap-4"
+            >
+              <Save className="w-10 h-10" /> SAVE SET
             </button>
-            <button onClick={onClose} className="px-8 py-5 bg-white/10 rounded-2xl font-bold hover:bg-white/20 transition-all">
+            <button 
+              onClick={onClose} 
+              className="px-10 py-6 bg-white/10 hover:bg-white/20 rounded-2xl font-bold text-2xl transition-all"
+            >
               Cancel
             </button>
           </div>
