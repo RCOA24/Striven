@@ -3,7 +3,9 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { Heart } from 'lucide-react';
-import { ExerciseModal } from '../modals/ExerciseModal';
+
+// CORRECT: Default import (no curly braces)
+import ExerciseModal from '../modals/ExerciseModal';
 
 const NO_GIF = 'https://via.placeholder.com/400x300/111/fff?text=No+GIF';
 
