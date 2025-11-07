@@ -1,5 +1,14 @@
 // src/api/exercises.js
 const API_BASE = 'https://exercisedb-api.vercel.app/api/v1';
+const CORS_PROXY = 'https://corsproxy.io/?'; // or 'https://api.allorigins.win/raw?url='
+
+const buildUrl = (endpoint) => {
+  // Only use proxy in development
+  if (import.meta.env.DEV) {
+    return `${CORS_PROXY}${encodeURIComponent(API_BASE + endpoint)}`;
+  }
+  return API_BASE + endpoint;
+};
 
 export const fetchExercises = async (page = 0, options = {}) => {
   try {
@@ -8,13 +17,12 @@ export const fetchExercises = async (page = 0, options = {}) => {
       search = '',
       muscles = null,
       equipment = null,
-      limit = 25, // Max allowed by API
+      limit = 25,
       sortBy = 'name',
       sortOrder = 'asc'
     } = options;
 
-    // Build advanced filter URL
-    let url = `${API_BASE}/exercises`;
+    let endpoint = '/exercises';
     const params = new URLSearchParams({
       offset: (page * limit).toString(),
       limit: limit.toString(),
@@ -25,14 +33,14 @@ export const fetchExercises = async (page = 0, options = {}) => {
       sortBy,
       sortOrder
     });
-    url += `?${params.toString()}`;
 
-    // If bodyPart filter but no advanced params, fallback to dedicated endpoint (for compatibility)
     if (bodyPart && !search && !muscles && !equipment) {
-      url = `${API_BASE}/bodyparts/${encodeURIComponent(bodyPart)}/exercises?${params.toString()}`;
+      endpoint = `/bodyparts/${encodeURIComponent(bodyPart)}/exercises`;
     }
 
+    const url = buildUrl(`${endpoint}?${params.toString()}`);
     const res = await fetch(url);
+    
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
     const json = await res.json();
@@ -42,21 +50,21 @@ export const fetchExercises = async (page = 0, options = {}) => {
 
     return {
       exercises: allExercises.map(ex => ({
-        id: ex.exerciseId || ex.id, // Fallback for variations
+        id: ex.exerciseId || ex.id,
         name: ex.name,
         description: ex.instructions?.join(' ') || 'No instructions available.',
         category: ex.bodyParts?.[0] || 'General',
         muscles: ex.targetMuscles?.join(', ') || 'Multiple',
-        musclesSecondary: ex.secondaryMuscles?.join(', ') || null, // Bonus: Add secondary if available
+        musclesSecondary: ex.secondaryMuscles?.join(', ') || null,
         equipment: ex.equipments?.join(', ') || 'Bodyweight',
         previewImage: ex.gifUrl || ex.image || '/placeholder-exercise.jpg',
         images: ex.images?.map(img => ({ image: img })) || [{ image: ex.gifUrl }],
         videos: ex.videos?.map(vid => ({ video: vid })) || [],
         hasVideo: !!ex.videos?.length,
-        aliases: ex.aliases || [] // If API supports
+        aliases: ex.aliases || []
       })),
-      hasMore: allExercises.length === limit, // Reliable check: Full page = more available
-      total: json.metadata?.totalExercises || (bodyPart ? undefined : 1300) // Fallback total for "All"
+      hasMore: allExercises.length === limit,
+      total: json.metadata?.totalExercises || (bodyPart ? undefined : 1300)
     };
   } catch (error) {
     console.error('ExerciseDB API Error:', error);
@@ -66,7 +74,8 @@ export const fetchExercises = async (page = 0, options = {}) => {
 
 export const getCategories = async () => {
   try {
-    const res = await fetch(`${API_BASE}/bodyparts`);
+    const url = buildUrl('/bodyparts');
+    const res = await fetch(url);
     const json = await res.json();
     return ['All', ...(json.data?.map(c => c.name) || [])];
   } catch (err) {
@@ -77,7 +86,8 @@ export const getCategories = async () => {
 
 export const fetchExerciseDetails = async (id) => {
   try {
-    const res = await fetch(`${API_BASE}/exercises/${id}`);
+    const url = buildUrl(`/exercises/${id}`);
+    const res = await fetch(url);
     if (!res.ok) throw new Error('Not found');
     const json = await res.json();
     const ex = json.data;
@@ -93,7 +103,7 @@ export const fetchExerciseDetails = async (id) => {
       videos: ex.videos?.map(vid => ({ video: vid })) || [],
       previewImage: ex.gifUrl || ex.image,
       aliases: ex.aliases || [],
-      license: 'CC0' // Common for public APIs; adjust if needed
+      license: 'CC0'
     };
   } catch (err) {
     console.error('Details failed:', err);

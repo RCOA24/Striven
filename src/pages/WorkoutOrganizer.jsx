@@ -4,10 +4,10 @@ import React, { useState, useEffect, useRef, useContext } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import confetti from 'canvas-confetti';
-import { Dumbbell } from 'lucide-react';
+import { Dumbbell, CheckCircle, XCircle, AlertCircle, Trash2, Zap } from 'lucide-react';
 import { 
   clearTodayWorkout, reorderTodayWorkout, removeFromToday, addToTodayWorkout,
-  setActivePlan, saveWorkoutPlan, deleteWorkoutPlan, saveSetLog 
+  setActivePlan, saveWorkoutPlan, deleteWorkoutPlan, saveSetLog, updateWorkoutPlan
 } from '../utils/db';
 import { fetchExercises } from '../api/exercises';
 import { AppContext } from '../App';
@@ -21,6 +21,51 @@ import { LogSetModal } from '../components/workout/modals/LogSetModal';
 import { CreatePlanModal } from '../components/workout/modals/CreatePlanModal';
 
 const LIMIT = 20;
+const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+// Modern Toast Component
+const ModernToast = ({ type, message, icon }) => {
+  const icons = {
+    success: <CheckCircle className="w-6 h-6" />,
+    error: <XCircle className="w-6 h-6" />,
+    warning: <AlertCircle className="w-6 h-6" />,
+    info: <Zap className="w-6 h-6" />,
+    fire: '🔥',
+    muscle: '💪',
+    rocket: '🚀',
+    trash: <Trash2 className="w-6 h-6" />
+  };
+
+  const colors = {
+    success: 'from-emerald-500 to-teal-500',
+    error: 'from-red-500 to-rose-500',
+    warning: 'from-amber-500 to-orange-500',
+    info: 'from-blue-500 to-cyan-500'
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -50, scale: 0.9 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.9 }}
+      className={`bg-gradient-to-r ${colors[type] || colors.info} text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 backdrop-blur-xl border border-white/20`}
+    >
+      <div className="text-white">
+        {icons[icon] || icons[type]}
+      </div>
+      <p className="font-bold text-base">{message}</p>
+    </motion.div>
+  );
+};
+
+const showToast = (message, type = 'success', icon = null) => {
+  toast.custom((t) => (
+    <ModernToast type={type} message={message} icon={icon || type} />
+  ), {
+    duration: 4000,
+    position: 'top-center'
+  });
+};
 
 export default function WorkoutOrganizer() {
   const { setCurrentPage } = useContext(AppContext);
@@ -47,15 +92,7 @@ export default function WorkoutOrganizer() {
 
   const [showCreatePlan, setShowCreatePlan] = useState(false);
   const [newPlanName, setNewPlanName] = useState('');
-  const [planDays, setPlanDays] = useState([
-    { day: 'Monday', exercises: [] },
-    { day: 'Tuesday', exercises: [] },
-    { day: 'Wednesday', exercises: [] },
-    { day: 'Thursday', exercises: [] },
-    { day: 'Friday', exercises: [] },
-    { day: 'Saturday', exercises: [] },
-    { day: 'Sunday', exercises: [] },
-  ]);
+  const [planDays, setPlanDays] = useState(DAYS_OF_WEEK.map(day => ({ day, exercises: [] })));
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
   const [planSearch, setPlanSearch] = useState('');
   const [planResults, setPlanResults] = useState([]);
@@ -83,12 +120,15 @@ export default function WorkoutOrganizer() {
   const formatTime = (secs) => `${Math.floor(secs / 60)}:${(secs % 60).toString().padStart(2, '0')}`;
 
   const startWorkout = () => {
-    if (todayExercises.length === 0) return toast.error('Add exercises first!');
+    if (todayExercises.length === 0) {
+      showToast('Add exercises first!', 'error');
+      return;
+    }
     setIsWorkoutStarted(true);
     setCurrentExerciseIndex(0);
     setSecondsLeft(0);
     setIsResting(false);
-    toast.success('Workout Started! Let’s crush it! 💪', { icon: '🔥', duration: 4000 });
+    showToast('Workout Started! Let\'s crush it!', 'success', 'fire');
   };
 
   const nextExercise = () => {
@@ -98,7 +138,7 @@ export default function WorkoutOrganizer() {
       setSecondsLeft(todayExercises[nextIdx]?.rest || 90);
       setIsResting(true);
     } else {
-      toast.success('Workout Complete! You’re a beast! 🏆', { duration: 8000 });
+      showToast('Workout Complete! You\'re a beast!', 'success', 'fire');
       confetti({ particleCount: 400, spread: 100, origin: { y: 0.6 } });
       setIsWorkoutStarted(false);
       setCurrentExerciseIndex(0);
@@ -109,10 +149,10 @@ export default function WorkoutOrganizer() {
     try {
       const enriched = await enrichWithGif(ex);
       await addToTodayWorkout(enriched);
-      toast.success(`✅ ${enriched.name} added!`, { icon: '💪' });
+      showToast(`Added ${enriched.name}!`, 'success', 'muscle');
       loadAllData();
     } catch (err) {
-      toast.error('Already in today’s workout');
+      showToast('Already in today\'s workout', 'error');
     }
   };
 
@@ -124,7 +164,10 @@ export default function WorkoutOrganizer() {
   };
 
   const saveLog = async () => {
-    if (!weightInput || !repInput) return toast.error('Enter weight & reps');
+    if (!weightInput || !repInput) {
+      showToast('Enter weight & reps', 'error');
+      return;
+    }
     const weight = parseFloat(weightInput);
     const reps = parseInt(repInput);
     const oneRm = parseFloat((weight * (1 + reps / 30)).toFixed(2));
@@ -136,9 +179,9 @@ export default function WorkoutOrganizer() {
 
     if (oneRm > currentPR + 0.1) {
       confetti({ particleCount: 500, spread: 120 });
-      toast.success(`NEW PR! ${weight}kg × ${reps} = ${oneRm}kg 1RM 🏆🔥`, { duration: 10000 });
+      showToast(`NEW PR! ${weight}kg × ${reps} = ${oneRm}kg 1RM`, 'success', 'fire');
     } else {
-      toast.success(`Set ${loggingSet.setIndex + 1} logged!`);
+      showToast(`Set ${loggingSet.setIndex + 1} logged!`, 'success');
     }
 
     setLoggingSet(null);
@@ -160,7 +203,7 @@ export default function WorkoutOrganizer() {
         const enriched = await Promise.all((res.exercises || []).map(enrichWithGif));
         setPlanResults(enriched);
       } catch (e) {
-        toast.error('Search failed');
+        showToast('Search failed', 'error');
       } finally {
         setPlanLoading(false);
       }
@@ -168,87 +211,206 @@ export default function WorkoutOrganizer() {
     return () => clearTimeout(delay);
   }, [planSearch]);
 
-  const addToPlanDay = async (exercise) => {
-    const enriched = await enrichWithGif(exercise);
-    const withDefaults = { ...enriched, sets: 4, reps: 10, rest: 90 };
-    const updated = [...planDays];
-    updated[selectedDayIndex].exercises.push(withDefaults);
-    setPlanDays(updated);
-    toast.success(`Added to ${planDays[selectedDayIndex].day}!`);
+  // Add to selected day - FIXED
+  const addToPlanDay = async (dayIndex, exercise) => {
+    try {
+      const enriched = await enrichWithGif(exercise);
+      const withDefaults = { 
+        ...enriched, 
+        sets: 4, 
+        reps: 10, 
+        rest: 90,
+        // Ensure unique identifier
+        exerciseId: enriched.id || enriched.exerciseId
+      };
+      
+      setPlanDays(prev => {
+        const newDays = [...prev];
+        const targetDay = { ...newDays[dayIndex] };
+        
+        // Check if exercise already exists in this day
+        const existsInDay = targetDay.exercises.some(
+          ex => (ex.id || ex.exerciseId) === (withDefaults.id || withDefaults.exerciseId)
+        );
+        
+        if (existsInDay) {
+          showToast('Exercise already in this day', 'warning');
+          return prev;
+        }
+        
+        targetDay.exercises = [...targetDay.exercises, withDefaults];
+        newDays[dayIndex] = targetDay;
+        
+        showToast(`Added to ${DAYS_OF_WEEK[dayIndex]}!`, 'success', 'muscle');
+        return newDays;
+      });
+    } catch (error) {
+      console.error('Error adding to plan day:', error);
+      showToast('Failed to add exercise', 'error');
+    }
   };
 
-  const saveNewPlan = async () => {
-    if (!newPlanName.trim()) return toast.error('Enter plan name');
-    if (planDays.every(d => d.exercises.length === 0)) return toast.error('Add exercises');
+  const removeFromPlanDay = (dayIndex, exIndex) => {
+    setPlanDays(prev => {
+      const newDays = [...prev];
+      newDays[dayIndex] = {
+        ...newDays[dayIndex],
+        exercises: newDays[dayIndex].exercises.filter((_, idx) => idx !== exIndex)
+      };
+      return newDays;
+    });
+    showToast('Exercise removed', 'info');
+  };
 
-    if (editingPlanId) {
-      // For edit: update in DB would need update function, but we'll just replace in state
-      setPlans(plans.map(p => p.id === editingPlanId ? { ...p, name: newPlanName, days: planDays } : p));
-      toast.success('Plan updated! 🎉', { icon: '✏️' });
-    } else {
-      await saveWorkoutPlan(newPlanName, planDays);
-      toast.success('Plan saved & activated! 🚀', { icon: '✅' });
-    }
-    confetti({ particleCount: 300, spread: 80 });
+  const reorderPlanDay = (dayIndex, newOrder) => {
+    setPlanDays(prev => {
+      const newDays = [...prev];
+      newDays[dayIndex] = {
+        ...newDays[dayIndex],
+        exercises: newOrder
+      };
+      return newDays;
+    });
+  };
+
+  const handleCloseCreatePlan = () => {
     setShowCreatePlan(false);
-    setNewPlanName('');
-    setEditingPlanId(null);
-    setPlanDays(planDays.map(d => ({ ...d, exercises: [] })));
-    loadAllData();
+    // Reset all states
+    setTimeout(() => {
+      setPlanSearch('');
+      setPlanResults([]);
+      setNewPlanName('');
+      setEditingPlanId(null);
+      setPlanDays(DAYS_OF_WEEK.map(day => ({ day, exercises: [] })));
+      setSelectedDayIndex(0);
+    }, 300);
+  };
+
+  // FIXED: Save/Update Plan Logic
+  const saveNewPlan = async () => {
+    if (!newPlanName.trim()) {
+      showToast('Enter plan name', 'error');
+      return;
+    }
+    
+    const hasExercises = planDays.some(d => d.exercises.length > 0);
+    if (!hasExercises) {
+      showToast('Add at least one exercise', 'error');
+      return;
+    }
+
+    try {
+      if (editingPlanId) {
+        // UPDATE existing plan
+        const updatedPlan = {
+          id: editingPlanId,
+          name: newPlanName.trim(),
+          days: planDays.map(day => ({
+            ...day,
+            exercises: day.exercises.map(ex => ({
+              ...ex,
+              exerciseId: ex.id || ex.exerciseId,
+              id: ex.id || ex.exerciseId
+            }))
+          })),
+          updatedAt: new Date().toISOString()
+        };
+        
+        await updateWorkoutPlan(editingPlanId, updatedPlan);
+        showToast('Plan updated successfully!', 'success', 'rocket');
+        
+        // Update local state
+        setPlans(prev => prev.map(p => p.id === editingPlanId ? updatedPlan : p));
+        if (activePlan?.id === editingPlanId) {
+          setActivePlanState(updatedPlan);
+        }
+      } else {
+        // CREATE new plan
+        const newPlan = await saveWorkoutPlan(newPlanName.trim(), planDays);
+        showToast('Plan created & activated!', 'success', 'rocket');
+        confetti({ particleCount: 300, spread: 80 });
+      }
+      
+      handleCloseCreatePlan();
+      loadAllData();
+    } catch (error) {
+      console.error('Error saving plan:', error);
+      showToast('Failed to save plan', 'error');
+    }
   };
 
   const openEditPlan = (plan) => {
     setEditingPlanId(plan.id);
     setNewPlanName(plan.name);
-    setPlanDays(plan.days.map(d => ({ ...d, exercises: [...d.exercises] })));
+    
+    // Deep clone the plan days to avoid mutations
+    const clonedDays = DAYS_OF_WEEK.map(dayName => {
+      const planDay = plan.days.find(d => d.day === dayName);
+      return {
+        day: dayName,
+        exercises: planDay ? [...planDay.exercises.map(ex => ({ ...ex }))] : []
+      };
+    });
+    
+    setPlanDays(clonedDays);
+    setSelectedDayIndex(0);
+    setPlanSearch('');
+    setPlanResults([]);
     setShowCreatePlan(true);
   };
 
   const activatePlan = async (planId) => {
-    await setActivePlan(planId);
-    const plan = plans.find(p => p.id === planId);
-    setActivePlanState(plan);
-    toast.success('Plan activated! 💥', { icon: '✅', style: { background: '#10b981', color: 'white' } });
-    confetti({ particleCount: 150 });
-    loadAllData();
+    try {
+      await setActivePlan(planId);
+      const plan = plans.find(p => p.id === planId);
+      setActivePlanState(plan);
+      showToast('Plan activated!', 'success', 'rocket');
+      confetti({ particleCount: 150 });
+      loadAllData();
+    } catch (error) {
+      showToast('Failed to activate plan', 'error');
+    }
   };
 
-const deletePlanHandler = async (planId) => {
-  toast((t) => (
-    <div className="bg-gradient-to-r from-red-600 to-rose-600 p-6 rounded-3xl text-white">
-      <p className="text-2xl font-bold mb-4">🗑️ Delete this plan forever?</p>
-      <div className="flex gap-4">
-        <button onClick={() => { toast.dismiss(t.id); actuallyDelete(); }} className="bg-white text-black px-8 py-3 rounded-xl font-bold">
-          Yes, Delete
-        </button>
-        <button onClick={() => toast.dismiss(t.id)} className="bg-white/20 px-8 py-3 rounded-xl font-bold">
-          Cancel
-        </button>
-      </div>
-    </div>
-  ), { duration: Infinity });
-};
-
-const actuallyDelete = async () => {
-  // your delete code
-  toast.success('Plan deleted!', { icon: '🗑️' });
-};
-
-  const removeFromPlanDay = (dayIndex, exIndex) => {
-    const updated = [...planDays];
-    updated[dayIndex].exercises.splice(exIndex, 1);
-    setPlanDays(updated);
+  const deletePlanHandler = (planId) => {
+    toast.custom((t) => (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-gradient-to-r from-red-600 to-rose-600 p-6 rounded-3xl text-white shadow-2xl border border-white/20"
+      >
+        <p className="text-2xl font-bold mb-4">Delete this plan forever?</p>
+        <div className="flex gap-4">
+          <button 
+            onClick={() => { toast.dismiss(t.id); actuallyDelete(planId); }} 
+            className="bg-white text-red-600 px-8 py-3 rounded-xl font-bold hover:scale-105 transition-transform"
+          >
+            Yes, Delete
+          </button>
+          <button 
+            onClick={() => toast.dismiss(t.id)} 
+            className="bg-white/20 px-8 py-3 rounded-xl font-bold hover:bg-white/30 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </motion.div>
+    ), { duration: Infinity, position: 'top-center' });
   };
 
-  const reorderPlanDay = (dayIndex, newOrder) => {
-    const updated = [...planDays];
-    updated[dayIndex].exercises = newOrder;
-    setPlanDays(updated);
+  const actuallyDelete = async (planId) => {
+    try {
+      await deleteWorkoutPlan(planId);
+      showToast('Plan deleted!', 'info', 'trash');
+      loadAllData();
+    } catch (error) {
+      showToast('Failed to delete plan', 'error');
+    }
   };
 
   return (
     <>
-      <Toaster position="top-center" toastOptions={{ duration: 5000 }} />
+      <Toaster position="top-center" />
 
       <WorkoutModeOverlay
         isWorkoutStarted={isWorkoutStarted}
@@ -276,7 +438,7 @@ const actuallyDelete = async () => {
 
       <CreatePlanModal
         showCreatePlan={showCreatePlan}
-        setShowCreatePlan={setShowCreatePlan}
+        setShowCreatePlan={handleCloseCreatePlan}
         newPlanName={newPlanName}
         setNewPlanName={setNewPlanName}
         planDays={planDays}
@@ -333,10 +495,7 @@ const actuallyDelete = async () => {
 
             {activeTab === 'favorites' && (
               <motion.div key="favorites" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
-                <FavoritesTab
-                  fullFavorites={fullFavorites}
-                  quickAdd={quickAdd}
-                />
+                <FavoritesTab fullFavorites={fullFavorites} quickAdd={quickAdd} />
               </motion.div>
             )}
 

@@ -98,7 +98,7 @@ export const getFavorites = async () => {
 ================================================================== */
 export const addToTodayWorkout = async (exercise, custom = {}) => {
   const exists = await db.todayWorkout.where('exerciseId').equals(exercise.id).first();
-  if (exists) throw new Error('Already in today’s workout');
+  if (exists) throw new Error('Already in today\'s workout');
 
   const order = await db.todayWorkout.count();
 
@@ -153,12 +153,17 @@ export const clearTodayWorkout = async () => {
    WORKOUT PLANS
 ================================================================== */
 export const saveWorkoutPlan = async (name, days) => {
+  // First, deactivate all existing plans
+  await db.workoutPlans.toCollection().modify({ isActive: 0 });
+  
+  // Create new plan and set it as active
   const id = await db.workoutPlans.add({
     name,
     days,
     createdAt: Date.now(),
-    isActive: false
+    isActive: 1 // Set new plan as active
   });
+  
   notifyChange();
   return id;
 };
@@ -168,18 +173,47 @@ export const getWorkoutPlans = async () => {
 };
 
 export const getActivePlan = async () => {
-  return await db.workoutPlans.where('isActive').equals(1).first(); // ← FIXED: 1 instead of true
+  return await db.workoutPlans.where('isActive').equals(1).first();
 };
 
 export const setActivePlan = async (id) => {
-  await db.workoutPlans.toCollection().modify({ isActive: 0 }); // ← FIXED: 0 instead of false
-  if (id) await db.workoutPlans.update(id, { isActive: 1 });     // ← FIXED: 1 instead of true
+  await db.workoutPlans.toCollection().modify({ isActive: 0 });
+  if (id) await db.workoutPlans.update(id, { isActive: 1 });
   notifyChange();
 };
 
 export const deleteWorkoutPlan = async (id) => {
   await db.workoutPlans.delete(id);
   notifyChange();
+};
+
+/**
+ * UPDATE WORKOUT PLAN - NEW FUNCTION
+ * Updates an existing workout plan with new data
+ */
+export const updateWorkoutPlan = async (planId, updatedData) => {
+  try {
+    const existingPlan = await db.workoutPlans.get(planId);
+    if (!existingPlan) {
+      throw new Error('Plan not found');
+    }
+    
+    // Update the plan while preserving important fields
+    await db.workoutPlans.update(planId, {
+      name: updatedData.name,
+      days: updatedData.days,
+      updatedAt: Date.now(),
+      // Preserve these fields
+      createdAt: existingPlan.createdAt,
+      isActive: existingPlan.isActive
+    });
+    
+    notifyChange();
+    console.log('Plan updated successfully:', planId);
+  } catch (error) {
+    console.error('Error updating workout plan:', error);
+    throw error;
+  }
 };
 
 /* ==================================================================
@@ -203,6 +237,61 @@ export const getExerciseHistory = async (exerciseId) => {
     .sortBy('date');
 
   return { logs };
+};
+
+export const getExercisePR = async (exerciseId) => {
+  try {
+    const logs = await db.exerciseLogs
+      .where('exerciseId')
+      .equals(exerciseId)
+      .toArray();
+    
+    if (logs.length === 0) return null;
+    
+    // Find highest 1RM
+    const maxLog = logs.reduce((max, log) => 
+      log.oneRm > max.oneRm ? log : max
+    );
+    
+    return {
+      weight: maxLog.weight,
+      reps: maxLog.reps,
+      oneRm: maxLog.oneRm,
+      date: maxLog.date
+    };
+  } catch (error) {
+    console.error('Failed to get PR:', error);
+    return null;
+  }
+};
+
+export const getAllExerciseHistory = async () => {
+  try {
+    const logs = await db.exerciseLogs.toArray();
+    
+    // Group by exerciseId and find PR for each
+    const history = {};
+    
+    for (const log of logs) {
+      if (!history[log.exerciseId]) {
+        history[log.exerciseId] = {
+          logs: [],
+          pr: 0
+        };
+      }
+      
+      history[log.exerciseId].logs.push(log);
+      
+      if (log.oneRm > history[log.exerciseId].pr) {
+        history[log.exerciseId].pr = log.oneRm;
+      }
+    }
+    
+    return history;
+  } catch (error) {
+    console.error('Failed to get all exercise history:', error);
+    return {};
+  }
 };
 
 /* ==================================================================
