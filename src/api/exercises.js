@@ -3,7 +3,7 @@ const API_BASE = 'https://exercisedb-api.vercel.app/api/v1';
 
 export const fetchExercises = async (page = 0, options = {}) => {
   try {
-    const { bodyPart = null, limit = 20 } = options;
+    const { bodyPart = null, limit = 25 } = options;
     let url = `${API_BASE}/exercises?offset=${page * limit}&limit=${limit}`;
 
     if (bodyPart && bodyPart !== 'all') {
