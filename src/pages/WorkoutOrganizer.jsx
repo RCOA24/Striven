@@ -4,20 +4,21 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
+import confetti from 'canvas-confetti'; // ← THIS WAS MISSING
 import { 
   Dumbbell, Play, Pause, SkipForward, Trash2, Plus, Heart, Search, Loader2,
-  X, GripVertical, ChevronLeft, ChevronRight, Info, ChevronDown, ChevronUp
+  X, GripVertical, ChevronLeft, ChevronRight, Info, ChevronDown, ChevronUp,
+  Trophy, Save, Check, HeartPulse, Clock // ← THESE WERE MISSING
 } from 'lucide-react';
 import { 
   getTodayWorkout, clearTodayWorkout, reorderTodayWorkout, removeFromToday, 
   addToTodayWorkout, getFavorites, getWorkoutPlans, setActivePlan, saveWorkoutPlan, 
-  getActivePlan 
+  getActivePlan, getExerciseHistory, saveSetLog // ← THESE TWO WERE MISSING
 } from '../utils/db';
 import { fetchExercises, fetchExerciseDetails } from '../api/exercises';
 import { AppContext } from '../App';
 
 const FALLBACK_GIF = 'https://via.placeholder.com/400x300/1a1a1a/ffffff?text=No+GIF';
-
 const LIMIT = 20;
 
 export default function WorkoutOrganizer() {
@@ -34,8 +35,15 @@ export default function WorkoutOrganizer() {
   const [showCreatePlan, setShowCreatePlan] = useState(false);
   const [selectedExercise, setSelectedExercise] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [instructionsOpen, setInstructionsOpen] = useState(true);
 
-  // Plan Creation - Mobile Responsive
+  // Weight Logging + PR
+  const [loggingSet, setLoggingSet] = useState(null);
+  const [weightInput, setWeightInput] = useState('');
+  const [repInput, setRepInput] = useState('');
+  const [exerciseHistory, setExerciseHistory] = useState({});
+
+  // Plan Creation
   const [newPlanName, setNewPlanName] = useState('');
   const [planDays, setPlanDays] = useState([
     { day: 'Monday', exercises: [] },
@@ -51,10 +59,9 @@ export default function WorkoutOrganizer() {
   const [planResults, setPlanResults] = useState([]);
   const [planLoading, setPlanLoading] = useState(false);
 
-  // Modal GIF Gallery
+  // GIF Gallery
   const [currentGifIndex, setCurrentGifIndex] = useState(0);
   const touchStartX = useRef(0);
-
   const intervalRef = useRef(null);
 
   useEffect(() => {
@@ -86,6 +93,18 @@ export default function WorkoutOrganizer() {
       })
     );
     setFullFavorites(fullFavs);
+
+    // Load PR history
+    const history = {};
+    for (const ex of today) {
+      const hist = await getExerciseHistory(ex.id);
+      const pr = hist?.logs?.reduce((max, log) => {
+        const oneRm = log.weight * (1 + log.reps / 30);
+        return oneRm > max ? oneRm : max;
+      }, 0) || 0;
+      history[ex.id] = { ...hist, pr };
+    }
+    setExerciseHistory(history);
   };
 
   // Plan Search
@@ -184,7 +203,7 @@ export default function WorkoutOrganizer() {
       setSecondsLeft(todayExercises[currentExerciseIndex + 1]?.rest || 90);
       setIsResting(true);
     } else {
-      toast.success('Workout Complete! 🎉');
+      toast.success('Workout Complete! 🎉🎉🎉');
       setIsWorkoutStarted(false);
     }
   };
@@ -198,7 +217,53 @@ export default function WorkoutOrganizer() {
     loadAllData();
   };
 
-  // Touch swipe for GIF
+  // Weight Logging + PR
+  const openLogModal = (exerciseId, setIndex) => {
+    setLoggingSet({ exerciseId, setIndex });
+    const ex = todayExercises.find(e => e.id === exerciseId);
+    setRepInput(ex.reps.toString());
+    setWeightInput('');
+  };
+
+  const saveLog = async () => {
+    if (!weightInput || !repInput) return toast.error('Enter weight & reps');
+
+    const weight = parseFloat(weightInput);
+    const reps = parseInt(repInput);
+    const oneRm = weight * (1 + reps / 30);
+
+    const ex = todayExercises.find(e => e.id === loggingSet.exerciseId);
+    const currentPR = exerciseHistory[ex.id]?.pr || 0;
+
+    await saveSetLog(ex.id, {
+      date: new Date().toISOString().split('T')[0],
+      weight,
+      reps,
+      oneRm,
+      set: loggingSet.setIndex + 1
+    });
+
+    if (oneRm > currentPR + 0.1) {
+      confetti({
+        particleCount: 300,
+        spread: 100,
+        origin: { y: 0.6 }
+      });
+      toast.success(`🏆 PR SMASHED! ${weight}kg × ${reps} = ${oneRm.toFixed(1)}kg 1RM`, {
+        duration: 8000,
+        icon: '🔥'
+      });
+    } else {
+      toast.success(`Set ${loggingSet.setIndex + 1} logged!`);
+    }
+
+    setLoggingSet(null);
+    setWeightInput('');
+    setRepInput('');
+    loadAllData();
+  };
+
+  // GIF Swipe
   const handleTouchStart = (e) => touchStartX.current = e.touches[0].clientX;
   const handleTouchEnd = (e) => {
     const diff = touchStartX.current - e.changedTouches[0].clientX;
@@ -212,13 +277,55 @@ export default function WorkoutOrganizer() {
   };
 
   const images = selectedExercise?.images || [];
-  const currentImage = images.length > 0 ? (images[currentGifIndex]?.image || selectedExercise.gifUrl || FALLBACK_GIF) : (selectedExercise?.gifUrl || FALLBACK_GIF);
+  const currentImage = images.length > 0 
+    ? (images[currentGifIndex]?.image || selectedExercise.gifUrl || FALLBACK_GIF)
+    : (selectedExercise?.gifUrl || FALLBACK_GIF);
 
   return (
     <>
       <Toaster position="top-center" />
 
-      {/* RICH MODAL WITH SWIPEABLE GIF */}
+      {/* WEIGHT LOGGING MODAL */}
+      <AnimatePresence>
+        {loggingSet && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }}
+              className="bg-gradient-to-br from-gray-900 to-black rounded-3xl p-8 max-w-sm w-full border border-emerald-500/30">
+              <h3 className="text-2xl font-bold mb-6 text-center">
+                Log Set {loggingSet.setIndex + 1}
+              </h3>
+              <div className="space-y-4">
+                <input
+                  type="number"
+                  placeholder="Weight (kg)"
+                  value={weightInput}
+                  onChange={e => setWeightInput(e.target.value)}
+                  className="w-full px-4 py-4 rounded-xl bg-white/10 border border-white/20 text-xl"
+                  autoFocus
+                />
+                <input
+                  type="number"
+                  placeholder="Reps"
+                  value={repInput}
+                  onChange={e => setRepInput(e.target.value)}
+                  className="w-full px-4 py-4 rounded-xl bg-white/10 border border-white/20 text-xl"
+                />
+                <div className="flex gap-3">
+                  <button onClick={saveLog} className="flex-1 bg-emerald-500 hover:bg-emerald-400 py-4 rounded-xl font-bold text-xl flex items-center justify-center gap-2">
+                    <Save className="w-6 h-6" /> Save
+                  </button>
+                  <button onClick={() => setLoggingSet(null)} className="px-8 py-4 bg-white/10 rounded-xl font-bold">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* EXERCISE MODAL WITH PR */}
       <AnimatePresence>
         {isModalOpen && selectedExercise && (
           <motion.div
@@ -241,11 +348,7 @@ export default function WorkoutOrganizer() {
                 </button>
               </div>
 
-              <div className="p-6 space-y-8"
-                onTouchStart={handleTouchStart}
-                onTouchEnd={handleTouchEnd}
-              >
-                {/* Swipeable GIF Gallery */}
+              <div className="p-6 space-y-8" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
                 {(selectedExercise.gifUrl || images.length > 0) && (
                   <div className="mb-8">
                     <div className="relative rounded-2xl overflow-hidden bg-black/40 border border-emerald-500/30">
@@ -255,7 +358,7 @@ export default function WorkoutOrganizer() {
                         className="w-full aspect-video object-contain bg-black"
                         onError={e => e.target.src = FALLBACK_GIF}
                       />
-                      {(images.length > 1 || selectedExercise.gifUrl) && (
+                      {images.length > 1 && (
                         <>
                           <button onClick={() => setCurrentGifIndex(i => i > 0 ? i - 1 : images.length - 1)} className="absolute left-3 top-1/2 -translate-y-1/2 p-3 bg-black/70 hover:bg-emerald-600 rounded-full">
                             <ChevronLeft className="w-6 h-6" />
@@ -264,7 +367,7 @@ export default function WorkoutOrganizer() {
                             <ChevronRight className="w-6 h-6" />
                           </button>
                           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/80 px-4 py-1.5 rounded-full text-sm">
-                            {currentGifIndex + 1} / {images.length || 1}
+                            {currentGifIndex + 1} / {images.length}
                           </div>
                         </>
                       )}
@@ -272,7 +375,16 @@ export default function WorkoutOrganizer() {
                   </div>
                 )}
 
-                {/* Quick Stats */}
+                {exerciseHistory[selectedExercise.id]?.pr > 0 && (
+                  <div className="bg-gradient-to-r from-amber-500 to-orange-600 rounded-2xl p-6 flex items-center gap-4">
+                    <Trophy className="w-12 h-12" />
+                    <div>
+                      <div className="text-2xl font-bold">Personal Record</div>
+                      <div className="text-4xl font-black">{exerciseHistory[selectedExercise.id].pr.toFixed(1)}kg 1RM</div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {['muscles', 'equipment', 'musclesSecondary', 'category'].map((key, i) => {
                     const icons = [HeartPulse, Dumbbell, HeartPulse, Clock];
@@ -290,7 +402,6 @@ export default function WorkoutOrganizer() {
                   })}
                 </div>
 
-                {/* Instructions */}
                 {selectedExercise.steps?.length > 0 && (
                   <div className="bg-gradient-to-r from-emerald-900/20 to-teal-900/20 rounded-2xl border border-emerald-500/40">
                     <button
@@ -327,7 +438,7 @@ export default function WorkoutOrganizer() {
       </AnimatePresence>
 
       <div className="min-h-screen bg-gradient-to-br from-black via-gray-950 to-black text-white">
-        {/* Full Workout Mode */}
+        {/* FULL WORKOUT MODE WITH LOGGING */}
         <AnimatePresence>
           {isWorkoutStarted && todayExercises.length > 0 && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -338,17 +449,55 @@ export default function WorkoutOrganizer() {
                   <p className="text-3xl text-emerald-400">
                     {todayExercises[currentExerciseIndex].sets} × {todayExercises[currentExerciseIndex].reps}
                   </p>
+                  {exerciseHistory[todayExercises[currentExerciseIndex].id]?.pr > 0 && (
+                    <p className="text-2xl text-amber-400 mt-4">
+                      <Trophy className="inline w-8 h-8" /> PR: {exerciseHistory[todayExercises[currentExerciseIndex].id].pr.toFixed(1)}kg
+                    </p>
+                  )}
                 </motion.div>
-                <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-12 text-center">
-                  <div className="text-9xl font-bold mb-8">{formatTime(secondsLeft)}</div>
-                  <p className="text-3xl">{isResting ? 'Rest' : 'Work'}</p>
+
+                <div className="mb-12 rounded-3xl overflow-hidden bg-black/40 border-4 border-emerald-500/50">
+                  <img 
+                    src={todayExercises[currentExerciseIndex].gifUrl || FALLBACK_GIF}
+                    alt={todayExercises[currentExerciseIndex].name}
+                    className="w-full aspect-video object-contain"
+                    onError={e => e.target.src = FALLBACK_GIF}
+                  />
                 </div>
-                <div className="flex justify-center gap-8 mt-12">
-                  <button onClick={() => setIsWorkoutStarted(false)} className="p-6 bg-red-600 rounded-full">
-                    <Pause className="w-12 h-12" />
+
+                <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-12 text-center mb-12">
+                  <div className="text-9xl font-bold mb-8">{formatTime(secondsLeft)}</div>
+                  <p className="text-4xl">{isResting ? 'Rest' : 'Work'}</p>
+                </div>
+
+                <div className="space-y-4 mb-12">
+                  <h3 className="text-3xl font-bold text-center mb-6">Log Your Sets</h3>
+                  {[...Array(todayExercises[currentExerciseIndex].sets)].map((_, i) => {
+                    const log = exerciseHistory[todayExercises[currentExerciseIndex].id]?.logs?.find(l => l.set === i + 1);
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => openLogModal(todayExercises[currentExerciseIndex].id, i)}
+                        className={`w-full py-6 rounded-2xl font-bold text-2xl transition-all ${
+                          log ? 'bg-emerald-500 text-black' : 'bg-white/10 hover:bg-white/20'
+                        }`}
+                      >
+                        {log 
+                          ? `Set ${i+1}: ${log.weight}kg × ${log.reps} ${log.oneRm > (exerciseHistory[todayExercises[currentExerciseIndex].id]?.pr || 0) ? '🔥 PR!' : ''}`
+                          : `Set ${i+1}`
+                        }
+                        {log && <Check className="inline ml-3 w-8 h-8" />}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex justify-center gap-12">
+                  <button onClick={() => setIsWorkoutStarted(false)} className="p-8 bg-red-600 rounded-full hover:bg-red-500">
+                    <Pause className="w-16 h-16" />
                   </button>
-                  <button onClick={nextExercise} className="p-6 bg-emerald-500 rounded-full">
-                    <SkipForward className="w-12 h-12" />
+                  <button onClick={nextExercise} className="p-8 bg-emerald-500 rounded-full hover:bg-emerald-400">
+                    <SkipForward className="w-16 h-16" />
                   </button>
                 </div>
               </div>
@@ -356,6 +505,7 @@ export default function WorkoutOrganizer() {
           )}
         </AnimatePresence>
 
+        {/* MAIN UI */}
         <div className="max-w-7xl mx-auto p-4 sm:p-6">
           <motion.h1 initial={{ y: -40 }} animate={{ y: 0 }}
             className="text-4xl sm:text-5xl md:text-6xl font-bold text-center mb-12 flex items-center justify-center gap-4">
@@ -363,7 +513,6 @@ export default function WorkoutOrganizer() {
             Workout Organizer
           </motion.h1>
 
-          {/* Tabs */}
           <div className="flex justify-center gap-3 mb-8 flex-wrap">
             {['today', 'favorites', 'plans'].map(tab => (
               <button key={tab} onClick={() => setActiveTab(tab)}
@@ -413,7 +562,7 @@ export default function WorkoutOrganizer() {
                       <motion.div layout className="bg-white/5 backdrop-blur-md rounded-2xl p-5 flex items-center gap-3 border border-white/10">
                         <GripVertical className="text-white/30 cursor-grab w-6 h-6" />
                         <span className="text-xl font-bold text-emerald-400 w-10">{i + 1}</span>
-                        <img src={ex.gifUrl || FALLBACK_GIF} alt="" className="w-16 h-16 rounded-xl object-cover" />
+                        <img src={ex.gifUrl || FALLBACK_GIF} alt="" className="w-16 h-16 rounded-xl object-cover" onError={e => e.target.src = FALLBACK_GIF} />
                         <div className="flex-1">
                           <h3 className="font-bold">{ex.name}</h3>
                           <p className="text-white/60 text-sm">{ex.muscles} • {ex.equipment}</p>
@@ -454,7 +603,7 @@ export default function WorkoutOrganizer() {
                     }}
                   >
                     <div className="relative h-40 bg-black/50">
-                      <img src={ex.gifUrl || FALLBACK_GIF} alt="" className="w-full h-full object-cover" />
+                      <img src={ex.gifUrl || FALLBACK_GIF} alt="" className="w-full h-full object-cover" onError={e => e.target.src = FALLBACK_GIF} />
                       <Heart className="absolute top-3 right-3 w-7 h-7 text-rose-500 fill-current" />
                     </div>
                     <div className="p-4">
@@ -506,7 +655,7 @@ export default function WorkoutOrganizer() {
           )}
         </div>
 
-        {/* RESPONSIVE CREATE PLAN MODAL */}
+        {/* CREATE PLAN MODAL */}
         <AnimatePresence>
           {showCreatePlan && (
             <motion.div
@@ -522,7 +671,6 @@ export default function WorkoutOrganizer() {
                 className="bg-gradient-to-br from-gray-900 to-black rounded-3xl w-full max-w-6xl max-h-[90vh] overflow-hidden border border-emerald-500/30 flex flex-col"
                 onClick={e => e.stopPropagation()}
               >
-                {/* Header */}
                 <div className="p-6 border-b border-white/10">
                   <h2 className="text-2xl font-bold mb-4">Create New Plan</h2>
                   <input
@@ -534,9 +682,7 @@ export default function WorkoutOrganizer() {
                   />
                 </div>
 
-                {/* Mobile: Stack | Desktop: Side by side */}
                 <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
-                  {/* Days */}
                   <div className="w-full lg:w-60 bg-white/5 border-b lg:border-b-0 lg:border-r border-white/10 overflow-y-auto">
                     {planDays.map((day, i) => (
                       <button
@@ -552,7 +698,6 @@ export default function WorkoutOrganizer() {
                     ))}
                   </div>
 
-                  {/* Search + Results */}
                   <div className="flex-1 flex flex-col">
                     <div className="p-5 border-b border-white/10">
                       <div className="relative">
@@ -564,34 +709,33 @@ export default function WorkoutOrganizer() {
                           onChange={e => setPlanSearch(e.target.value)}
                           className="w-full pl-12 pr-4 py-3 rounded-xl bg-white/10 border border-white/20"
                         />
-                  </div>
-                  {planLoading ? (
-                    <div className="flex justify-center py-20">
-                      <Loader2 className="w-10 h-10 text-emerald-400 animate-spin" />
-                    </div>
-                  ) : planResults.length === 0 ? (
-                    <p className="text-center text-white/60 py-20">Type to search</p>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 max-h-96 overflow-y-auto">
-                      {planResults.map(ex => (
-                        <motion.div
-                          key={ex.id}
-                          whileHover={{ scale: 1.02 }}
-                          onClick={() => addToPlanDay(ex)}
-                          className="bg-white/5 rounded-2xl p-4 flex items-center gap-4 border border-white/10 hover:border-emerald-500/50 cursor-pointer"
-                        >
-                          <img src={ex.gifUrl || FALLBACK_GIF} alt="" className="w-16 h-16 rounded-xl object-cover" />
-                          <div>
-                            <h4 className="font-bold">{ex.name}</h4>
-                            <p className="text-sm text-white/60">{ex.muscles}</p>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                  )}
+                      </div>
+                      {planLoading ? (
+                        <div className="flex justify-center py-20">
+                          <Loader2 className="w-10 h-10 text-emerald-400 animate-spin" />
+                        </div>
+                      ) : planResults.length === 0 ? (
+                        <p className="text-center text-white/60 py-20">Type to search</p>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 max-h-96 overflow-y-auto">
+                          {planResults.map(ex => (
+                            <motion.div
+                              key={ex.id}
+                              whileHover={{ scale: 1.02 }}
+                              onClick={() => addToPlanDay(ex)}
+                              className="bg-white/5 rounded-2xl p-4 flex items-center gap-4 border border-white/10 hover:border-emerald-500/50 cursor-pointer"
+                            >
+                              <img src={ex.gifUrl || FALLBACK_GIF} alt="" className="w-16 h-16 rounded-xl object-cover" onError={e => e.target.src = FALLBACK_GIF} />
+                              <div>
+                                <h4 className="font-bold">{ex.name}</h4>
+                                <p className="text-sm text-white/60">{ex.muscles}</p>
+                              </div>
+                            </motion.div>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
-                    {/* Selected Day Exercises */}
                     <div className="flex-1 p-5 overflow-y-auto bg-black/20">
                       <h3 className="text-xl font-bold text-emerald-400 mb-4">
                         {planDays[selectedDayIndex].day} ({planDays[selectedDayIndex].exercises.length})
@@ -605,7 +749,7 @@ export default function WorkoutOrganizer() {
                               <motion.div layout className="bg-white/10 rounded-xl p-4 mb-3 flex items-center gap-3">
                                 <GripVertical className="text-white/30 cursor-grab" />
                                 <span className="text-emerald-400 font-bold w-8">{i + 1}</span>
-                                <img src={ex.gifUrl || FALLBACK_GIF} alt="" className="w-12 h-12 rounded-lg object-cover" />
+                                <img src={ex.gifUrl || FALLBACK_GIF} alt="" className="w-12 h-12 rounded-lg object-cover" onError={e => e.target.src = FALLBACK_GIF} />
                                 <div className="flex-1 text-sm">
                                   <div className="font-bold">{ex.name}</div>
                                   <div className="text-white/60">{ex.sets}×{ex.reps} • Rest {ex.rest}s</div>
@@ -622,7 +766,6 @@ export default function WorkoutOrganizer() {
                   </div>
                 </div>
 
-                {/* Footer */}
                 <div className="p-6 border-t border-white/10 flex flex-col sm:flex-row gap-4">
                   <button onClick={saveNewPlan} className="flex-1 bg-emerald-500 hover:bg-emerald-400 py-4 rounded-xl font-bold text-lg">
                     Save Plan

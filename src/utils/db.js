@@ -11,24 +11,35 @@ db.version(1).stores({
   goals: '++id, type, target, current, date, completed'
 });
 
-// Version 2: Add workout features (safe migration)
+// Version 2: Workout features
 db.version(2).stores({
   activities: '++id, date, steps, distance, calories, duration, timestamp',
   weeklyStats: '++id, weekStart, totalSteps, totalDistance, totalCalories, totalDuration',
   settings: '++id, key, value',
   goals: '++id, type, target, current, date, completed',
-
-  // === NEW: Workout Features ===
-  favorites: '++id, exerciseId, name, muscles, equipment, category, gifUrl, addedAt', // Indexed by exerciseId
-  todayWorkout: '++id, exerciseId, name, sets, reps, weight, rest, notes, order, addedAt', // order for drag-reorder
-  workoutPlans: '++id, name, days, createdAt, isActive' // days = array of {day: "Monday", exercises: [...]}
+  favorites: '++id, exerciseId, name, muscles, equipment, category, gifUrl, addedAt',
+  todayWorkout: '++id, exerciseId, name, sets, reps, weight, rest, notes, order, addedAt',
+  workoutPlans: '++id, name, days, createdAt, isActive'
 }).upgrade(tx => {
-  // Optional: migrate old data if needed
-  console.log('Upgraded to v2: Added favorites, todayWorkout, workoutPlans');
+  console.log('Upgraded to v2: Added workout features');
+});
+
+// Version 3: ADD WEIGHT LOGS + PR TRACKING
+db.version(3).stores({
+  activities: '++id, date, steps, distance, calories, duration, timestamp',
+  weeklyStats: '++id, weekStart, totalSteps, totalDistance, totalCalories, totalDuration',
+  settings: '++id, key, value',
+  goals: '++id, type, target, current, date, completed',
+  favorites: '++id, exerciseId, name, muscles, equipment, category, gifUrl, addedAt',
+  todayWorkout: '++id, exerciseId, name, sets, reps, weight, rest, notes, order, addedAt',
+  workoutPlans: '++id, name, days, createdAt, isActive',
+  exerciseLogs: '++id, exerciseId, date, set, weight, reps, oneRm' // NEW TABLE
+}).upgrade(tx => {
+  console.log('Upgraded to v3: Added exerciseLogs for PRs & weight tracking');
 });
 
 /* ==================================================================
-   FAVORITES (Save Exercise)
+   FAVORITES
 ================================================================== */
 export const addToFavorites = async (exercise) => {
   const exists = await db.favorites.where('exerciseId').equals(exercise.id).first();
@@ -104,7 +115,6 @@ export const updateTodayExercise = async (id, updates) => {
 };
 
 export const reorderTodayWorkout = async (newOrder) => {
-  // newOrder = array of IDs in desired order
   const tx = db.transaction('rw', db.todayWorkout, async () => {
     for (let i = 0; i < newOrder.length; i++) {
       await db.todayWorkout.update(newOrder[i], { order: i });
@@ -122,10 +132,9 @@ export const clearTodayWorkout = async () => {
 };
 
 /* ==================================================================
-   WORKOUT PLANS (PPL, Upper/Lower, etc.)
+   WORKOUT PLANS
 ================================================================== */
 export const saveWorkoutPlan = async (name, days) => {
-  // days: [{ day: "Monday", exercises: [{...exercise, sets, reps...}] }, ...]
   return await db.workoutPlans.add({
     name,
     days,
@@ -144,7 +153,7 @@ export const getActivePlan = async () => {
 
 export const setActivePlan = async (id) => {
   await db.workoutPlans.toCollection().modify({ isActive: false });
-  await db.workoutPlans.update(id, { isActive: true });
+  if (id) await db.workoutPlans.update(id, { isActive: true });
 };
 
 export const deleteWorkoutPlan = async (id) => {
@@ -152,11 +161,31 @@ export const deleteWorkoutPlan = async (id) => {
 };
 
 /* ==================================================================
-   ORIGINAL FUNCTIONS (unchanged + improved)
+   NEW: WEIGHT LOGS & PR TRACKING
 ================================================================== */
-// Activities, Weekly Stats, Settings, Goals — all your original code (kept intact)
-// ... [your original functions here — I’ll keep them clean below]
+export const saveSetLog = async (exerciseId, log) => {
+  return await db.exerciseLogs.add({
+    exerciseId,
+    date: log.date || new Date().toISOString().split('T')[0],
+    set: log.set,
+    weight: log.weight,
+    reps: log.reps,
+    oneRm: log.oneRm || log.weight * (1 + log.reps / 30)
+  });
+};
 
+export const getExerciseHistory = async (exerciseId) => {
+  const logs = await db.exerciseLogs
+    .where('exerciseId')
+    .equals(exerciseId)
+    .sortBy('date');
+
+  return { logs };
+};
+
+/* ==================================================================
+   ORIGINAL FUNCTIONS (100% unchanged)
+================================================================== */
 export const addActivity = async (activity) => {
   try {
     const id = await db.activities.add({
@@ -179,69 +208,6 @@ export const getActivities = async (limit = 50) => {
     return [];
   }
 };
-
-// ... (all your other original functions — getActivitiesByDateRange, deleteActivity, etc.)
-// I'll include them all at the end for completeness
-
-/* ==================================================================
-   FULL EXPORT / IMPORT (Now includes ALL tables)
-================================================================== */
-export const exportData = async () => {
-  try {
-    const data = {
-      activities: await db.activities.toArray(),
-      weeklyStats: await db.weeklyStats.toArray(),
-      settings: await db.settings.toArray(),
-      goals: await db.goals.toArray(),
-      favorites: await db.favorites.toArray(),
-      todayWorkout: await db.todayWorkout.toArray(),
-      workoutPlans: await db.workoutPlans.toArray(),
-      exportDate: new Date().toISOString(),
-      appVersion: '2.0'
-    };
-    return data;
-  } catch (error) {
-    console.error('Export failed:', error);
-    throw error;
-  }
-};
-
-export const importData = async (data) => {
-  try {
-    const tx = db.transaction('rw', db.tableNames, async () => {
-      if (data.activities) await db.activities.bulkPut(data.activities);
-      if (data.weeklyStats) await db.weeklyStats.bulkPut(data.weeklyStats);
-      if (data.settings) await db.settings.bulkPut(data.settings);
-      if (data.goals) await db.goals.bulkPut(data.goals);
-      if (data.favorites) await db.favorites.bulkPut(data.favorites);
-      if (data.todayWorkout) await db.todayWorkout.bulkPut(data.todayWorkout);
-      if (data.workoutPlans) await db.workoutPlans.bulkPut(data.workoutPlans);
-    });
-    await tx;
-  } catch (error) {
-    console.error('Import failed:', error);
-    throw error;
-  }
-};
-
-export const clearAllData = async () => {
-  try {
-    await db.transaction('rw', db.tables, async () => {
-      for (const table of db.tables) {
-        if (table.name !== 'settings') await table.clear();
-      }
-    });
-  } catch (error) {
-    console.error('Clear all failed:', error);
-    throw error;
-  }
-};
-
-/* ==================================================================
-   YOUR ORIGINAL FUNCTIONS (full list — safe & clean)
-================================================================== */
-// Paste all your original helper functions here (getActivitiesByDateRange, updateWeeklyStats, etc.)
-// They remain 100% unchanged and fully compatible.
 
 export const getActivitiesByDateRange = async (startDate, endDate) => {
   try {
@@ -382,6 +348,62 @@ export const getTotalStats = async () => {
   } catch (error) {
     console.error('Failed to get total stats:', error);
     return { totalSteps: 0, totalDistance: 0, totalCalories: 0, totalDuration: 0, totalActivities: 0 };
+  }
+};
+
+/* ==================================================================
+   EXPORT / IMPORT
+================================================================== */
+export const exportData = async () => {
+  try {
+    const data = {
+      activities: await db.activities.toArray(),
+      weeklyStats: await db.weeklyStats.toArray(),
+      settings: await db.settings.toArray(),
+      goals: await db.goals.toArray(),
+      favorites: await db.favorites.toArray(),
+      todayWorkout: await db.todayWorkout.toArray(),
+      workoutPlans: await db.workoutPlans.toArray(),
+      exerciseLogs: await db.exerciseLogs.toArray(),
+      exportDate: new Date().toISOString(),
+      appVersion: '3.0'
+    };
+    return data;
+  } catch (error) {
+    console.error('Export failed:', error);
+    throw error;
+  }
+};
+
+export const importData = async (data) => {
+  try {
+    const tx = db.transaction('rw', db.tableNames, async () => {
+      if (data.activities) await db.activities.bulkPut(data.activities);
+      if (data.weeklyStats) await db.weeklyStats.bulkPut(data.weeklyStats);
+      if (data.settings) await db.settings.bulkPut(data.settings);
+      if (data.goals) await db.goals.bulkPut(data.goals);
+      if (data.favorites) await db.favorites.bulkPut(data.favorites);
+      if (data.todayWorkout) await db.todayWorkout.bulkPut(data.todayWorkout);
+      if (data.workoutPlans) await db.workoutPlans.bulkPut(data.workoutPlans);
+      if (data.exerciseLogs) await db.exerciseLogs.bulkPut(data.exerciseLogs);
+    });
+    await tx;
+  } catch (error) {
+    console.error('Import failed:', error);
+    throw error;
+  }
+};
+
+export const clearAllData = async () => {
+  try {
+    await db.transaction('rw', db.tables, async () => {
+      for (const table of db.tables) {
+        if (table.name !== 'settings') await table.clear();
+      }
+    });
+  } catch (error) {
+    console.error('Clear all failed:', error);
+    throw error;
   }
 };
 
