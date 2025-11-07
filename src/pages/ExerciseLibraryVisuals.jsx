@@ -1,4 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+// src/pages/ExerciseLibraryVisuals.jsx
+'use client';
+
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Dumbbell, Loader2, AlertCircle } from 'lucide-react';
 import { fetchExercises, fetchExerciseDetails, getCategories } from '../api/exercises';
@@ -20,143 +23,116 @@ export default function ExerciseLibraryVisuals() {
   const [hasMore, setHasMore] = useState(true);
   const [categories, setCategories] = useState(['All']);
   const [totalCount, setTotalCount] = useState(0);
+  const gridRef = useRef(null);
 
-  // Load categories on mount
+  // Load categories
   useEffect(() => {
     const loadCategories = async () => {
       try {
         const cats = await getCategories();
         setCategories(cats);
       } catch (err) {
-        console.error('Failed to load categories:', err);
+        console.error('Categories load failed:', err);
+        setCategories(['All']); // Fallback
       }
     };
     loadCategories();
   }, []);
 
-  // Load exercises with pagination
+  // Load exercises with infinite scroll
   const loadExercises = useCallback(async (resetPage = false) => {
     if (!hasMore && !resetPage) return;
-    
+
     setLoading(true);
     setError(null);
 
     try {
       const currentPage = resetPage ? 0 : page;
-      const options = {};
-      
-      // Apply category filter to API call
-      if (selectedCategory !== 'All') {
-        options.category = selectedCategory;
-      }
+      const result = await fetchExercises(currentPage, { bodyPart: selectedCategory !== 'All' ? selectedCategory : null });
 
-      const result = await fetchExercises(currentPage, options);
-      
       if (result.error) {
         setError(result.error);
+        return;
       }
 
       setExercises(prev => resetPage ? result.exercises : [...prev, ...result.exercises]);
-      setHasMore(result.hasMore);
-      setTotalCount(result.total || 0);
-      
-      if (resetPage) {
-        setPage(0);
-      }
+      setHasMore(result.hasMore !== undefined ? result.hasMore : false);
+      setTotalCount(result.total || result.exercises.length);
+      if (resetPage) setPage(0);
+      else setPage(prev => prev + 1);
     } catch (err) {
-      setError('Failed to load exercises. Please try again.');
+      setError('Failed to load exercises. Check your connection.');
       console.error('Load exercises error:', err);
     } finally {
       setLoading(false);
     }
   }, [page, hasMore, selectedCategory]);
 
-  // Initial load
-  useEffect(() => {
-    loadExercises();
-  }, []);
-
-  // Reload when category changes
+  // Initial load + category change
   useEffect(() => {
     setExercises([]);
-    setPage(0);
-    setHasMore(true);
     loadExercises(true);
   }, [selectedCategory]);
 
-  // Client-side filtering for search
+  // Debounced search
   useEffect(() => {
     const timer = setTimeout(() => {
-      let filtered = exercises;
-
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase();
-        filtered = filtered.filter(ex =>
-          ex.name.toLowerCase().includes(query) ||
-          ex.category.toLowerCase().includes(query) ||
-          ex.equipment?.toLowerCase().includes(query) ||
-          ex.muscles?.toLowerCase().includes(query)
-        );
-      }
-
+      const filtered = exercises.filter(ex =>
+        (ex.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+         ex.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+         (ex.equipment?.toLowerCase().includes(searchQuery.toLowerCase()) || '') ||
+         (ex.muscles?.toLowerCase().includes(searchQuery.toLowerCase()) || ''))
+      );
       setFilteredExercises(filtered);
     }, 300);
-
     return () => clearTimeout(timer);
   }, [searchQuery, exercises]);
 
-  // Load full exercise details when card is clicked
+  // Load details
   const handleCardClick = async (lightExercise) => {
     setLoadingDetails(true);
     setSelectedExercise(null);
-    
     try {
       const fullExercise = await fetchExerciseDetails(lightExercise.id);
-      if (fullExercise) {
-        setSelectedExercise(fullExercise);
-      } else {
-        setError('Failed to load exercise details');
-      }
+      setSelectedExercise(fullExercise || { ...lightExercise, description: 'Details unavailable.' });
     } catch (err) {
-      console.error('Failed to load exercise details:', err);
-      setError('Failed to load exercise details');
+      console.error('Details load failed:', err);
+      setError('Couldn’t load exercise details.');
     } finally {
       setLoadingDetails(false);
     }
   };
 
-  // Load more exercises
-  const loadMore = () => {
-    if (!loading && hasMore) {
-      setPage(p => p + 1);
-    }
-  };
-
-  // Trigger load when page changes
-  useEffect(() => {
-    if (page > 0) {
+  // Infinite scroll logic
+  const handleScroll = useCallback(() => {
+    if (!gridRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = gridRef.current;
+    if (scrollHeight - scrollTop - clientHeight < 200 && !loading && hasMore) {
       loadExercises();
     }
-  }, [page]);
+  }, [loading, hasMore]);
+
+  useEffect(() => {
+    const grid = gridRef.current;
+    if (grid) {
+      grid.addEventListener('scroll', handleScroll);
+      return () => grid.removeEventListener('scroll', handleScroll);
+    }
+  }, [handleScroll]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black-900 via-black-900 to-black-900 relative overflow-hidden">
-      {/* Animated Background Orbs */}
+    <div className="min-h-screen bg-gradient-to-br from-black via-gray-950 to-black relative overflow-hidden">
+      {/* Animated Background */}
       <div className="absolute inset-0 -z-10">
         <motion.div
           animate={{ scale: [1, 1.3, 1], opacity: [0.3, 0.5, 0.3] }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute top-1/4 left-1/4 w-96 h-96 bg-green-400/10 rounded-full blur-3xl"
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-400/10 rounded-full blur-3xl"
         />
         <motion.div
           animate={{ scale: [1.2, 1, 1.2], opacity: [0.4, 0.6, 0.4] }}
-          transition={{ duration: 7, repeat: Infinity, delay: 1 }}
-          className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl"
-        />
-        <motion.div
-          animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0.4, 0.2] }}
-          transition={{ duration: 9, repeat: Infinity, delay: 2 }}
-          className="absolute top-1/2 right-1/3 w-72 h-72 bg-green-300/10 rounded-full blur-3xl"
+          transition={{ duration: 8, repeat: Infinity, delay: 2 }}
+          className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-green-500/10 rounded-full blur-3xl"
         />
       </div>
 
@@ -170,20 +146,20 @@ export default function ExerciseLibraryVisuals() {
         .scrollbar-hide::-webkit-scrollbar { display: none; }
       `}</style>
 
-      <div className="px-4 py-8 md:px-8 lg:px-12 max-w-7xl mx-auto">
+      <div className="px-4 py-10 md:px-8 lg:px-16 max-w-7xl mx-auto relative" ref={gridRef}>
         {/* Header */}
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }} 
+        <motion.div
+          initial={{ opacity: 0, y: -40 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="text-center mb-10"
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="text-center mb-12"
         >
-          <h2 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-white flex items-center justify-center mb-3">
-            <Dumbbell className="w-8 h-8 md:w-10 md:h-10 text-green-400 mr-3" />
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-white flex items-center justify-center gap-4 mb-4">
+            <Dumbbell className="w-10 h-10 text-emerald-400" />
             Exercise Library
-          </h2>
-          <p className="text-white/60 font-body text-base md:text-lg">
-            {totalCount > 0 ? `${totalCount.toLocaleString()}+ exercises` : '1,000+ exercises'} powered by Wger
+          </h1>
+          <p className="text-white/60 font-body text-lg">
+            {totalCount > 0 ? `${totalCount.toLocaleString()}+ exercises` : '1,300+ exercises'} powered by your ExerciseDB API
           </p>
           {searchQuery && (
             <p className="text-white/40 text-sm mt-2">
@@ -195,22 +171,16 @@ export default function ExerciseLibraryVisuals() {
         {/* Error Banner */}
         {error && (
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
+            initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-2xl mb-6 max-w-2xl mx-auto flex items-center gap-3"
+            exit={{ opacity: 0, y: -20 }}
+            className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-2xl mb-8 max-w-3xl mx-auto flex items-center gap-3"
           >
             <AlertCircle className="w-5 h-5 flex-shrink-0" />
-            <div className="flex-1">
-              <p className="font-medium">{error}</p>
-              {error.includes('demo data') && (
-                <p className="text-xs text-red-400/70 mt-1">
-                  API might be temporarily unavailable. Showing fallback examples.
-                </p>
-              )}
-            </div>
+            <span className="text-sm font-medium">{error}</span>
             <button
               onClick={() => setError(null)}
-              className="text-red-400 hover:text-red-300 text-xl"
+              className="ml-auto text-red-400 hover:text-red-300"
             >
               ×
             </button>
@@ -226,111 +196,100 @@ export default function ExerciseLibraryVisuals() {
           setSelectedCategory={setSelectedCategory}
         />
 
-        {/* Results Count */}
+        {/* Results Info */}
         {!loading && filteredExercises.length > 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="text-center mb-6"
+            className="text-center mb-8 text-white/50 text-sm"
           >
-            <p className="text-white/50 text-sm">
-              {searchQuery || selectedCategory !== 'All'
-                ? `Found ${filteredExercises.length} exercise${filteredExercises.length !== 1 ? 's' : ''}`
-                : `Browsing ${filteredExercises.length} exercise${filteredExercises.length !== 1 ? 's' : ''}`}
-            </p>
+            {searchQuery || selectedCategory !== 'All'
+              ? `Found ${filteredExercises.length} exercise${filteredExercises.length !== 1 ? 's' : ''}`
+              : `Browsing ${filteredExercises.length} of ${totalCount.toLocaleString()} exercises`}
           </motion.div>
         )}
 
-        {/* Exercise Grid */}
+        {/* Exercise Grid with Scroll */}
         <ExerciseGrid
           exercises={filteredExercises}
           loading={loading && page === 0}
           onCardClick={handleCardClick}
         />
 
-        {/* Load More Button */}
-        {!searchQuery && hasMore && filteredExercises.length > 0 && (
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            className="text-center mt-12"
+        {/* Loading More Indicator */}
+        {loading && hasMore && filteredExercises.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="text-center py-6"
           >
-            <button
-              onClick={loadMore}
-              disabled={loading}
-              className="group relative bg-white/5 backdrop-blur-md px-8 py-4 rounded-2xl text-white border border-white/10 hover:border-green-400/50 hover:bg-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-            >
-              {loading ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Loading...
-                </span>
-              ) : (
-                <span className="flex items-center gap-2">
-                  Load More Exercises
-                  <span className="text-green-400 text-sm">({exercises.length} loaded)</span>
-                </span>
-              )}
-            </button>
+            <Loader2 className="w-8 h-8 text-emerald-400 animate-spin mx-auto" />
+            <p className="text-white/60 text-sm mt-2">Loading more...</p>
           </motion.div>
         )}
 
         {/* Empty State */}
         {!loading && filteredExercises.length === 0 && (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }} 
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3 }}
             className="text-center py-20"
           >
-            <div className="bg-white/5 backdrop-blur-md rounded-3xl p-12 max-w-md mx-auto border border-white/10">
-              <Dumbbell className="w-16 h-16 text-white/20 mx-auto mb-4" />
-              <h3 className="text-xl font-bold text-white mb-2">No Exercises Found</h3>
+            <div className="bg-white/5 backdrop-blur-md rounded-3xl p-8 max-w-md mx-auto border border-white/10">
+              <Dumbbell className="w-20 h-20 text-white/20 mx-auto mb-6" />
+              <h3 className="text-2xl font-bold text-white mb-4">No Matches</h3>
               <p className="text-white/60 mb-6">
-                {searchQuery 
-                  ? `No results for "${searchQuery}". Try a different search term.`
-                  : 'No exercises match your filters. Try adjusting your selection.'}
+                {searchQuery
+                  ? `No results for "${searchQuery}". Try another search.`
+                  : 'No exercises match your filters. Reset to browse all.'}
               </p>
               {(searchQuery || selectedCategory !== 'All') && (
-                <button
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => {
                     setSearchQuery('');
                     setSelectedCategory('All');
                   }}
-                  className="bg-gradient-to-r from-green-400 to-emerald-500 px-6 py-2.5 rounded-xl text-black font-medium hover:shadow-lg hover:shadow-green-500/25 transition-all"
+                  className="bg-gradient-to-r from-emerald-500 to-green-600 px-6 py-3 rounded-xl text-black font-medium hover:shadow-lg hover:shadow-emerald-500/30 transition-all"
                 >
-                  Clear Filters
-                </button>
+                  Reset Filters
+                </motion.button>
               )}
             </div>
           </motion.div>
         )}
 
-        {/* Initial Loading State */}
+        {/* Initial Load */}
         {loading && page === 0 && exercises.length === 0 && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="text-center py-20"
+            className="text-center py-24"
           >
-            <Loader2 className="w-12 h-12 text-green-400 mx-auto mb-4 animate-spin" />
-            <p className="text-white/60">Loading exercises...</p>
+            <Loader2 className="w-12 h-12 text-emerald-400 animate-spin mx-auto mb-4" />
+            <p className="text-white/60 text-lg">Fetching your exercises...</p>
           </motion.div>
         )}
       </div>
 
-      {/* Loading Modal Overlay */}
+      {/* Loading Details Overlay */}
       {loadingDetails && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
-          <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-8 border border-white/20">
-            <Loader2 className="w-12 h-12 text-green-400 mx-auto mb-4 animate-spin" />
-            <p className="text-white text-center">Loading exercise details...</p>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md"
+        >
+          <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20 shadow-2xl">
+            <Loader2 className="w-10 h-10 text-emerald-400 animate-spin mx-auto mb-3" />
+            <p className="text-white text-center">Loading details...</p>
           </div>
-        </div>
+        </motion.div>
       )}
 
-      {/* Exercise Details Modal */}
+      {/* Exercise Modal */}
       <ExerciseModal
         exercise={selectedExercise}
         isOpen={!!selectedExercise && !loadingDetails}
