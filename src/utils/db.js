@@ -294,6 +294,21 @@ export const getAllExerciseHistory = async () => {
   }
 };
 
+export const clearExercisePR = async (exerciseId) => {
+  try {
+    await db.exerciseLogs
+      .where('exerciseId')
+      .equals(exerciseId)
+      .delete();
+    
+    notifyChange();
+    console.log(`Cleared all logs for exercise: ${exerciseId}`);
+  } catch (error) {
+    console.error('Failed to clear exercise PR:', error);
+    throw error;
+  }
+};
+
 /* ==================================================================
    ORIGINAL FUNCTIONS (100% unchanged)
 ================================================================== */
@@ -488,17 +503,64 @@ export const exportData = async () => {
 
 export const importData = async (data) => {
   try {
-    const tx = db.transaction('rw', db.tableNames, async () => {
-      if (data.activities) await db.activities.bulkPut(data.activities);
-      if (data.weeklyStats) await db.weeklyStats.bulkPut(data.weeklyStats);
-      if (data.settings) await db.settings.bulkPut(data.settings);
-      if (data.goals) await db.goals.bulkPut(data.goals);
-      if (data.favorites) await db.favorites.bulkPut(data.favorites);
-      if (data.todayWorkout) await db.todayWorkout.bulkPut(data.todayWorkout);
-      if (data.workoutPlans) await db.workoutPlans.bulkPut(data.workoutPlans);
-      if (data.exerciseLogs) await db.exerciseLogs.bulkPut(data.exerciseLogs);
+    // Clear existing data first (except settings to preserve user preferences)
+    await db.transaction('rw', db.tables, async () => {
+      for (const table of db.tables) {
+        if (table.name !== 'settings') {
+          await table.clear();
+        }
+      }
     });
+
+    // Import new data using bulkAdd instead of bulkPut
+    // This works better with auto-increment primary keys
+    const tx = db.transaction('rw', 
+      db.activities, 
+      db.weeklyStats, 
+      db.settings, 
+      db.goals, 
+      db.favorites, 
+      db.todayWorkout, 
+      db.workoutPlans, 
+      db.exerciseLogs, 
+      async () => {
+        if (data.activities?.length) {
+          // Remove id field to let auto-increment handle it
+          const activities = data.activities.map(({ id, ...rest }) => rest);
+          await db.activities.bulkAdd(activities);
+        }
+        if (data.weeklyStats?.length) {
+          const stats = data.weeklyStats.map(({ id, ...rest }) => rest);
+          await db.weeklyStats.bulkAdd(stats);
+        }
+        if (data.settings?.length) {
+          // For settings, use bulkPut to update/merge with existing
+          await db.settings.bulkPut(data.settings);
+        }
+        if (data.goals?.length) {
+          const goals = data.goals.map(({ id, ...rest }) => rest);
+          await db.goals.bulkAdd(goals);
+        }
+        if (data.favorites?.length) {
+          const favorites = data.favorites.map(({ id, ...rest }) => rest);
+          await db.favorites.bulkAdd(favorites);
+        }
+        if (data.todayWorkout?.length) {
+          const workout = data.todayWorkout.map(({ id, ...rest }) => rest);
+          await db.todayWorkout.bulkAdd(workout);
+        }
+        if (data.workoutPlans?.length) {
+          const plans = data.workoutPlans.map(({ id, ...rest }) => rest);
+          await db.workoutPlans.bulkAdd(plans);
+        }
+        if (data.exerciseLogs?.length) {
+          const logs = data.exerciseLogs.map(({ id, ...rest }) => rest);
+          await db.exerciseLogs.bulkAdd(logs);
+        }
+      }
+    );
     await tx;
+    notifyChange();
   } catch (error) {
     console.error('Import failed:', error);
     throw error;

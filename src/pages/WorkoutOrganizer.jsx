@@ -7,7 +7,8 @@ import confetti from 'canvas-confetti';
 import { Dumbbell, CheckCircle, XCircle, AlertCircle, Trash2, Zap } from 'lucide-react';
 import { 
   clearTodayWorkout, reorderTodayWorkout, removeFromToday, addToTodayWorkout,
-  setActivePlan, saveWorkoutPlan, deleteWorkoutPlan, saveSetLog, updateWorkoutPlan
+  setActivePlan, saveWorkoutPlan, deleteWorkoutPlan, saveSetLog, updateWorkoutPlan,
+  getAllExerciseHistory
 } from '../utils/db';
 import { fetchExercises } from '../api/exercises';
 import { AppContext } from '../App';
@@ -76,7 +77,7 @@ export default function WorkoutOrganizer() {
     fullFavorites,
     plans, setPlans,
     activePlan, setActivePlan: setActivePlanState,
-    exerciseHistory,
+    exerciseHistory, setExerciseHistory,
     loadAllData, enrichWithGif
   } = useWorkoutData();
 
@@ -98,6 +99,16 @@ export default function WorkoutOrganizer() {
   const [planResults, setPlanResults] = useState([]);
   const [planLoading, setPlanLoading] = useState(false);
   const [editingPlanId, setEditingPlanId] = useState(null);
+
+  // ADDED: Refresh History Function
+  const refreshHistory = async () => {
+    try {
+      const history = await getAllExerciseHistory();
+      setExerciseHistory(history);
+    } catch (error) {
+      console.error('Failed to refresh history:', error);
+    }
+  };
 
   // Timer
   useEffect(() => {
@@ -187,6 +198,7 @@ export default function WorkoutOrganizer() {
     setLoggingSet(null);
     setWeightInput('');
     setRepInput('');
+    await refreshHistory(); // Refresh after saving
     loadAllData();
   };
 
@@ -423,6 +435,7 @@ export default function WorkoutOrganizer() {
         setIsWorkoutStarted={setIsWorkoutStarted}
         exerciseHistory={exerciseHistory}
         openLogModal={openLogModal}
+        refreshHistory={refreshHistory}
       />
 
       <LogSetModal

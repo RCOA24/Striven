@@ -78,17 +78,58 @@ const ProfilePage = ({ activities = [], weeklyStats = {} }) => {
       const text = await file.text();
       const data = JSON.parse(text);
       
-      // Validate data structure
-      if (!data.activities && !data.weeklyStats && !data.settings && !data.goals) {
+      // Better validation - check if it's a valid Striven backup
+      // Check for exportDate and appVersion OR at least one data table
+      const hasValidStructure = (
+        data.exportDate || 
+        data.appVersion || 
+        data.activities || 
+        data.weeklyStats || 
+        data.settings || 
+        data.goals ||
+        data.favorites ||
+        data.todayWorkout ||
+        data.workoutPlans ||
+        data.exerciseLogs
+      );
+
+      if (!hasValidStructure) {
         throw new Error('Invalid backup file format');
       }
 
+      console.log('Importing data:', {
+        activities: data.activities?.length || 0,
+        weeklyStats: data.weeklyStats?.length || 0,
+        goals: data.goals?.length || 0,
+        favorites: data.favorites?.length || 0,
+        workoutPlans: data.workoutPlans?.length || 0,
+        exerciseLogs: data.exerciseLogs?.length || 0
+      });
+
       await importData(data);
       showNotification('success', 'Data imported successfully! Reloading...');
+      
+      // Reset the file input
+      event.target.value = '';
+      
       setTimeout(() => window.location.reload(), 1500);
     } catch (error) {
       console.error('Import failed:', error);
-      showNotification('error', 'Failed to import data. Please check the file.');
+      
+      // More detailed error message
+      let errorMessage = 'Failed to import data.';
+      if (error.message.includes('Invalid backup')) {
+        errorMessage = 'Invalid backup file format.';
+      } else if (error.message.includes('JSON')) {
+        errorMessage = 'Invalid JSON file.';
+      } else {
+        errorMessage = `Import error: ${error.message}`;
+      }
+      
+      showNotification('error', errorMessage);
+      
+      // Reset the file input
+      event.target.value = '';
     } finally {
       setIsImporting(false);
     }
