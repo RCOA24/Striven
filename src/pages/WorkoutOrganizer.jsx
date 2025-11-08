@@ -165,8 +165,16 @@ export default function WorkoutOrganizer() {
   };
 
   const nextExercise = () => {
-    console.log('🔴 nextExercise called from:', new Error().stack);
+    const stack = new Error().stack;
+    console.log('🔴🔴🔴 nextExercise called!');
+    console.log('Stack trace:', stack);
     console.log('Current state:', { currentExerciseIndex, todayExercises: todayExercises.length });
+    
+    // Check if this was called from an unexpected place
+    if (stack.includes('saveLog') || stack.includes('refreshHistory') || stack.includes('loadAllData')) {
+      console.error('⚠️⚠️⚠️ WARNING: nextExercise called from save/refresh function!');
+      console.error('This should NOT happen. Check for auto-advance logic.');
+    }
     
     const nextIdx = currentExerciseIndex + 1;
     if (nextIdx < todayExercises.length) {
@@ -196,10 +204,12 @@ export default function WorkoutOrganizer() {
 
   const openLogModal = (exerciseId, setIndex) => {
     console.log('📝 Opening log modal:', { exerciseId, setIndex });
+    console.log('📝 Current exercise index:', currentExerciseIndex);
     setLoggingSet({ exerciseId, setIndex });
     const ex = todayExercises.find(e => (e.id || e.exerciseId) === exerciseId);
     setRepInput((ex?.reps || '10').toString().replace(/[^0-9]/g, ''));
     setWeightInput('');
+    console.log('📝 Modal opened - should NOT advance exercise');
   };
 
   const saveLog = async () => {
@@ -245,6 +255,9 @@ export default function WorkoutOrganizer() {
     setRepInput('');
     await refreshHistory();
     loadAllData();
+    
+    console.log('✅ Set logged - NOT calling nextExercise');
+    // NOTE: We do NOT call nextExercise() here automatically
   };
 
   // Plan Search
