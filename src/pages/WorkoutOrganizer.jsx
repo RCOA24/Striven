@@ -100,6 +100,14 @@ export default function WorkoutOrganizer() {
   const [planLoading, setPlanLoading] = useState(false);
   const [editingPlanId, setEditingPlanId] = useState(null);
 
+  // DEBUG: Track state changes
+  useEffect(() => {
+    console.log('⚠️ currentExerciseIndex changed:', currentExerciseIndex);
+    if (isWorkoutStarted) {
+      console.log('Current exercise:', todayExercises[currentExerciseIndex]?.name);
+    }
+  }, [currentExerciseIndex, isWorkoutStarted, todayExercises]);
+
   // ADDED: Refresh History Function
   const refreshHistory = async () => {
     try {
@@ -110,9 +118,13 @@ export default function WorkoutOrganizer() {
     }
   };
 
-  // Timer
+  // Timer - FIXED: Only counts down when secondsLeft > 0
   useEffect(() => {
-    if (!isWorkoutStarted || todayExercises.length === 0) return;
+    if (!isWorkoutStarted || todayExercises.length === 0) {
+      clearInterval(intervalRef.current);
+      return;
+    }
+    
     if (secondsLeft > 0) {
       intervalRef.current = setInterval(() => {
         setSecondsLeft(s => {
@@ -124,35 +136,50 @@ export default function WorkoutOrganizer() {
           return s - 1;
         });
       }, 1000);
+    } else {
+      clearInterval(intervalRef.current);
     }
+    
     return () => clearInterval(intervalRef.current);
-  }, [isWorkoutStarted, secondsLeft, currentExerciseIndex, isResting, todayExercises]);
+  }, [isWorkoutStarted, secondsLeft, todayExercises.length]);
 
   const formatTime = (secs) => `${Math.floor(secs / 60)}:${(secs % 60).toString().padStart(2, '0')}`;
 
   const startWorkout = () => {
+    console.log('🚀 startWorkout called');
+    console.log('State before:', { currentExerciseIndex, secondsLeft, isResting, isWorkoutStarted });
+    
     if (todayExercises.length === 0) {
       showToast('Add exercises first!', 'error');
       return;
     }
+    
+    // Set all states in one batch
     setIsWorkoutStarted(true);
     setCurrentExerciseIndex(0);
     setSecondsLeft(0);
     setIsResting(false);
+    
+    console.log('✅ Workout started - should be on exercise 0');
     showToast('Workout Started! Let\'s crush it!', 'success', 'fire');
   };
 
   const nextExercise = () => {
+    console.log('🔴 nextExercise called from:', new Error().stack);
+    console.log('Current state:', { currentExerciseIndex, todayExercises: todayExercises.length });
+    
     const nextIdx = currentExerciseIndex + 1;
     if (nextIdx < todayExercises.length) {
       setCurrentExerciseIndex(nextIdx);
       setSecondsLeft(todayExercises[nextIdx]?.rest || 90);
       setIsResting(true);
+      console.log('✅ Moving to exercise', nextIdx);
     } else {
       showToast('Workout Complete! You\'re a beast!', 'success', 'fire');
       confetti({ particleCount: 400, spread: 100, origin: { y: 0.6 } });
       setIsWorkoutStarted(false);
       setCurrentExerciseIndex(0);
+      console.log('✅ Workout complete');
     }
   };
 
@@ -168,6 +195,7 @@ export default function WorkoutOrganizer() {
   };
 
   const openLogModal = (exerciseId, setIndex) => {
+    console.log('📝 Opening log modal:', { exerciseId, setIndex });
     setLoggingSet({ exerciseId, setIndex });
     const ex = todayExercises.find(e => (e.id || e.exerciseId) === exerciseId);
     setRepInput((ex?.reps || '10').toString().replace(/[^0-9]/g, ''));
@@ -182,9 +210,26 @@ export default function WorkoutOrganizer() {
     const weight = parseFloat(weightInput);
     const reps = parseInt(repInput);
     const oneRm = parseFloat((weight * (1 + reps / 30)).toFixed(2));
-    const ex = todayExercises.find(e => (e.id || e.exerciseId) === loggingSet.exerciseId);
-    const exId = ex.id || ex.exerciseId;
-    const currentPR = parseFloat(exerciseHistory[exId]?.pr) || 0;
+    
+    // Use the exerciseId from loggingSet directly
+    const exId = loggingSet.exerciseId;
+    
+    // Check both possible ID formats for existing PR
+    let currentPR = parseFloat(exerciseHistory[exId]?.pr) || 0;
+    
+    // If no PR found, try alternate ID format
+    const ex = todayExercises.find(e => 
+      (e.id || e.exerciseId) === exId || 
+      (e.exerciseId || e.id) === exId
+    );
+    if (currentPR === 0 && ex) {
+      const alternateId = ex.id !== exId ? ex.id : ex.exerciseId;
+      if (alternateId && exerciseHistory[alternateId]) {
+        currentPR = parseFloat(exerciseHistory[alternateId]?.pr) || 0;
+      }
+    }
+
+    console.log('💾 Saving log:', { exId, weight, reps, oneRm, currentPR });
 
     await saveSetLog(exId, { weight, reps, oneRm, set: loggingSet.setIndex + 1 });
 
@@ -198,7 +243,7 @@ export default function WorkoutOrganizer() {
     setLoggingSet(null);
     setWeightInput('');
     setRepInput('');
-    await refreshHistory(); // Refresh after saving
+    await refreshHistory();
     loadAllData();
   };
 
@@ -223,7 +268,6 @@ export default function WorkoutOrganizer() {
     return () => clearTimeout(delay);
   }, [planSearch]);
 
-  // Add to selected day - FIXED
   const addToPlanDay = async (dayIndex, exercise) => {
     try {
       const enriched = await enrichWithGif(exercise);
@@ -232,7 +276,6 @@ export default function WorkoutOrganizer() {
         sets: 4, 
         reps: 10, 
         rest: 90,
-        // Ensure unique identifier
         exerciseId: enriched.id || enriched.exerciseId
       };
       
@@ -240,7 +283,6 @@ export default function WorkoutOrganizer() {
         const newDays = [...prev];
         const targetDay = { ...newDays[dayIndex] };
         
-        // Check if exercise already exists in this day
         const existsInDay = targetDay.exercises.some(
           ex => (ex.id || ex.exerciseId) === (withDefaults.id || withDefaults.exerciseId)
         );
@@ -287,7 +329,6 @@ export default function WorkoutOrganizer() {
 
   const handleCloseCreatePlan = () => {
     setShowCreatePlan(false);
-    // Reset all states
     setTimeout(() => {
       setPlanSearch('');
       setPlanResults([]);
@@ -298,7 +339,6 @@ export default function WorkoutOrganizer() {
     }, 300);
   };
 
-  // FIXED: Save/Update Plan Logic
   const saveNewPlan = async () => {
     if (!newPlanName.trim()) {
       showToast('Enter plan name', 'error');
@@ -313,7 +353,6 @@ export default function WorkoutOrganizer() {
 
     try {
       if (editingPlanId) {
-        // UPDATE existing plan
         const updatedPlan = {
           id: editingPlanId,
           name: newPlanName.trim(),
@@ -331,14 +370,12 @@ export default function WorkoutOrganizer() {
         await updateWorkoutPlan(editingPlanId, updatedPlan);
         showToast('Plan updated successfully!', 'success', 'rocket');
         
-        // Update local state
         setPlans(prev => prev.map(p => p.id === editingPlanId ? updatedPlan : p));
         if (activePlan?.id === editingPlanId) {
           setActivePlanState(updatedPlan);
         }
       } else {
-        // CREATE new plan
-        const newPlan = await saveWorkoutPlan(newPlanName.trim(), planDays);
+        await saveWorkoutPlan(newPlanName.trim(), planDays);
         showToast('Plan created & activated!', 'success', 'rocket');
         confetti({ particleCount: 300, spread: 80 });
       }
@@ -355,7 +392,6 @@ export default function WorkoutOrganizer() {
     setEditingPlanId(plan.id);
     setNewPlanName(plan.name);
     
-    // Deep clone the plan days to avoid mutations
     const clonedDays = DAYS_OF_WEEK.map(dayName => {
       const planDay = plan.days.find(d => d.day === dayName);
       return {

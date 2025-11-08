@@ -95,15 +95,49 @@ export const WorkoutModeOverlay = ({
   const containerRef = useRef(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const currentEx = todayExercises[currentExerciseIndex];
-  const currentExId = currentEx?.exerciseId || currentEx?.id;
   
-  // Safely get current history with defaults
-  const currentHistory = exerciseHistory[currentExId] || { logs: [], pr: 0 };
-  const safePR = typeof currentHistory.pr === 'number' ? currentHistory.pr : 0;
+  // Safe access to current exercise
+  const currentEx = todayExercises?.[currentExerciseIndex];
+  
+  // FIX: Try both ID formats and find which one has data
+  let currentExId = currentEx?.exerciseId || currentEx?.id;
+  let currentHistory = exerciseHistory?.[currentExId];
+
+  // If no history found, try the alternate ID format
+  if (!currentHistory || !currentHistory.logs) {
+    const alternateId = currentEx?.id || currentEx?.exerciseId;
+    if (alternateId !== currentExId && exerciseHistory?.[alternateId]) {
+      currentExId = alternateId;
+      currentHistory = exerciseHistory[alternateId];
+    }
+  }
+
+  // Provide safe defaults if still no history
+  if (!currentHistory || !currentHistory.logs) {
+    currentHistory = { logs: [], pr: 0 };
+  }
+    
+  // FIX: PR can be stored as string or number - parse it safely
+  const safePR = (() => {
+    const pr = currentHistory.pr;
+    if (pr === null || pr === undefined || pr === '') return 0;
+    const parsed = typeof pr === 'string' ? parseFloat(pr) : pr;
+    return !isNaN(parsed) && parsed > 0 ? parsed : 0;
+  })();
+    
   const sortedLogs = Array.isArray(currentHistory.logs) 
-    ? [...currentHistory.logs].sort((a, b) => b.date.localeCompare(a.date))
+    ? [...currentHistory.logs].sort((a, b) => new Date(b.date) - new Date(a.date))
     : [];
+
+  console.log('🔍 WorkoutModeOverlay Debug:', {
+    currentExerciseIndex,
+    currentEx: currentEx?.name,
+    currentExId,
+    exerciseHistoryKeys: Object.keys(exerciseHistory || {}),
+    currentHistory,
+    safePR,
+    sortedLogs: sortedLogs.length
+  });
 
   // Auto-scroll to top on exercise change
   useEffect(() => {
@@ -321,9 +355,10 @@ export const WorkoutModeOverlay = ({
                     exercise={currentEx}
                     sets={currentEx.sets || 4}
                     history={currentHistory}
-                    onLogSet={(exerciseId, setIndex) => {
-                      console.log('🔍 Opening log modal:', { exerciseId, setIndex, currentEx });
-                      openLogModal(exerciseId, setIndex);
+                    onLogSet={(_, setIndex) => {
+                      // FIX: Use the already-resolved currentExId
+                      console.log('🔍 Opening log modal:', { currentExId, setIndex, currentEx });
+                      openLogModal(currentExId, setIndex);
                     }}
                   />
                 </motion.div>
