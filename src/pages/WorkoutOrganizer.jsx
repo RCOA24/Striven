@@ -31,9 +31,9 @@ const ModernToast = ({ type, message, icon }) => {
     error: <XCircle className="w-6 h-6" />,
     warning: <AlertCircle className="w-6 h-6" />,
     info: <Zap className="w-6 h-6" />,
-    fire: '🔥',
-    muscle: '💪',
-    rocket: '🚀',
+    fire: 'fire',
+    muscle: 'muscle',
+    rocket: 'rocket',
     trash: <Trash2 className="w-6 h-6" />
   };
 
@@ -100,9 +100,14 @@ export default function WorkoutOrganizer() {
   const [planLoading, setPlanLoading] = useState(false);
   const [editingPlanId, setEditingPlanId] = useState(null);
 
+  // ── PLAN PAGINATION STATE ────────────────────────────────────────
+  const [planCurrentPage, setPlanCurrentPage] = useState(1);
+  const [planTotalPages, setPlanTotalPages] = useState(1);
+  const [planTotalCount, setPlanTotalCount] = useState(0);
+
   // DEBUG: Track state changes
   useEffect(() => {
-    console.log('⚠️ currentExerciseIndex changed:', currentExerciseIndex);
+    console.log('currentExerciseIndex changed:', currentExerciseIndex);
     if (isWorkoutStarted) {
       console.log('Current exercise:', todayExercises[currentExerciseIndex]?.name);
     }
@@ -146,7 +151,7 @@ export default function WorkoutOrganizer() {
   const formatTime = (secs) => `${Math.floor(secs / 60)}:${(secs % 60).toString().padStart(2, '0')}`;
 
   const startWorkout = () => {
-    console.log('🚀 startWorkout called');
+    console.log('startWorkout called');
     console.log('State before:', { currentExerciseIndex, secondsLeft, isResting, isWorkoutStarted });
     
     if (todayExercises.length === 0) {
@@ -154,25 +159,23 @@ export default function WorkoutOrganizer() {
       return;
     }
     
-    // Set all states in one batch
     setIsWorkoutStarted(true);
     setCurrentExerciseIndex(0);
     setSecondsLeft(0);
     setIsResting(false);
     
-    console.log('✅ Workout started - should be on exercise 0');
+    console.log('Workout started - should be on exercise 0');
     showToast('Workout Started! Let\'s crush it!', 'success', 'fire');
   };
 
   const nextExercise = () => {
     const stack = new Error().stack;
-    console.log('🔴🔴🔴 nextExercise called!');
+    console.log('nextExercise called!');
     console.log('Stack trace:', stack);
     console.log('Current state:', { currentExerciseIndex, todayExercises: todayExercises.length });
     
-    // Check if this was called from an unexpected place
     if (stack.includes('saveLog') || stack.includes('refreshHistory') || stack.includes('loadAllData')) {
-      console.error('⚠️⚠️⚠️ WARNING: nextExercise called from save/refresh function!');
+      console.error('WARNING: nextExercise called from save/refresh function!');
       console.error('This should NOT happen. Check for auto-advance logic.');
     }
     
@@ -181,13 +184,13 @@ export default function WorkoutOrganizer() {
       setCurrentExerciseIndex(nextIdx);
       setSecondsLeft(todayExercises[nextIdx]?.rest || 90);
       setIsResting(true);
-      console.log('✅ Moving to exercise', nextIdx);
+      console.log('Moving to exercise', nextIdx);
     } else {
       showToast('Workout Complete! You\'re a beast!', 'success', 'fire');
       confetti({ particleCount: 400, spread: 100, origin: { y: 0.6 } });
       setIsWorkoutStarted(false);
       setCurrentExerciseIndex(0);
-      console.log('✅ Workout complete');
+      console.log('Workout complete');
     }
   };
 
@@ -203,13 +206,13 @@ export default function WorkoutOrganizer() {
   };
 
   const openLogModal = (exerciseId, setIndex) => {
-    console.log('📝 Opening log modal:', { exerciseId, setIndex });
-    console.log('📝 Current exercise index:', currentExerciseIndex);
+    console.log('Opening log modal:', { exerciseId, setIndex });
+    console.log('Current exercise index:', currentExerciseIndex);
     setLoggingSet({ exerciseId, setIndex });
     const ex = todayExercises.find(e => (e.id || e.exerciseId) === exerciseId);
     setRepInput((ex?.reps || '10').toString().replace(/[^0-9]/g, ''));
     setWeightInput('');
-    console.log('📝 Modal opened - should NOT advance exercise');
+    console.log('Modal opened - should NOT advance exercise');
   };
 
   const saveLog = async () => {
@@ -221,13 +224,10 @@ export default function WorkoutOrganizer() {
     const reps = parseInt(repInput);
     const oneRm = parseFloat((weight * (1 + reps / 30)).toFixed(2));
     
-    // Use the exerciseId from loggingSet directly
     const exId = loggingSet.exerciseId;
     
-    // Check both possible ID formats for existing PR
     let currentPR = parseFloat(exerciseHistory[exId]?.pr) || 0;
     
-    // If no PR found, try alternate ID format
     const ex = todayExercises.find(e => 
       (e.id || e.exerciseId) === exId || 
       (e.exerciseId || e.id) === exId
@@ -239,7 +239,7 @@ export default function WorkoutOrganizer() {
       }
     }
 
-    console.log('💾 Saving log:', { exId, weight, reps, oneRm, currentPR });
+    console.log('Saving log:', { exId, weight, reps, oneRm, currentPR });
 
     await saveSetLog(exId, { weight, reps, oneRm, set: loggingSet.setIndex + 1 });
 
@@ -256,30 +256,52 @@ export default function WorkoutOrganizer() {
     await refreshHistory();
     loadAllData();
     
-    console.log('✅ Set logged - NOT calling nextExercise');
-    // NOTE: We do NOT call nextExercise() here automatically
+    console.log('Set logged - NOT calling nextExercise');
   };
 
-  // Plan Search
+  // ── PLAN SEARCH (PAGINATED) ─────────────────────────────────────
   useEffect(() => {
     const delay = setTimeout(async () => {
       if (!planSearch.trim()) {
         setPlanResults([]);
+        setPlanCurrentPage(1);
+        setPlanTotalPages(1);
+        setPlanTotalCount(0);
         return;
       }
+
       setPlanLoading(true);
       try {
-        const res = await fetchExercises(0, { search: planSearch, limit: LIMIT });
-        const enriched = await Promise.all((res.exercises || []).map(enrichWithGif));
+        const res = await fetchExercises(planCurrentPage - 1, {
+          search: planSearch,
+          limit: LIMIT
+        });
+
+        const enriched = await Promise.all(
+          (res.exercises || []).map(enrichWithGif)
+        );
+
+        setPlanResults(prev =>
+          planCurrentPage === 1 ? enriched : [...prev, ...enriched]
+        );
         setPlanResults(enriched);
+        setPlanTotalCount(res.total || 0);
+        setPlanTotalPages(Math.ceil((res.total || 0) / LIMIT));
       } catch (e) {
         showToast('Search failed', 'error');
       } finally {
         setPlanLoading(false);
       }
     }, 600);
+
     return () => clearTimeout(delay);
-  }, [planSearch]);
+  }, [planSearch, planCurrentPage]);
+
+  // ── PAGE CHANGE HANDLER ───────────────────────────────────────
+  const handlePlanPageChange = (page) => {
+    if (page < 1 || page > planTotalPages || planLoading) return;
+    setPlanCurrentPage(page);
+  };
 
   const addToPlanDay = async (dayIndex, exercise) => {
     try {
@@ -308,7 +330,7 @@ export default function WorkoutOrganizer() {
         targetDay.exercises = [...targetDay.exercises, withDefaults];
         newDays[dayIndex] = targetDay;
         
-        showToast(`Added to ${DAYS_OF_WEEK[dayIndex]}!`, 'success', 'muscle');
+        showToast(`Added to ${DAYS_OF_WEEK[dayIndex]}!`, 'success');
         return newDays;
       });
     } catch (error) {
@@ -349,6 +371,10 @@ export default function WorkoutOrganizer() {
       setEditingPlanId(null);
       setPlanDays(DAYS_OF_WEEK.map(day => ({ day, exercises: [] })));
       setSelectedDayIndex(0);
+      // Reset pagination
+      setPlanCurrentPage(1);
+      setPlanTotalPages(1);
+      setPlanTotalCount(0);
     }, 300);
   };
 
@@ -360,7 +386,7 @@ export default function WorkoutOrganizer() {
     
     const hasExercises = planDays.some(d => d.exercises.length > 0);
     if (!hasExercises) {
-      showToast('Add at least one exercise', 'error');
+      showToast('Add at least one exercise', 'errorfile');
       return;
     }
 
@@ -504,78 +530,117 @@ export default function WorkoutOrganizer() {
         newPlanName={newPlanName}
         setNewPlanName={setNewPlanName}
         planDays={planDays}
+        setPlanDays={setPlanDays}               // <-- NEW
         selectedDayIndex={selectedDayIndex}
         setSelectedDayIndex={setSelectedDayIndex}
         planSearch={planSearch}
         setPlanSearch={setPlanSearch}
         planResults={planResults}
         planLoading={planLoading}
+        planTotalCount={planTotalCount}
+        planCurrentPage={planCurrentPage}
+        planTotalPages={planTotalPages}
         addToPlanDay={addToPlanDay}
         removeFromPlanDay={removeFromPlanDay}
         reorderPlanDay={reorderPlanDay}
         saveNewPlan={saveNewPlan}
         editingPlanId={editingPlanId}
+        onPlanPageChange={handlePlanPageChange}
       />
 
-      <div className="min-h-screen bg-gradient-to-br from-black via-gray-950 to-black text-white">
-        <div className="max-w-7xl mx-auto p-6">
-          <motion.h1 initial={{ y: -40 }} animate={{ y: 0 }} className="text-6xl font-bold text-center mb-12 flex items-center justify-center gap-4">
-            <Dumbbell className="text-emerald-400" />
-            Workout Organizer
-          </motion.h1>
+{/* Full-screen gradient background - fixed behind everything */}
+<div className="fixed inset-0 w-screen h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 pointer-events-none -z-10" />
 
-          <div className="flex justify-center gap-4 mb-10 flex-wrap">
-            {['today', 'favorites', 'plans'].map(tab => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-8 py-4 rounded-full font-bold text-lg transition-all ${activeTab === tab 
-                  ? 'bg-emerald-500 text-black shadow-xl shadow-emerald-500/50' 
-                  : 'bg-white/10 hover:bg-white/20'}`}
-              >
-                {tab === 'today' && `Today (${todayExercises.length})`}
-                {tab === 'favorites' && `Favorites (${fullFavorites.length})`}
-                {tab === 'plans' && `Plans (${plans.length})`}
-              </button>
-            ))}
-          </div>
+{/* Decorative gradient orbs */}
+<div className="fixed top-20 left-10 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none -z-10" />
+<div className="fixed bottom-20 right-10 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl pointer-events-none -z-10" />
 
-          <AnimatePresence mode="wait">
-            {activeTab === 'today' && (
-              <motion.div key="today" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
-                <TodayTab
-                  todayExercises={todayExercises}
-                  setTodayExercises={setTodayExercises}
-                  startWorkout={startWorkout}
-                  clearTodayWorkout={clearTodayWorkout}
-                  reorderTodayWorkout={reorderTodayWorkout}
-                  removeFromToday={removeFromToday}
-                  setCurrentPage={setCurrentPage}
-                />
-              </motion.div>
-            )}
+{/* Content section - scrollable over the background */}
+<div className="min-h-screen w-full text-white relative flex flex-col">
+  <div className="w-full flex-grow px-4 sm:px-6 lg:px-8 py-12">
+    <div className="w-full max-w-7xl mx-auto">
+      <motion.h1
+        initial={{ y: -40, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-center mb-8 sm:mb-12 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4"
+      >
+        <Dumbbell className="text-emerald-400 w-10 h-10 sm:w-12 sm:h-12" />
+        <span>Workout Organizer</span>
+      </motion.h1>
 
-            {activeTab === 'favorites' && (
-              <motion.div key="favorites" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
-                <FavoritesTab fullFavorites={fullFavorites} quickAdd={quickAdd} />
-              </motion.div>
-            )}
-
-            {activeTab === 'plans' && (
-              <motion.div key="plans" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
-                <PlansTab
-                  plans={plans}
-                  activePlan={activePlan}
-                  activatePlan={activatePlan}
-                  openEditPlan={openEditPlan}
-                  deletePlan={deletePlanHandler}
-                  setShowCreatePlan={setShowCreatePlan}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+      <div className="flex flex-wrap justify-center gap-3 sm:gap-4 mb-8 sm:mb-10">
+        {['today', 'favorites', 'plans'].map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-6 sm:px-8 py-3 sm:py-4 rounded-full font-bold text-sm sm:text-base md:text-lg transition-all ${
+              activeTab === tab
+                ? 'bg-emerald-500 text-black shadow-xl shadow-emerald-500/50 scale-105'
+                : 'bg-white/10 hover:bg-white/20 hover:scale-105'
+            }`}
+          >
+            {tab === 'today' && `Today (${todayExercises.length})`}
+            {tab === 'favorites' && `Favorites (${fullFavorites.length})`}
+            {tab === 'plans' && `Plans (${plans.length})`}
+          </button>
+        ))}
       </div>
+
+      <AnimatePresence mode="wait">
+        {activeTab === 'today' && (
+          <motion.div
+            key="today"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+          >
+            <TodayTab
+              todayExercises={todayExercises}
+              setTodayExercises={setTodayExercises}
+              startWorkout={startWorkout}
+              clearTodayWorkout={clearTodayWorkout}
+              reorderTodayWorkout={reorderTodayWorkout}
+              removeFromToday={removeFromToday}
+              setCurrentPage={setCurrentPage}
+            />
+          </motion.div>
+        )}
+
+        {activeTab === 'favorites' && (
+          <motion.div
+            key="favorites"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+          >
+            <FavoritesTab fullFavorites={fullFavorites} quickAdd={quickAdd} />
+          </motion.div>
+        )}
+
+        {activeTab === 'plans' && (
+          <motion.div
+            key="plans"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+          >
+            <PlansTab
+              plans={plans}
+              activePlan={activePlan}
+              activatePlan={activatePlan}
+              openEditPlan={openEditPlan}
+              deletePlan={deletePlanHandler}
+              setShowCreatePlan={setShowCreatePlan}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  </div>
+</div>
+
+
+
     </>
   );
 }

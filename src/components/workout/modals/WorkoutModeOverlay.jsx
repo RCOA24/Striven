@@ -1,9 +1,9 @@
 // src/components/workout/WorkoutModeOverlay.jsx
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Pause, SkipForward, TrendingUp, Trash2, X, AlertTriangle, 
-  Play, Timer, Zap, Award, Calendar, Target, ChevronRight 
+  Play, Timer, Zap, Award, Calendar, Target, ChevronRight, ImageOff
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { PRBadge } from '../ui/PRBadge';
@@ -11,7 +11,15 @@ import { TimerDisplay } from '../ui/TimerDisplay';
 import SetLogger from '../ui/SetLogger';
 import { clearExercisePR } from '../../../utils/db';
 
-const FALLBACK_GIF = 'https://via.placeholder.com/600x400/111/fff?text=No+GIF';
+// Inline SVG Fallback (No external request, no spam)
+const FALLBACK_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400" fill="none">
+  <rect width="600" height="400" fill="%23111111"/>
+  <path d="M150 100 L450 100 L450 300 L150 300 Z" stroke="%23ffffff" stroke-width="4" fill="none"/>
+  <circle cx="300" cy="200" r="60" stroke="%23ffffff" stroke-width="4" fill="none"/>
+  <path d="M270 180 L270 220 M330 180 L330 220" stroke="%23ffffff" stroke-width="6" stroke-linecap="round"/>
+  <text x="300" y="350" font-family="system-ui, sans-serif" font-size="28" font-weight="bold" fill="%23ffffff" text-anchor="middle">No GIF Available</text>
+  <text x="300" y="380" font-family="system-ui, sans-serif" font-size="18" fill="%23666" text-anchor="middle">Exercise demo not found</text>
+</svg>`;
 
 // Animated Progress Ring
 const ProgressRing = ({ progress, total }) => {
@@ -162,6 +170,15 @@ export const WorkoutModeOverlay = ({
     ? [...currentHistory.logs].sort((a, b) => new Date(b.date) - new Date(a.date))
     : [];
 
+  // Memoized safe GIF URL
+  const gifSrc = useMemo(() => {
+    const url = currentEx?.gifUrl;
+    if (typeof url === 'string' && url.trim() !== '' && url.startsWith('http')) {
+      return url;
+    }
+    return FALLBACK_SVG;
+  }, [currentEx?.gifUrl]);
+
   useEffect(() => {
     containerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentExerciseIndex]);
@@ -294,11 +311,20 @@ export const WorkoutModeOverlay = ({
                   </div>
                 </motion.div>
 
-                {/* GIF */}
+                {/* GIF - Now Safe with Inline SVG Fallback */}
                 <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.1 }} className="relative mb-6 rounded-3xl overflow-hidden shadow-2xl">
                   <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 opacity-50 blur-xl" />
                   <div className="relative bg-slate-900/90 backdrop-blur-xl rounded-3xl overflow-hidden border-2 border-emerald-500/30">
-                    <img src={currentEx.gifUrl || FALLBACK_GIF} alt={currentEx.name} className="w-full aspect-video object-contain" onError={e => e.target.src = FALLBACK_GIF} />
+                    <img 
+                      src={gifSrc} 
+                      alt={currentEx.name} 
+                      className="w-full aspect-video object-contain"
+                      onError={(e) => {
+                        if (e.currentTarget.src !== FALLBACK_SVG) {
+                          e.currentTarget.src = FALLBACK_SVG;
+                        }
+                      }}
+                    />
                     <div className="absolute top-4 left-4 w-12 h-12 border-l-4 border-t-4 border-emerald-400 rounded-tl-2xl" />
                     <div className="absolute bottom-4 right-4 w-12 h-12 border-r-4 border-b-4 border-teal-400 rounded-br-2xl" />
                   </div>
@@ -430,7 +456,7 @@ export const WorkoutModeOverlay = ({
             next={nextExerciseName}
           />
 
-          {/* Clear PR Modal (unchanged, already beautiful) */}
+          {/* Clear PR Modal */}
           <AnimatePresence>
             {showClearConfirm && (
               <>
