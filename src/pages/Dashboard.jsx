@@ -1,5 +1,12 @@
-import React from 'react';
+/**
+ * Striven - Privacy-First Fitness Tracker
+ * Copyright (c) 2025 Rodney Austria
+ * Licensed under the MIT License
+ */
+
+import React, { useState } from 'react';
 import { Footprints, Flame, Clock, Target, Activity, Check, Play, Pause, RotateCcw, ChevronRight, TrendingUp, Award } from 'lucide-react';
+import LicenseModal from '../components/LicenseModal';
 
 // Step Counter Component with Modern Circular Progress
 const StepCounter = ({ steps, goal }) => {
@@ -180,6 +187,7 @@ const Dashboard = ({
   onNavigateToStats = () => {}
 }) => {
   const dailyStepsGoal = 10000;
+  const [showLicense, setShowLicense] = useState(false);
 
   // Calculate weekly average from total steps
   const weeklyAverage = weeklyStats.activeDays > 0 
@@ -329,11 +337,16 @@ const Dashboard = ({
 
         {/* Footer */}
         <div className="text-center">
-          <p className="text-white/40 text-xs font-medium">
-            Developed by Rodney Austria
-          </p>
+          <button
+            onClick={() => setShowLicense(true)}
+            className="text-white/40 hover:text-white/60 text-xs font-medium transition-colors underline decoration-dotted"
+          >
+            © 2025 Rodney Austria - View License
+          </button>
         </div>
       </div>
+
+      <LicenseModal isOpen={showLicense} onClose={() => setShowLicense(false)} />
     </div>
   );
 };

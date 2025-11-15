@@ -493,7 +493,7 @@ export const exportData = async () => {
       goals: await db.goals.toArray(),
       favorites: await db.favorites.toArray(),
       todayWorkout: await db.todayWorkout.toArray(),
-      workoutPlans: await db.workoutPlans.toArray(),
+      workoutPlans: await db.workoutPlans.toArray(), // Includes rest day info in days array
       exerciseLogs: await db.exerciseLogs.toArray(),
       exportDate: new Date().toISOString(),
       appVersion: '3.0'

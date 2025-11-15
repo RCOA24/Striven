@@ -1,3 +1,9 @@
+/**
+ * Striven - Privacy-First Fitness Tracker
+ * Copyright (c) 2025 Rodney Austria
+ * Licensed under the MIT License
+ */
+
 'use client';
 
 import React, { useState, useEffect, useRef, useContext } from 'react';

@@ -1,6 +1,13 @@
+/**
+ * Striven - Privacy-First Fitness Tracker
+ * Copyright (c) 2025 Rodney Austria
+ * Licensed under the MIT License
+ */
+
 import React, { useState } from 'react';
 import { User, Award, TrendingUp, Zap, Download, Upload, Trash2, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 import { exportData, importData, clearAllData } from '../utils/db';
+import LicenseModal from '../components/LicenseModal';
 
 const StatCard = ({ icon: Icon, label, value, gradient }) => (
   <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20">
@@ -21,6 +28,7 @@ const ProfilePage = ({ activities = [], weeklyStats = {} }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [notification, setNotification] = useState(null); // { type: 'success' | 'error', message: string }
+  const [showLicense, setShowLicense] = useState(false);
 
   // Show notification
   const showNotification = (type, message) => {
@@ -329,12 +337,18 @@ const ProfilePage = ({ activities = [], weeklyStats = {} }) => {
       {/* App Info */}
       <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-6 border border-white/20 text-center">
         <h3 className="text-white font-bold text-lg mb-2">Striven</h3>
-        <p className="text-white/60 text-sm mb-2">Privacy-First Step Tracker</p>
-        <p className="text-white/40 text-xs">
+        <p className="text-white/60 text-sm mb-2">Privacy-First Fitness Tracker</p>
+        <p className="text-white/40 text-xs mb-4">
           All your data is stored locally on your device. We never collect or share your information.
         </p>
-        <div className="mt-4 text-white/30 text-xs">
-          Version 1.0.0
+        <div className="mt-4 space-y-2">
+          <p className="text-white/30 text-xs">Version 1.0.0</p>
+          <button
+            onClick={() => setShowLicense(true)}
+            className="text-white/50 hover:text-white/70 text-xs underline decoration-dotted transition-colors"
+          >
+            © 2025 Rodney Austria - View License & Credits
+          </button>
         </div>
       </div>
 
@@ -359,6 +373,8 @@ const ProfilePage = ({ activities = [], weeklyStats = {} }) => {
           </div>
         </div>
       )}
+
+      <LicenseModal isOpen={showLicense} onClose={() => setShowLicense(false)} />
     </div>
   );
 };

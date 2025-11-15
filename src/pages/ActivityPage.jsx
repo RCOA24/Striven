@@ -1,3 +1,9 @@
+/**
+ * Striven - Privacy-First Fitness Tracker
+ * Copyright (c) 2025 Rodney Austria
+ * Licensed under the MIT License
+ */
+
 import React, { useState, useMemo } from 'react';
 import {
   Calendar,
@@ -14,6 +20,7 @@ import {
   Flame,
   X,
 } from 'lucide-react';
+import LicenseModal from '../components/LicenseModal';
 
 const GOAL_STEPS = 5;   // unified goal
 
@@ -397,6 +404,7 @@ const ActivityPage = ({
 }) => {
   const [selectedDate, setSelectedDate] = useState(null);
   const [filterMode, setFilterMode] = useState('all');
+  const [showLicense, setShowLicense] = useState(false);
 
   const filteredActivities = useMemo(() => {
     if (filterMode === 'all' || !selectedDate) return activities;
@@ -573,9 +581,16 @@ const ActivityPage = ({
 
         {/* Footer */}
         <div className="text-center pt-8">
-          <p className="text-white/40 text-sm font-medium">Developed by Rodney Austria</p>
+          <button
+            onClick={() => setShowLicense(true)}
+            className="text-white/40 hover:text-white/60 text-sm font-medium transition-colors underline decoration-dotted"
+          >
+            © 2025 Rodney Austria - View License
+          </button>
         </div>
       </div>
+
+      <LicenseModal isOpen={showLicense} onClose={() => setShowLicense(false)} />
     </div>
   );
 };

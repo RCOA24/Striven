@@ -1,7 +1,10 @@
 {
-  "name": "Striven",
+  "name": "striven",
+  "version": "1.0.0",
+  "description": "Privacy-First Fitness Tracker",
+  "author": "Rodney Austria",
+  "license": "MIT",
   "private": true,
-  "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

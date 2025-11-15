@@ -1,3 +1,9 @@
+/**
+ * Striven - Privacy-First Fitness Tracker
+ * Copyright (c) 2025 Rodney Austria
+ * Licensed under the MIT License
+ */
+
 // src/pages/ExerciseLibraryVisuals.jsx
 'use client';
 
