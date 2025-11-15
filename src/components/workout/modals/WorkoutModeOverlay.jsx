@@ -249,7 +249,7 @@ export const WorkoutModeOverlay = ({
                 <div className="flex items-center gap-2 sm:gap-3 md:gap-4 min-w-0 flex-1">
                   <ProgressRing progress={currentExerciseIndex + 1} total={todayExercises.length} />
                   <div className="min-w-0 flex-1">
-                    <p className="text-white/60 text-[10px] sm:text-xs md:text-sm font-medium truncate">Workout Session</p>
+                    <p className="text-white/60 text-[10px] sm:text-xs md:text-sm font-medium truncate">Workout Sessiawawdwaon</p>
                     <p className="text-white text-sm sm:text-base md:text-lg lg:text-xl font-bold truncate">Exercise {currentExerciseIndex + 1}</p>
                   </div>
                 </div>
