@@ -1,6 +1,7 @@
 import { Reorder, motion } from 'framer-motion';
 import { Play, Plus, Trash2, Dumbbell, Clock, Flame, Target, GripVertical, X, CheckCircle2 } from 'lucide-react';
 import { DraggableExerciseItem } from '../ui/DraggableExerciseItem';
+import { useRef } from 'react';
 
 const WorkoutStats = ({ exercises }) => {
   const totalExercises = exercises.length;
@@ -8,20 +9,20 @@ const WorkoutStats = ({ exercises }) => {
   const estimatedCalories = totalExercises * 15; // rough estimate
 
   return (
-    <div className="grid grid-cols-3 gap-4 mb-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6 w-full">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="bg-gradient-to-br from-emerald-500/20 to-teal-500/20 backdrop-blur-xl rounded-2xl p-4 border border-emerald-500/30"
+        className="min-w-0 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 backdrop-blur-xl rounded-2xl p-3 sm:p-4 border border-emerald-500/30"
       >
         <div className="flex items-center gap-3">
           <div className="p-2 bg-emerald-500/30 rounded-xl">
-            <Target className="w-5 h-5 text-emerald-400" />
+            <Target className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400" />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-white/60 text-xs font-medium">Exercises</p>
-            <p className="text-white text-2xl font-bold">{totalExercises}</p>
+            <p className="text-white text-xl sm:text-2xl font-bold leading-tight truncate">{totalExercises}</p>
           </div>
         </div>
       </motion.div>
@@ -30,15 +31,18 @@ const WorkoutStats = ({ exercises }) => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 backdrop-blur-xl rounded-2xl p-4 border border-blue-500/30"
+        className="min-w-0 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 backdrop-blur-xl rounded-2xl p-3 sm:p-4 border border-blue-500/30"
       >
         <div className="flex items-center gap-3">
           <div className="p-2 bg-blue-500/30 rounded-xl">
-            <Clock className="w-5 h-5 text-blue-400" />
+            <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-white/60 text-xs font-medium">Duration</p>
-            <p className="text-white text-2xl font-bold">{estimatedTime}<span className="text-sm text-white/60">m</span></p>
+            <p className="text-white text-xl sm:text-2xl font-bold leading-tight">
+              {estimatedTime}
+              <span className="text-xs sm:text-sm text-white/60 ml-0.5">m</span>
+            </p>
           </div>
         </div>
       </motion.div>
@@ -47,15 +51,15 @@ const WorkoutStats = ({ exercises }) => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
-        className="bg-gradient-to-br from-orange-500/20 to-red-500/20 backdrop-blur-xl rounded-2xl p-4 border border-orange-500/30"
+        className="min-w-0 bg-gradient-to-br from-orange-500/20 to-red-500/20 backdrop-blur-xl rounded-2xl p-3 sm:p-4 border border-orange-500/30"
       >
         <div className="flex items-center gap-3">
           <div className="p-2 bg-orange-500/30 rounded-xl">
-            <Flame className="w-5 h-5 text-orange-400" />
+            <Flame className="w-5 h-5 sm:w-6 sm:h-6 text-orange-400" />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-white/60 text-xs font-medium">Est. Calories</p>
-            <p className="text-white text-2xl font-bold">{estimatedCalories}</p>
+            <p className="text-white text-xl sm:text-2xl font-bold leading-tight truncate">{estimatedCalories}</p>
           </div>
         </div>
       </motion.div>
@@ -134,6 +138,9 @@ export const TodayTab = ({
 }) => {
   const hasExercises = todayExercises && todayExercises.length > 0;
 
+  // Track latest order to persist on drag end
+  const orderRef = useRef(todayExercises);
+
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       {/* Header Section */}
@@ -210,10 +217,12 @@ export const TodayTab = ({
           </motion.div>
 
           <Reorder.Group 
-            values={todayExercises} 
+            values={todayExercises}
+            axis="y"
             onReorder={(newOrder) => {
+              orderRef.current = newOrder;
               setTodayExercises(newOrder);
-              reorderTodayWorkout(newOrder.map(e => e.id || e.exerciseId));
+              // NOTE: persist only on drag end to prevent jitter
             }}
             className="space-y-3"
           >
@@ -223,6 +232,10 @@ export const TodayTab = ({
                 exercise={ex}
                 index={i}
                 onRemove={removeFromToday}
+                onDragEnd={() => {
+                  const ids = (orderRef.current || []).map(e => e.id);
+                  if (ids.length) reorderTodayWorkout(ids);
+                }}
               />
             ))}
           </Reorder.Group>

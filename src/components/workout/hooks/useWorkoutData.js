@@ -17,21 +17,35 @@ export const useWorkoutData = () => {
 
   const enrichWithGif = async (ex) => {
     if (!ex) return { ...ex, gifUrl: FALLBACK_GIF };
-    const id = ex.exerciseId || ex.id;
-    if (!id) return { ...ex, gifUrl: FALLBACK_GIF };
+
+    // API exercise id (or fallback to whatever we have)
+    const apiExerciseId = ex.exerciseId || ex.id;
 
     try {
-      const full = await fetchExerciseDetails(id);
+      const full = await fetchExerciseDetails(apiExerciseId);
       const gif = full?.previewImage || full?.images?.[0]?.image || full?.gifUrl || FALLBACK_GIF;
-      return { 
-        ...ex, 
-        ...full, 
-        id: full.id || ex.id,
-        exerciseId: id,
-        gifUrl: gif 
+
+      // IMPORTANT: never overwrite db primary key id. Strip id from full.
+      const { id: _apiId, ...fullRest } = full || {};
+
+      return {
+        // keep original object first to preserve db id if present
+        ...ex,
+        // merge fetched details without 'id' to avoid clobbering db id
+        ...fullRest,
+        exerciseId: apiExerciseId,     // API exercise id
+        gifUrl: gif,
+        // ensure id remains the db row id when it exists (from todayWorkout),
+        // otherwise for pure API objects it's already the API id which is fine for adds.
+        id: ex.id
       };
     } catch {
-      return { ...ex, id: ex.id || id, exerciseId: id, gifUrl: ex.gifUrl || FALLBACK_GIF };
+      return { 
+        ...ex, 
+        exerciseId: apiExerciseId, 
+        gifUrl: ex.gifUrl || FALLBACK_GIF,
+        id: ex.id
+      };
     }
   };
 
