@@ -1,11 +1,12 @@
 import { Reorder, useDragControls } from 'framer-motion';
-import { GripVertical, X } from 'lucide-react';
+import { GripVertical, X, Dumbbell } from 'lucide-react';
 import { motion } from 'framer-motion';
-
-const FALLBACK_GIF = 'https://via.placeholder.com/400x300/1a1a1a/ffffff?text=No+GIF';
+import { useState } from 'react';
 
 export const DraggableExerciseItem = ({ exercise, index, onRemove, onDragEnd }) => {
   const controls = useDragControls();
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   return (
     <Reorder.Item
@@ -30,14 +31,31 @@ export const DraggableExerciseItem = ({ exercise, index, onRemove, onDragEnd }) 
 
         <span className="text-xl font-bold text-emerald-400 w-10 text-center">{index + 1}</span>
 
-        <img
-          src={exercise.gifUrl || FALLBACK_GIF}
-          alt={exercise.name || 'Exercise'}
-          className="w-16 h-16 rounded-xl object-cover"
-          loading="lazy"
-          decoding="async"
-          onError={(e) => { e.currentTarget.src = FALLBACK_GIF; }}
-        />
+        <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-gradient-to-br from-emerald-950/20 to-gray-900/20 flex-shrink-0">
+          {!imageLoaded && !imageError && (
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-950/20 to-gray-900/20 animate-pulse" />
+          )}
+          {imageError ? (
+            <div className="w-full h-full flex items-center justify-center bg-black/40">
+              <Dumbbell className="w-8 h-8 text-white/40" />
+            </div>
+          ) : (
+            <img
+              src={exercise.gifUrl || exercise.image}
+              alt={exercise.name || 'Exercise'}
+              className={`w-full h-full object-cover transition-opacity duration-300 ${
+                imageLoaded ? 'opacity-100' : 'opacity-0'
+              }`}
+              loading="lazy"
+              decoding="async"
+              onLoad={() => setImageLoaded(true)}
+              onError={() => {
+                setImageError(true);
+                setImageLoaded(true);
+              }}
+            />
+          )}
+        </div>
 
         <div className="flex-1 min-w-0">
           <h3 className="font-bold truncate">{exercise.name}</h3>

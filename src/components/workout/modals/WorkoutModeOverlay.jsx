@@ -5,7 +5,6 @@ import {
   Pause, SkipForward, TrendingUp, Trash2, X, AlertTriangle, 
   Play, Timer, Zap, Award, Calendar, Target, ChevronRight, ImageOff
 } from 'lucide-react';
-import toast from 'react-hot-toast';
 import { PRBadge } from '../ui/PRBadge';
 import { TimerDisplay } from '../ui/TimerDisplay';
 import SetLogger from '../ui/SetLogger';
@@ -136,7 +135,8 @@ export const WorkoutModeOverlay = ({
   setIsWorkoutStarted,
   exerciseHistory,
   openLogModal,
-  refreshHistory
+  refreshHistory,
+  showToast // NEW PROP
 }) => {
   const containerRef = useRef(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -185,7 +185,7 @@ export const WorkoutModeOverlay = ({
 
   const handleClearPR = async () => {
     if (!currentExId) {
-      toast.error('No exercise selected');
+      if (showToast) showToast('No exercise selected', 'error');
       setShowClearConfirm(false);
       return;
     }
@@ -197,27 +197,15 @@ export const WorkoutModeOverlay = ({
         await new Promise(resolve => setTimeout(resolve, 100));
       }
       
-      toast.success('All logs cleared!', {
-        icon: 'Trash',
-        style: {
-          background: 'linear-gradient(to right, #10b981, #34d399)',
-          color: 'white',
-          fontWeight: 'bold',
-          borderRadius: '16px',
-          boxShadow: '0 10px 30px rgba(16, 185, 129, 0.4)',
-        },
-      });
+      if (showToast) {
+        showToast('All logs cleared!', 'success', 'trash');
+      }
       setShowClearConfirm(false);
     } catch (error) {
       console.error('Error in handleClearPR:', error);
-      toast.error(`Failed to clear PR: ${error.message}`, {
-        style: {
-          background: 'linear-gradient(to right, #ef4444, #f87171)',
-          color: 'white',
-          fontWeight: 'bold',
-          borderRadius: '16px',
-        },
-      });
+      if (showToast) {
+        showToast(`Failed to clear PR: ${error.message}`, 'error');
+      }
       setShowClearConfirm(false);
     }
   };

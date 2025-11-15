@@ -6,13 +6,12 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSwipeable } from 'react-swipeable';
-import toast from 'react-hot-toast';
 import { toggleFavorite, isFavorite } from '../../../utils/db';
 
 const FALLBACK = 'https://via.placeholder.com/600x400/111/fff?text=No+Preview';
 const WGER_API = 'https://wger.de/api/v2';
 
-export default function ExerciseModal({ isOpen, exercise: initialExercise, onClose, onQuickAdd }) {
+export default function ExerciseModal({ isOpen, exercise: initialExercise, onClose, onQuickAdd, showToast }) {
   const [exercise, setExercise] = useState(initialExercise);
   const [imgIdx, setImgIdx] = useState(0);
   const [instructionsOpen, setInstructionsOpen] = useState(false);
@@ -130,89 +129,45 @@ export default function ExerciseModal({ isOpen, exercise: initialExercise, onClo
     trackMouse: true
   });
 
-const addToday = async () => {
-  if (!onQuickAdd || adding) return;
-  setAdding(true);
-  try {
-    await onQuickAdd(exercise);
-    toast.success(`${exercise.name} added!`, {
-      icon: 'Checkmark',
-      duration: 3000,
-      style: {
-        background: 'linear-gradient(to right, #10b981, #34d399)',
-        color: 'white',
-        fontWeight: 'bold',
-        borderRadius: '16px',
-        padding: '14px 28px',
-        boxShadow: '0 10px 30px rgba(16, 185, 129, 0.4)',
-        border: '1px solid rgba(255,255,255,0.2)',
-      },
-    });
-  } catch {
-    toast.error('Already in today', {
-      icon: 'Cross',
-      style: {
-        background: 'linear-gradient(to right, #ef4444, #f87171)',
-        color: 'white',
-        fontWeight: 'bold',
-        borderRadius: '16px',
-        padding: '14px 28px',
-        boxShadow: '0 10px 30px rgba(239, 68, 68, 0.4)',
-      },
-    });
-  } finally {
-    setAdding(false);
-  }
-};
-
-const toggleFav = async () => {
-  if (saving) return;
-  setSaving(true);
-  try {
-    const newFav = await toggleFavorite(exercise);
-    setIsFav(newFav);
-
-    if (newFav) {
-      toast.success('Saved to favorites!', {
-        icon: 'Red Heart',
-        duration: 3000,
-        style: {
-          background: 'linear-gradient(to right, #ec4899, #f43f5e)',
-          color: 'white',
-          fontWeight: 'bold',
-          borderRadius: '16px',
-          padding: '14px 28px',
-          boxShadow: '0 10px 30px rgba(236, 72, 153, 0.5)',
-          border: '1px solid rgba(255,255,255,0.2)',
-        },
-      });
-    } else {
-      toast('Removed from favorites', {
-        icon: 'Broken Heart',
-        duration: 2500,
-        style: {
-          background: 'linear-gradient(to right, #6b7280, #9ca3af)',
-          color: 'white',
-          fontWeight: 'bold',
-          borderRadius: '16px',
-          padding: '14px 28px',
-          boxShadow: '0 10px 30px rgba(107, 114, 128, 0.3)',
-        },
-      });
+  const addToday = async () => {
+    if (!onQuickAdd || adding) return;
+    setAdding(true);
+    try {
+      await onQuickAdd(exercise);
+      if (showToast) {
+        showToast(`${exercise.name} added to workout!`, 'success', 'muscle');
+      }
+    } catch {
+      if (showToast) {
+        showToast('Already in today\'s workout', 'error');
+      }
+    } finally {
+      setAdding(false);
     }
-  } catch {
-    toast.error('Failed to update', {
-      icon: 'Warning',
-      style: {
-        background: '#1f2937',
-        color: '#fca5a5',
-        border: '1px solid #ef4444',
-      },
-    });
-  } finally {
-    setSaving(false);
-  }
-};
+  };
+
+  const toggleFav = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const newFav = await toggleFavorite(exercise);
+      setIsFav(newFav);
+
+      if (showToast) {
+        if (newFav) {
+          showToast(`Added ${exercise.name} to favorites!`, 'success', 'muscle');
+        } else {
+          showToast(`Removed ${exercise.name} from favorites`, 'info', 'trash');
+        }
+      }
+    } catch (error) {
+      if (showToast) {
+        showToast('Failed to update favorites', 'error');
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -368,12 +323,24 @@ const toggleFav = async () => {
               <button
                 onClick={toggleFav}
                 disabled={saving}
-                className={`p-5 rounded-2xl border-4 transition-all hover:scale-110 relative ${
-                  isFav ? 'border-rose-500 bg-rose-500/20' : 'border-white/20 bg-white/10'
+                className={`p-5 rounded-2xl border-4 transition-all hover:scale-110 relative shadow-lg ${
+                  isFav 
+                    ? 'border-rose-500 bg-gradient-to-br from-rose-500/30 to-pink-500/20 shadow-rose-500/50' 
+                    : 'border-white/20 bg-white/10 hover:border-white/30'
                 }`}
               >
-                <Heart className={`w-12 h-12 ${isFav ? 'fill-rose-500 text-rose-500' : 'text-white'}`} />
-                {saving && <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-2xl"><Loader2 className="w-7 h-7 animate-spin text-white" /></div>}
+                <Heart 
+                  className={`w-12 h-12 transition-all ${
+                    isFav 
+                      ? 'fill-rose-500 text-rose-500 drop-shadow-[0_0_8px_rgba(244,63,94,0.8)]' 
+                      : 'text-white/70 hover:text-white'
+                  }`} 
+                />
+                {saving && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-2xl">
+                    <Loader2 className="w-7 h-7 animate-spin text-white" />
+                  </div>
+                )}
               </button>
             </div>
           </motion.div>

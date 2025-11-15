@@ -42,11 +42,12 @@ db.version(3).stores({
    FAVORITES
 ================================================================== */
 export const addToFavorites = async (exercise) => {
-  const exists = await db.favorites.where('exerciseId').equals(exercise.id).first();
+  const exerciseId = exercise.exerciseId || exercise.id;
+  const exists = await db.favorites.where('exerciseId').equals(exerciseId).first();
   if (exists) throw new Error('Already saved');
 
   const id = await db.favorites.add({
-    exerciseId: exercise.id,
+    exerciseId: exerciseId,
     name: exercise.name,
     muscles: exercise.muscles,
     musclesSecondary: exercise.musclesSecondary || null,
@@ -70,14 +71,16 @@ const notifyChange = () => {
 };
 
 export const removeFromFavorites = async (exerciseId) => {
-  await db.favorites.where('exerciseId').equals(exerciseId).delete();
+  const actualId = typeof exerciseId === 'object' ? (exerciseId.exerciseId || exerciseId.id) : exerciseId;
+  await db.favorites.where('exerciseId').equals(actualId).delete();
   notifyChange();
 };
 
 export const toggleFavorite = async (exercise) => {
-  const exists = await db.favorites.where('exerciseId').equals(exercise.id).first();
+  const exerciseId = exercise.exerciseId || exercise.id;
+  const exists = await db.favorites.where('exerciseId').equals(exerciseId).first();
   if (exists) {
-    await removeFromFavorites(exercise.id);
+    await removeFromFavorites(exerciseId);
     return false;
   } else {
     await addToFavorites(exercise);
@@ -86,7 +89,8 @@ export const toggleFavorite = async (exercise) => {
 };
 
 export const isFavorite = async (exerciseId) => {
-  return await db.favorites.where('exerciseId').equals(exerciseId).count() > 0;
+  const actualId = typeof exerciseId === 'object' ? (exerciseId.exerciseId || exerciseId.id) : exerciseId;
+  return await db.favorites.where('exerciseId').equals(actualId).count() > 0;
 };
 
 export const getFavorites = async () => {

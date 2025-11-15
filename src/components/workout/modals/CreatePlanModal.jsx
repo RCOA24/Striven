@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  X, Save, AlertCircle, Check, Dumbbell
+  X, Save, AlertCircle, Check, Dumbbell, Search, ListOrdered
 } from 'lucide-react';
 import { SafeExerciseImage } from './components/SafeExerciseImage';
 import { PlanDaySelector } from './components/PlanDaySelector';
@@ -9,6 +9,13 @@ import { SearchResults } from './components/SearchResults';
 import { PlanExerciseList } from './components/PlanExerciseList';
 
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+// Mobile tab states
+const MOBILE_TABS = {
+  DAYS: 'days',
+  SEARCH: 'search',
+  EXERCISES: 'exercises'
+};
 
 // ══════════════════════════════════════════════════════════════
 // MAIN MODAL COMPONENT
@@ -40,6 +47,7 @@ export const CreatePlanModal = ({
   const nameInputRef = useRef(null);
   const [showUnsavedWarning, setShowUnsavedWarning] = useState(false);
   const [nameFocused, setNameFocused] = useState(false);
+  const [mobileTab, setMobileTab] = useState(MOBILE_TABS.DAYS);
 
   const toggleRestDay = (index) => {
     setPlanDays(prev => {
@@ -102,7 +110,7 @@ export const CreatePlanModal = ({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-2xl p-2 sm:p-4"
+        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-2xl p-0 sm:p-4"
         onClick={e => e.target === e.currentTarget && handleClose()}
       >
         <motion.div
@@ -113,109 +121,82 @@ export const CreatePlanModal = ({
           transition={{ type: "spring", damping: 30, stiffness: 300 }}
           className="
             bg-gradient-to-br from-gray-900 via-emerald-950/30 to-gray-900
-            rounded-2xl lg:rounded-3xl w-full max-w-7xl h-[98vh] lg:h-[95vh]
-            overflow-hidden border-2 border-emerald-500/30
+            rounded-none sm:rounded-2xl lg:rounded-3xl w-full sm:max-w-7xl h-full sm:h-[95vh]
+            overflow-hidden border-0 sm:border-2 border-emerald-500/30
             shadow-2xl shadow-emerald-500/20
             flex flex-col
           "
           onClick={e => e.stopPropagation()}
         >
-          {/* ═══ HEADER ═══ */}
-          <div className="flex-shrink-0 p-4 lg:p-6 bg-gradient-to-b from-emerald-950/60 via-emerald-950/30 to-transparent border-b border-emerald-500/20">
-            <div className="flex items-start justify-between mb-4 gap-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <motion.div
-                    animate={{ rotate: [0, 10, -10, 0] }}
-                    transition={{ duration: 0.5, delay: 0.2 }}
-                    className="p-2 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-xl border border-emerald-500/30"
-                  >
-                    <Dumbbell className="w-6 h-6 text-emerald-400" />
-                  </motion.div>
-                  <div>
-                    <h2 className="text-2xl lg:text-3xl font-bold text-white">
-                      {editingPlanId ? 'Edit Workout Plan' : 'Create New Plan'}
-                    </h2>
-                    {totalExercises > 0 && (
-                      <motion.p
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className="text-sm text-emerald-400 mt-1 flex items-center gap-2"
-                      >
-                        <Check className="w-4 h-4" />
-                        {activeDays} day{activeDays !== 1 ? 's' : ''} • {totalExercises} exercise{totalExercises !== 1 ? 's' : ''}
-                      </motion.p>
-                    )}
-                  </div>
+          {/* ═══ COMPACT HEADER ═══ */}
+          <div className="flex-shrink-0 p-3 sm:p-4 lg:p-5 bg-gradient-to-b from-emerald-950/60 via-emerald-950/30 to-transparent border-b border-emerald-500/20">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <motion.div
+                  animate={{ rotate: [0, 10, -10, 0] }}
+                  transition={{ duration: 0.5, delay: 0.2 }}
+                  className="p-1.5 sm:p-2 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-lg border border-emerald-500/30"
+                >
+                  <Dumbbell className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
+                </motion.div>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-white truncate">
+                    {editingPlanId ? 'Edit Plan' : 'New Plan'}
+                  </h2>
+                  {totalExercises > 0 && (
+                    <p className="text-xs sm:text-sm text-emerald-400 flex items-center gap-1.5">
+                      <Check className="w-3 h-3" />
+                      {activeDays}d • {totalExercises}ex
+                    </p>
+                  )}
                 </div>
               </div>
               
               <motion.button
-                whileHover={{ scale: 1.05, rotate: 90 }}
+                whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={handleClose}
-                className="p-2 hover:bg-white/10 rounded-full transition-all border border-white/10 hover:border-white/20"
+                className="p-1.5 sm:p-2 hover:bg-white/10 rounded-lg transition-all border border-white/10"
               >
-                <X className="w-6 h-6 text-white/70" />
+                <X className="w-5 h-5 text-white/70" />
               </motion.button>
             </div>
 
-            {/* Plan Name Input */}
-            <motion.div
-              animate={{ scale: nameFocused ? 1.01 : 1 }}
-              transition={{ duration: 0.2 }}
-            >
-              <div className="relative">
-                <input
-                  ref={nameInputRef}
-                  type="text"
-                  placeholder="Enter plan name (e.g., Upper/Lower Split, Push/Pull/Legs)"
-                  value={newPlanName}
-                  onChange={e => setNewPlanName(e.target.value)}
-                  onFocus={() => setNameFocused(true)}
-                  onBlur={() => setNameFocused(false)}
-                  maxLength={50}
-                  className="
-                    w-full px-5 py-4 rounded-xl
-                    bg-white/10 border-2 border-white/20
-                    focus:border-emerald-500 focus:bg-white/15
-                    focus:ring-4 focus:ring-emerald-500/20
-                    transition-all duration-200 outline-none
-                    text-white placeholder-white/40 font-semibold text-lg
-                  "
-                />
-                {newPlanName && (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2"
-                  >
-                    <span className="text-xs text-white/40">
-                      {newPlanName.length}/50
-                    </span>
-                    <Check className="w-5 h-5 text-emerald-400" />
-                  </motion.div>
-                )}
-              </div>
-            </motion.div>
+            {/* Compact Name Input */}
+            <input
+              ref={nameInputRef}
+              type="text"
+              placeholder="Plan name..."
+              value={newPlanName}
+              onChange={e => setNewPlanName(e.target.value)}
+              maxLength={50}
+              className="
+                w-full px-3 py-2.5 sm:py-3 rounded-lg
+                bg-white/10 border border-white/20
+                focus:border-emerald-500 focus:bg-white/15
+                focus:ring-2 focus:ring-emerald-500/20
+                transition-all duration-200 outline-none
+                text-white placeholder-white/40 font-medium text-sm sm:text-base
+              "
+            />
           </div>
 
-          {/* ═══ BODY ═══ */}
-          <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
-            {/* Day Selector Sidebar */}
-            <div className="flex-shrink-0">
-              <PlanDaySelector
-                days={planDays}
-                selectedDayIndex={selectedDayIndex}
-                onSelect={setSelectedDayIndex}
-                onToggleRest={toggleRestDay}
-              />
-            </div>
+          {/* ═══ BODY - MOBILE TABS / DESKTOP PANELS ═══ */}
+          <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden relative">
+            {/* DESKTOP LAYOUT */}
+            <div className="hidden lg:flex flex-1 min-h-0 overflow-hidden">
+              {/* Day Selector Sidebar */}
+              <div className="flex-shrink-0 w-64">
+                <PlanDaySelector
+                  days={planDays}
+                  selectedDayIndex={selectedDayIndex}
+                  onSelect={setSelectedDayIndex}
+                  onToggleRest={toggleRestDay}
+                />
+              </div>
 
-            {/* Main Content Area */}
-            <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
               {/* Search Panel */}
-              <div className="flex-shrink-0 h-1/2 lg:h-auto lg:w-96 flex flex-col min-h-0 border-b lg:border-b-0 lg:border-r border-white/10">
+              <div className="flex-shrink-0 w-80 border-r border-white/10">
                 <SearchResults
                   search={planSearch}
                   setSearch={setPlanSearch}
@@ -230,7 +211,7 @@ export const CreatePlanModal = ({
               </div>
 
               {/* Exercise List Panel */}
-              <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+              <div className="flex-1 min-h-0">
                 <PlanExerciseList
                   exercises={currentDay.exercises}
                   dayName={DAYS_OF_WEEK[selectedDayIndex]}
@@ -240,39 +221,173 @@ export const CreatePlanModal = ({
                 />
               </div>
             </div>
+
+            {/* MOBILE LAYOUT - TAB BASED */}
+            <div className="lg:hidden flex-1 flex flex-col min-h-0 overflow-hidden">
+              {/* Mobile Tab Content */}
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <AnimatePresence mode="wait">
+                  {mobileTab === MOBILE_TABS.DAYS && (
+                    <motion.div
+                      key="days"
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 20 }}
+                      className="h-full"
+                    >
+                      <PlanDaySelector
+                        days={planDays}
+                        selectedDayIndex={selectedDayIndex}
+                        onSelect={(i) => {
+                          setSelectedDayIndex(i);
+                          setMobileTab(MOBILE_TABS.EXERCISES);
+                        }}
+                        onToggleRest={toggleRestDay}
+                      />
+                    </motion.div>
+                  )}
+
+                  {mobileTab === MOBILE_TABS.SEARCH && (
+                    <motion.div
+                      key="search"
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 20 }}
+                      className="h-full"
+                    >
+                      <SearchResults
+                        search={planSearch}
+                        setSearch={setPlanSearch}
+                        results={planResults}
+                        totalCount={planTotalCount}
+                        currentPage={planCurrentPage}
+                        totalPages={planTotalPages}
+                        loading={planLoading}
+                        onAdd={ex => {
+                          if (!currentDay.isRest) {
+                            addToPlanDay(selectedDayIndex, ex);
+                            setMobileTab(MOBILE_TABS.EXERCISES);
+                          }
+                        }}
+                        onPageChange={onPlanPageChange}
+                      />
+                    </motion.div>
+                  )}
+
+                  {mobileTab === MOBILE_TABS.EXERCISES && (
+                    <motion.div
+                      key="exercises"
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 20 }}
+                      className="h-full"
+                    >
+                      <PlanExerciseList
+                        exercises={currentDay.exercises}
+                        dayName={DAYS_OF_WEEK[selectedDayIndex]}
+                        isRest={currentDay.isRest}
+                        onReorder={newOrder => reorderPlanDay(selectedDayIndex, newOrder)}
+                        onRemove={i => removeFromPlanDay(selectedDayIndex, i)}
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Mobile Bottom Tab Bar */}
+              <div className="flex-shrink-0 bg-gradient-to-t from-black via-black/95 to-transparent border-t border-emerald-500/20 backdrop-blur-xl">
+                <div className="grid grid-cols-3 gap-1 p-2">
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setMobileTab(MOBILE_TABS.DAYS)}
+                    className={`
+                      flex flex-col items-center gap-1 py-2.5 px-2 rounded-lg transition-all
+                      ${mobileTab === MOBILE_TABS.DAYS
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                        : 'bg-white/5 text-white/60 border border-white/10'
+                      }
+                    `}
+                  >
+                    <Dumbbell className="w-5 h-5" />
+                    <span className="text-[10px] font-medium">Days</span>
+                    {activeDays > 0 && (
+                      <span className="text-[9px] px-1.5 py-0.5 bg-emerald-500/30 rounded-full">
+                        {activeDays}
+                      </span>
+                    )}
+                  </motion.button>
+
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setMobileTab(MOBILE_TABS.SEARCH)}
+                    className={`
+                      flex flex-col items-center gap-1 py-2.5 px-2 rounded-lg transition-all
+                      ${mobileTab === MOBILE_TABS.SEARCH
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                        : 'bg-white/5 text-white/60 border border-white/10'
+                      }
+                    `}
+                  >
+                    <Search className="w-5 h-5" />
+                    <span className="text-[10px] font-medium">Search</span>
+                    {planResults.length > 0 && (
+                      <span className="text-[9px] px-1.5 py-0.5 bg-emerald-500/30 rounded-full">
+                        {planResults.length}
+                      </span>
+                    )}
+                  </motion.button>
+
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setMobileTab(MOBILE_TABS.EXERCISES)}
+                    className={`
+                      flex flex-col items-center gap-1 py-2.5 px-2 rounded-lg transition-all
+                      ${mobileTab === MOBILE_TABS.EXERCISES
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                        : 'bg-white/5 text-white/60 border border-white/10'
+                      }
+                    `}
+                  >
+                    <ListOrdered className="w-5 h-5" />
+                    <span className="text-[10px] font-medium">Exercises</span>
+                    {currentDay.exercises.length > 0 && (
+                      <span className="text-[9px] px-1.5 py-0.5 bg-emerald-500/30 rounded-full">
+                        {currentDay.exercises.length}
+                      </span>
+                    )}
+                  </motion.button>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* ═══ FOOTER ═══ */}
-          <div className="flex-shrink-0 p-4 lg:p-6 bg-gradient-to-t from-black/80 via-black/60 to-transparent border-t border-emerald-500/20 backdrop-blur-xl">
-            <div className="flex flex-col sm:flex-row gap-3">
+          {/* ═══ COMPACT FOOTER ═══ */}
+          <div className="flex-shrink-0 p-3 sm:p-4 bg-gradient-to-t from-black/80 via-black/60 to-transparent border-t border-emerald-500/20 backdrop-blur-xl">
+            <div className="flex gap-2">
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={saveNewPlan}
                 disabled={!newPlanName.trim()}
                 className="
-                  flex-1 bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600
-                  hover:from-emerald-400 hover:via-emerald-500 hover:to-teal-500
+                  flex-1 bg-gradient-to-r from-emerald-500 to-emerald-600
+                  hover:from-emerald-400 hover:to-emerald-500
                   disabled:from-gray-700 disabled:to-gray-800
                   disabled:cursor-not-allowed
-                  py-4 px-6 rounded-xl font-bold text-lg
-                  shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50
+                  py-3 px-4 rounded-lg font-bold text-sm sm:text-base
+                  shadow-lg shadow-emerald-500/30
                   transition-all duration-200
-                  flex items-center justify-center gap-3
-                  border-2 border-emerald-400/30
+                  flex items-center justify-center gap-2
+                  border border-emerald-400/30
                   disabled:border-gray-700
-                  relative overflow-hidden
-                  group
                 "
               >
-                <motion.div
-                  className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0"
-                  animate={{ x: ['-200%', '200%'] }}
-                  transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                />
-                <Save className="w-5 h-5 relative z-10" />
-                <span className="relative z-10">
+                <Save className="w-4 h-4" />
+                <span className="hidden sm:inline">
                   {editingPlanId ? 'Update Plan' : 'Save Plan'}
+                </span>
+                <span className="sm:hidden">
+                  {editingPlanId ? 'Update' : 'Save'}
                 </span>
               </motion.button>
               
@@ -281,9 +396,9 @@ export const CreatePlanModal = ({
                 whileTap={{ scale: 0.98 }}
                 onClick={handleClose}
                 className="
-                  px-8 py-4 bg-white/10 hover:bg-white/20
-                  rounded-xl font-semibold text-lg
-                  transition-all border-2 border-white/20 hover:border-white/30
+                  px-6 sm:px-8 py-3 bg-white/10 hover:bg-white/20
+                  rounded-lg font-semibold text-sm sm:text-base
+                  transition-all border border-white/20
                 "
               >
                 Cancel

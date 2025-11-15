@@ -12,7 +12,6 @@ const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'S
  */
 export const PlanDaySelector = ({ days, selectedDayIndex, onSelect, onToggleRest }) => {
   const scrollRef = useRef(null);
-
   const getWeekDates = () => {
     const today = new Date();
     const day = today.getDay();
@@ -47,53 +46,37 @@ export const PlanDaySelector = ({ days, selectedDayIndex, onSelect, onToggleRest
 
   useEffect(() => scrollToDay(selectedDayIndex), [selectedDayIndex]);
 
-  // Calculate total exercises for progress indication
   const totalExercises = days.reduce((sum, d) => sum + (d.isRest ? 0 : d.exercises.length), 0);
   const activeDays = days.filter(d => !d.isRest && d.exercises.length > 0).length;
 
   return (
-    <div className="bg-gradient-to-b from-emerald-950/60 via-emerald-950/30 to-transparent border-b lg:border-b-0 lg:border-r border-emerald-500/20">
+    <div className="h-full flex flex-col bg-gradient-to-b from-emerald-950/40 to-transparent">
       {/* ═══ DESKTOP SIDEBAR ═══ */}
-      <div className="hidden lg:block w-72">
-        {/* Header with Stats */}
-        <div className="p-5 border-b border-emerald-500/20 space-y-3">
-          <div>
-            <h3 className="font-bold text-emerald-400 flex items-center gap-2.5 text-sm uppercase tracking-wider">
-              <Calendar className="w-4 h-4" /> 
-              Weekly Schedule
-            </h3>
-            <p className="text-xs text-white/50 mt-1.5">
-              {weekStart.month} {weekStart.date} – {weekEnd.month} {weekEnd.date}
-            </p>
-          </div>
+      <div className="hidden lg:flex lg:flex-col h-full">
+        <div className="flex-shrink-0 p-4 border-b border-emerald-500/20 space-y-2">
+          <h3 className="font-bold text-emerald-400 flex items-center gap-2 text-xs uppercase tracking-wider">
+            <Calendar className="w-3.5 h-3.5" /> 
+            Schedule
+          </h3>
+          <p className="text-[11px] text-white/50">
+            {weekStart.month} {weekStart.date} – {weekEnd.month} {weekEnd.date}
+          </p>
           
-          {/* Progress Stats */}
           {totalExercises > 0 && (
-            <motion.div 
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex gap-2"
-            >
-              <div className="flex-1 bg-emerald-500/10 rounded-lg p-2.5 border border-emerald-500/20">
-                <div className="flex items-center gap-1.5">
-                  <Target className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-xs text-white/60">Days</span>
-                </div>
-                <div className="text-lg font-bold text-emerald-300 mt-0.5">{activeDays}/7</div>
+            <div className="flex gap-2 text-[11px]">
+              <div className="flex-1 bg-emerald-500/10 rounded-lg p-2 border border-emerald-500/20">
+                <span className="text-white/60">Days</span>
+                <div className="font-bold text-emerald-300">{activeDays}/7</div>
               </div>
-              <div className="flex-1 bg-emerald-500/10 rounded-lg p-2.5 border border-emerald-500/20">
-                <div className="flex items-center gap-1.5">
-                  <Zap className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-xs text-white/60">Exercises</span>
-                </div>
-                <div className="text-lg font-bold text-emerald-300 mt-0.5">{totalExercises}</div>
+              <div className="flex-1 bg-emerald-500/10 rounded-lg p-2 border border-emerald-500/20">
+                <span className="text-white/60">Ex</span>
+                <div className="font-bold text-emerald-300">{totalExercises}</div>
               </div>
-            </motion.div>
+            </div>
           )}
         </div>
 
-        {/* Day List */}
-        <div className="overflow-y-auto max-h-[calc(100vh-480px)] scrollbar-thin scrollbar-thumb-emerald-500/20 scrollbar-track-transparent">
+        <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-emerald-500/20">
           {weekDates.map((d, i) => {
             const dayData = days.find(dd => dd.day === d.name) || { 
               day: d.name, 
@@ -105,14 +88,12 @@ export const PlanDaySelector = ({ days, selectedDayIndex, onSelect, onToggleRest
             const hasExercises = dayData.exercises.length > 0;
 
             return (
-              <motion.button
+              <button
                 key={d.name}
-                whileHover={{ x: isRest ? 0 : 2 }}
-                whileTap={{ scale: isRest ? 1 : 0.98 }}
                 onClick={() => !isRest && onSelect(i)}
                 className={`
-                  w-full text-left p-4 transition-all duration-200
-                  border-b border-white/5 relative flex items-center gap-3
+                  w-full text-left p-3 transition-all
+                  border-b border-white/5 relative flex items-center gap-2.5
                   ${isSel && !isRest
                     ? 'bg-gradient-to-r from-emerald-500/20 to-emerald-500/10 text-emerald-300'
                     : isRest
@@ -121,192 +102,155 @@ export const PlanDaySelector = ({ days, selectedDayIndex, onSelect, onToggleRest
                   }
                 `}
               >
-                {/* Active Indicator */}
                 {isSel && !isRest && (
-                  <motion.div
-                    layoutId="dayIndicator"
-                    className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/50"
-                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                  />
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-400" />
                 )}
 
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className={`
-                        font-semibold text-sm truncate
-                        ${isSel && !isRest ? 'text-emerald-300' : ''}
-                        ${d.isToday && !isRest ? 'text-emerald-400' : ''}
-                      `}>
-                        {d.name}
-                        {d.isToday && (
-                          <span className="ml-1.5 text-[10px] px-1.5 py-0.5 bg-emerald-500/30 rounded-full">
-                            Today
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-white/40 mt-0.5">
-                        {d.month} {d.date}
-                      </div>
-                    </div>
-
-                    {/* Status Indicator */}
-                    <div className="flex items-center gap-2">
-                      {isRest ? (
-                        <div className="flex items-center gap-1 text-xs text-gray-500 px-2 py-1 bg-gray-800/50 rounded-full">
-                          <Moon className="w-3 h-3" />
-                          Rest
-                        </div>
-                      ) : (
-                        <>
-                          <motion.span 
-                            animate={{ scale: hasExercises ? [1, 1.1, 1] : 1 }}
-                            transition={{ duration: 0.3 }}
-                            className={`
-                              text-xs px-2.5 py-1 rounded-full font-medium
-                              ${hasExercises
-                                ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-500/30'
-                                : 'bg-white/5 text-white/40 border border-white/10'
-                              }
-                            `}
-                          >
-                            {dayData.exercises.length}
-                          </motion.span>
-                          {hasExercises && (
-                            <motion.div
-                              initial={{ scale: 0 }}
-                              animate={{ scale: 1 }}
-                              transition={{ type: "spring", stiffness: 500, damping: 15 }}
-                            >
-                              <Check className="w-4 h-4 text-emerald-400" />
-                            </motion.div>
-                          )}
-                        </>
-                      )}
-                    </div>
+                  <div className="font-semibold text-sm">
+                    {d.name}
+                    {d.isToday && (
+                      <span className="ml-1.5 text-[9px] px-1.5 py-0.5 bg-emerald-500/30 rounded-full">
+                        Today
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[11px] text-white/40">
+                    {d.month} {d.date}
                   </div>
                 </div>
 
-                {/* Rest Toggle */}
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
+                <div className="flex items-center gap-2">
+                  {isRest ? (
+                    <div className="text-[11px] text-gray-500 px-2 py-0.5 bg-gray-800/50 rounded-full flex items-center gap-1">
+                      <Moon className="w-3 h-3" />
+                      Rest
+                    </div>
+                  ) : (
+                    <>
+                      <span className={`
+                        text-[11px] px-2 py-0.5 rounded-full font-medium
+                        ${hasExercises
+                          ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-500/30'
+                          : 'bg-white/5 text-white/40'
+                        }
+                      `}>
+                        {dayData.exercises.length}
+                      </span>
+                      {hasExercises && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+                    </>
+                  )}
+                </div>
+
+                <button
                   onClick={(e) => { e.stopPropagation(); onToggleRest(i); }}
                   className={`
-                    p-2 rounded-lg transition-all
-                    ${isRest 
-                      ? 'bg-gray-700/50 text-gray-400' 
-                      : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/80'
-                    }
+                    p-1.5 rounded-lg transition-all
+                    ${isRest ? 'bg-gray-700/50 text-gray-400' : 'bg-white/5 text-white/50 hover:bg-white/10'}
                   `}
-                  title={isRest ? 'Make workout day' : 'Make rest day'}
                 >
-                  <Moon className="w-4 h-4" />
-                </motion.button>
-              </motion.button>
+                  <Moon className="w-3.5 h-3.5" />
+                </button>
+              </button>
             );
           })}
         </div>
       </div>
 
-      {/* ═══ MOBILE HORIZONTAL SCROLL ═══ */}
-      <div className="lg:hidden">
-        <div className="px-4 pt-4 pb-2 space-y-2">
-          <p className="text-xs text-white/60 text-center font-medium">
+      {/* ═══ MOBILE LIST VIEW ═══ */}
+      <div className="lg:hidden flex-1 overflow-y-auto p-3 space-y-2">
+        <div className="mb-3 text-center">
+          <p className="text-xs text-white/60 mb-2">
             {weekStart.month} {weekStart.date} – {weekEnd.month} {weekEnd.date}
           </p>
           {totalExercises > 0 && (
-            <div className="flex gap-2 justify-center">
-              <span className="text-[10px] px-2 py-1 bg-emerald-500/20 text-emerald-300 rounded-full">
-                {activeDays} days • {totalExercises} exercises
+            <div className="flex gap-2 justify-center text-[11px]">
+              <span className="px-2 py-1 bg-emerald-500/20 text-emerald-300 rounded-full">
+                {activeDays} days
+              </span>
+              <span className="px-2 py-1 bg-emerald-500/20 text-emerald-300 rounded-full">
+                {totalExercises} exercises
               </span>
             </div>
           )}
         </div>
 
-        <div className="flex items-center gap-2 px-3 pb-3">
-          <button
-            onClick={() => onSelect(Math.max(0, selectedDayIndex - 1))}
-            disabled={selectedDayIndex === 0}
-            className="p-2 rounded-lg bg-white/10 disabled:opacity-20 hover:bg-white/20 transition-all disabled:cursor-not-allowed"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
+        {weekDates.map((d, i) => {
+          const dayData = days.find(dd => dd.day === d.name) || { 
+            day: d.name, 
+            exercises: [], 
+            isRest: false 
+          };
+          const isSel = selectedDayIndex === i;
+          const isRest = dayData.isRest;
+          const hasExercises = dayData.exercises.length > 0;
 
-          <div
-            ref={scrollRef}
-            className="flex-1 flex gap-2 overflow-x-auto scrollbar-hide snap-x snap-mandatory px-1"
-            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-          >
-            {weekDates.map((d, i) => {
-              const dayData = days.find(dd => dd.day === d.name) || { 
-                day: d.name, 
-                exercises: [], 
-                isRest: false 
-              };
-              const isSel = selectedDayIndex === i;
-              const isRest = dayData.isRest;
-              const hasExercises = dayData.exercises.length > 0;
+          return (
+            <button
+              key={d.name}
+              onClick={() => !isRest && onSelect(i)}
+              className={`
+                w-full p-4 rounded-lg transition-all border-2 flex items-center gap-3
+                ${isSel && !isRest
+                  ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                  : isRest
+                  ? 'bg-gray-900/50 border-gray-700/30 text-gray-500'
+                  : 'bg-white/5 border-white/10 text-white/80 active:bg-white/10'
+                }
+              `}
+            >
+              <div className={`
+                w-12 h-12 rounded-lg flex flex-col items-center justify-center flex-shrink-0
+                ${isSel && !isRest
+                  ? 'bg-emerald-500/30 border-2 border-emerald-400'
+                  : isRest
+                  ? 'bg-gray-800/50 border border-gray-700'
+                  : 'bg-white/10 border border-white/20'
+                }
+              `}>
+                <span className="text-[10px] uppercase font-bold opacity-70">
+                  {d.short}
+                </span>
+                <span className="text-lg font-bold">
+                  {d.date}
+                </span>
+              </div>
 
-              return (
-                <motion.button
-                  key={d.name}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => !isRest && onSelect(i)}
-                  className={`
-                    snap-center flex-shrink-0 w-20 py-3 rounded-xl text-center 
-                    transition-all shadow-sm relative border
-                    ${isRest
-                      ? 'bg-gray-900/70 text-gray-500 border-gray-700/50'
-                      : isSel
-                      ? 'bg-gradient-to-b from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/30 border-emerald-400'
-                      : 'bg-white/10 text-white/70 hover:bg-white/20 border-white/20'
-                    }
-                  `}
-                >
-                  <div className="text-[10px] font-bold uppercase tracking-wide opacity-80">
-                    {d.short}
-                  </div>
-                  <div className={`
-                    text-lg font-bold mt-0.5
-                    ${isSel && !isRest ? 'text-white' : ''}
-                    ${d.isToday && !isRest ? 'text-emerald-300' : ''}
-                  `}>
-                    {d.date}
-                  </div>
-
-                  {isRest ? (
-                    <Moon className="absolute top-1 right-1 w-3 h-3 text-gray-500" />
-                  ) : hasExercises && (
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-gray-900"
-                    >
-                      {dayData.exercises.length}
-                    </motion.div>
+              <div className="flex-1 min-w-0 text-left">
+                <div className="font-semibold text-sm">
+                  {d.name}
+                  {d.isToday && (
+                    <span className="ml-1.5 text-[9px] px-1.5 py-0.5 bg-emerald-500/30 rounded-full">
+                      Today
+                    </span>
                   )}
+                </div>
+                <div className="text-xs text-white/50 mt-0.5">
+                  {isRest ? (
+                    <span className="flex items-center gap-1">
+                      <Moon className="w-3 h-3" />
+                      Rest Day
+                    </span>
+                  ) : (
+                    <span>
+                      {dayData.exercises.length} exercise{dayData.exercises.length !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+              </div>
 
-                  <motion.button
-                    whileTap={{ scale: 0.9 }}
-                    onClick={(e) => { e.stopPropagation(); onToggleRest(i); }}
-                    className="absolute bottom-1 right-1 p-1 rounded-full bg-black/20 backdrop-blur-sm"
-                  >
-                    <Moon className="w-2.5 h-2.5" />
-                  </motion.button>
-                </motion.button>
-              );
-            })}
-          </div>
-
-          <button
-            onClick={() => onSelect(Math.min(6, selectedDayIndex + 1))}
-            disabled={selectedDayIndex === 6}
-            className="p-2 rounded-lg bg-white/10 disabled:opacity-20 hover:bg-white/20 transition-all disabled:cursor-not-allowed"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); onToggleRest(i); }}
+                className={`
+                  p-2.5 rounded-lg transition-all flex-shrink-0
+                  ${isRest ? 'bg-gray-700/50' : 'bg-white/10 active:bg-white/20'}
+                `}
+              >
+                <Moon className="w-4 h-4" />
+              </button>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

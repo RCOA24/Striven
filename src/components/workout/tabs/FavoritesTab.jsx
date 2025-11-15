@@ -1,7 +1,6 @@
 // src/components/workout/tabs/FavoritesTab.jsx
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import toast from 'react-hot-toast';
 import { Heart, Plus, Sparkles, Search, X, TrendingUp, Zap } from 'lucide-react';
 
 // CORRECT: Default import (no curly braces)
@@ -185,7 +184,7 @@ const FilterBar = ({ searchTerm, onSearchChange, totalCount }) => {
   );
 };
 
-export const FavoritesTab = ({ fullFavorites, quickAdd, toggleFavorite }) => {
+export const FavoritesTab = ({ fullFavorites, quickAdd, toggleFavorite, showToast }) => {
   const [modalState, setModalState] = useState({ isOpen: false, exercise: null });
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -198,28 +197,19 @@ export const FavoritesTab = ({ fullFavorites, quickAdd, toggleFavorite }) => {
   };
 
   const handleQuickAdd = (item) => {
+    // Just pass the item - parent will enrich it
     quickAdd(item);
-    toast.success(`✅ ${item.name} added!`, {
-      icon: '💪',
-      style: { background: '#10b981', color: 'white' }
-    });
   };
 
   const handleUnfavorite = (item) => {
-    console.log('🔍 Unfavoriting item:', item); // Debug log
-    console.log('🔍 Item ID:', item.exerciseId || item.id); // Debug log
+    console.log('🔍 Unfavoriting item:', item);
+    console.log('🔍 Item ID:', item.exerciseId || item.id);
     
     if (toggleFavorite) {
       toggleFavorite(item);
-      toast.success(`💔 Removed from favorites`, {
-        icon: '👋',
-        style: { background: '#ef4444', color: 'white' }
-      });
+      // Remove toast here - let parent handle it
     } else {
       console.error('❌ toggleFavorite function not provided!');
-      toast.error('Unable to remove favorite', {
-        style: { background: '#ef4444', color: 'white' }
-      });
     }
   };
 
@@ -303,6 +293,7 @@ export const FavoritesTab = ({ fullFavorites, quickAdd, toggleFavorite }) => {
         onClose={closeModal}
         onQuickAdd={quickAdd}
         toggleFavorite={toggleFavorite}
+        showToast={showToast}
       />
     </>
   );

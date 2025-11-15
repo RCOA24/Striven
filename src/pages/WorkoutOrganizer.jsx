@@ -4,11 +4,11 @@ import React, { useState, useEffect, useRef, useContext } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import confetti from 'canvas-confetti';
-import { Dumbbell, CheckCircle, XCircle, AlertCircle, Trash2, Zap } from 'lucide-react';
+import { Dumbbell, CheckCircle, XCircle, AlertCircle, Trash2, Zap, Flame, Rocket, X } from 'lucide-react';
 import { 
   clearTodayWorkout, reorderTodayWorkout, removeFromToday, addToTodayWorkout,
   setActivePlan, saveWorkoutPlan, deleteWorkoutPlan, saveSetLog, updateWorkoutPlan,
-  getAllExerciseHistory
+  getAllExerciseHistory, toggleFavorite
 } from '../utils/db';
 import { fetchExercises } from '../api/exercises';
 import { AppContext } from '../App';
@@ -25,45 +25,107 @@ const LIMIT = 20;
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 // Modern Toast Component
-const ModernToast = ({ type, message, icon }) => {
+const ModernToast = ({ type, message, icon, onClose, durationMs = 4000 }) => {
   const icons = {
-    success: <CheckCircle className="w-6 h-6" />,
-    error: <XCircle className="w-6 h-6" />,
-    warning: <AlertCircle className="w-6 h-6" />,
-    info: <Zap className="w-6 h-6" />,
-    fire: 'fire',
-    muscle: 'muscle',
-    rocket: 'rocket',
-    trash: <Trash2 className="w-6 h-6" />
+    success: <CheckCircle className="w-5 h-5 text-emerald-300" />,
+    error: <XCircle className="w-5 h-5 text-rose-300" />,
+    warning: <AlertCircle className="w-5 h-5 text-amber-300" />,
+    info: <Zap className="w-5 h-5 text-cyan-300" />,
+    fire: <Flame className="w-5 h-5 text-amber-300" />,
+    muscle: <Dumbbell className="w-5 h-5 text-emerald-300" />,
+    rocket: <Rocket className="w-5 h-5 text-violet-300" />,
+    trash: <Trash2 className="w-5 h-5 text-rose-300" />,
   };
 
-  const colors = {
-    success: 'from-emerald-500 to-teal-500',
-    error: 'from-red-500 to-rose-500',
-    warning: 'from-amber-500 to-orange-500',
-    info: 'from-blue-500 to-cyan-500'
+  const palettes = {
+    success: {
+      border: 'from-emerald-400 via-teal-400 to-cyan-400',
+      glow: 'from-emerald-400/20 via-teal-400/15 to-cyan-400/20',
+    },
+    error: {
+      border: 'from-rose-500 via-red-500 to-orange-500',
+      glow: 'from-rose-500/20 via-red-500/15 to-orange-500/20',
+    },
+    warning: {
+      border: 'from-amber-400 via-orange-400 to-rose-400',
+      glow: 'from-amber-400/20 via-orange-400/15 to-rose-400/20',
+    },
+    info: {
+      border: 'from-cyan-400 via-blue-400 to-violet-400',
+      glow: 'from-cyan-400/20 via-blue-400/15 to-violet-400/20',
+    },
   };
+
+  const palette = palettes[type] || palettes.info;
+  const IconEl = icons[icon] || icons[type] || icons.info;
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: -50, scale: 0.9 }}
+      initial={{ opacity: 0, y: -24, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.9 }}
-      className={`bg-gradient-to-r ${colors[type] || colors.info} text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 backdrop-blur-xl border border-white/20`}
+      exit={{ opacity: 0, scale: 0.98 }}
+      role="status"
+      aria-live="polite"
+      className="relative pointer-events-auto"
     >
-      <div className="text-white">
-        {icons[icon] || icons[type]}
+      {/* Ambient glow */}
+      <span className={`pointer-events-none absolute -inset-2 rounded-2xl blur-2xl opacity-40 bg-gradient-to-r ${palette.glow}`} />
+
+      {/* Gradient border shell */}
+      <div className={`relative rounded-2xl p-[2px] bg-gradient-to-r ${palette.border} shadow-[0_12px_40px_rgba(0,0,0,0.35)]`}>
+        {/* Inner glass card */}
+        <div className="relative rounded-2xl bg-zinc-900/70 backdrop-blur-xl ring-1 ring-white/10 px-5 py-4 flex items-center gap-4">
+          {/* Icon capsule */}
+          <div className="relative">
+            <div className={`rounded-xl p-[2px] bg-gradient-to-br ${palette.border}`}>
+              <div className="h-10 w-10 rounded-[10px] bg-zinc-900/80 ring-1 ring-white/10 flex items-center justify-center shadow-inner">
+                {IconEl}
+              </div>
+            </div>
+            <span className={`pointer-events-none absolute -inset-1 rounded-[12px] blur-md opacity-30 bg-gradient-to-br ${palette.glow}`} />
+          </div>
+
+          {/* Message */}
+          <p className="font-semibold text-base text-white/90">{message}</p>
+
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Close button */}
+          <button
+            aria-label="Dismiss notification"
+            onClick={onClose}
+            className="rounded-lg p-2 hover:bg-white/10 transition-colors ring-1 ring-transparent hover:ring-white/10"
+          >
+            <X className="w-4 h-4 text-white/60" />
+          </button>
+
+          {/* Progress bar */}
+          <motion.span
+            aria-hidden
+            className={`absolute left-0 bottom-0 h-[2px] bg-gradient-to-r ${palette.border} origin-left`}
+            initial={{ scaleX: 1 }}
+            animate={{ scaleX: 0 }}
+            transition={{ duration: durationMs / 1000, ease: 'linear' }}
+          />
+        </div>
       </div>
-      <p className="font-bold text-base">{message}</p>
     </motion.div>
   );
 };
 
 const showToast = (message, type = 'success', icon = null) => {
+  const duration = 4000;
   toast.custom((t) => (
-    <ModernToast type={type} message={message} icon={icon || type} />
+    <ModernToast
+      type={type}
+      message={message}
+      icon={icon || type}
+      durationMs={duration}
+      onClose={() => toast.dismiss(t.id)}
+    />
   ), {
-    duration: 4000,
+    duration,
     position: 'top-center'
   });
 };
@@ -196,11 +258,14 @@ export default function WorkoutOrganizer() {
 
   const quickAdd = async (ex) => {
     try {
+      console.log('Quick add called with:', ex);
       const enriched = await enrichWithGif(ex);
+      console.log('Enriched exercise:', enriched);
       await addToTodayWorkout(enriched);
       showToast(`Added ${enriched.name}!`, 'success', 'muscle');
-      loadAllData();
+      await loadAllData();
     } catch (err) {
+      console.error('Quick add error:', err);
       showToast('Already in today\'s workout', 'error');
     }
   };
@@ -495,6 +560,21 @@ export default function WorkoutOrganizer() {
     }
   };
 
+  const handleToggleFavorite = async (exercise) => {
+    try {
+      const isFavorited = await toggleFavorite(exercise);
+      if (isFavorited) {
+        showToast(`Added ${exercise.name} to favorites!`, 'success', 'muscle');
+      } else {
+        showToast(`Removed ${exercise.name} from favorites`, 'info', 'trash');
+      }
+      loadAllData();
+    } catch (error) {
+      console.error('Toggle favorite error:', error);
+      showToast('Failed to update favorites', 'error');
+    }
+  };
+
   return (
     <>
       <Toaster position="top-center" />
@@ -511,6 +591,7 @@ export default function WorkoutOrganizer() {
         exerciseHistory={exerciseHistory}
         openLogModal={openLogModal}
         refreshHistory={refreshHistory}
+        showToast={showToast}
       />
 
       <LogSetModal
@@ -613,7 +694,12 @@ export default function WorkoutOrganizer() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
           >
-            <FavoritesTab fullFavorites={fullFavorites} quickAdd={quickAdd} />
+            <FavoritesTab 
+              fullFavorites={fullFavorites} 
+              quickAdd={quickAdd}
+              toggleFavorite={handleToggleFavorite}
+              showToast={showToast}
+            />
           </motion.div>
         )}
 
@@ -638,8 +724,6 @@ export default function WorkoutOrganizer() {
     </div>
   </div>
 </div>
-
-
 
     </>
   );
