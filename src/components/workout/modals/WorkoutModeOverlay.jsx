@@ -27,11 +27,11 @@ const ProgressRing = ({ progress, total }) => {
   const strokeDashoffset = circumference - (percentage / 100) * circumference;
 
   return (
-    <div className="relative w-28 h-28">
+    <div className="relative w-16 h-16 sm:w-20 sm:h-20 md:w-28 md:h-28">
       <svg className="transform -rotate-90 w-full h-full">
-        <circle cx="56" cy="56" r="45" stroke="currentColor" strokeWidth="8" fill="none" className="text-white/10" />
+        <circle cx="50%" cy="50%" r="45%" stroke="currentColor" strokeWidth="8" fill="none" className="text-white/10" />
         <motion.circle
-          cx="56" cy="56" r="45" stroke="url(#gradient)" strokeWidth="8" fill="none"
+          cx="50%" cy="50%" r="45%" stroke="url(#gradient)" strokeWidth="8" fill="none"
           strokeLinecap="round" strokeDasharray={circumference}
           initial={{ strokeDashoffset: circumference }}
           animate={{ strokeDashoffset }}
@@ -45,8 +45,8 @@ const ProgressRing = ({ progress, total }) => {
         </defs>
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-3xl font-black text-white">{progress}</span>
-        <span className="text-xs text-white/60 font-semibold">of {total}</span>
+        <span className="text-xl sm:text-2xl md:text-3xl font-black text-white">{progress}</span>
+        <span className="text-[9px] sm:text-[10px] md:text-xs text-white/60 font-semibold">of {total}</span>
       </div>
     </div>
   );
@@ -54,14 +54,14 @@ const ProgressRing = ({ progress, total }) => {
 
 // Exercise Stats Card
 const StatCard = ({ icon: Icon, label, value, color = "emerald" }) => (
-  <motion.div whileHover={{ scale: 1.05 }} className={`bg-gradient-to-br from-${color}-500/20 to-${color}-600/10 backdrop-blur-xl rounded-2xl p-4 border border-${color}-500/30`}>
-    <div className="flex items-center gap-3">
-      <div className={`p-2 bg-${color}-500/30 rounded-xl`}>
-        <Icon className={`w-5 h-5 text-${color}-400`} />
+  <motion.div whileHover={{ scale: 1.02 }} className={`bg-gradient-to-br from-${color}-500/20 to-${color}-600/10 backdrop-blur-xl rounded-xl sm:rounded-2xl p-2.5 sm:p-3 md:p-4 border border-${color}-500/30`}>
+    <div className="flex items-center gap-2 sm:gap-3">
+      <div className={`p-1.5 sm:p-2 bg-${color}-500/30 rounded-lg sm:rounded-xl flex-shrink-0`}>
+        <Icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 text-${color}-400`} />
       </div>
-      <div>
-        <p className="text-white/60 text-xs font-medium">{label}</p>
-        <p className="text-white text-lg font-bold">{value}</p>
+      <div className="min-w-0 flex-1">
+        <p className="text-white/60 text-[9px] sm:text-[10px] md:text-xs font-medium truncate">{label}</p>
+        <p className="text-white text-xs sm:text-sm md:text-base lg:text-lg font-bold truncate">{value}</p>
       </div>
     </div>
   </motion.div>
@@ -219,7 +219,7 @@ export const WorkoutModeOverlay = ({
       {isWorkoutStarted && (
         <>
           {/* Backdrop */}
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9998] bg-slate-950">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[8000] bg-slate-950 overflow-hidden">
             <div className="absolute inset-0 overflow-hidden">
               <motion.div
                 animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
@@ -241,68 +241,70 @@ export const WorkoutModeOverlay = ({
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 100, opacity: 0 }}
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className="fixed inset-0 z-[9999] flex flex-col overflow-y-auto"
+            className="fixed inset-0 z-[8001] flex flex-col overflow-y-auto overflow-x-hidden"
           >
             {/* Top Bar */}
-            <motion.div initial={{ y: -100 }} animate={{ y: 0 }} className="sticky top-0 z-50 bg-slate-950 backdrop-blur-2xl border-b border-white/10">
-              <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
-                <div className="flex items-center gap-4">
+            <motion.div initial={{ y: -100 }} animate={{ y: 0 }} className="sticky top-0 z-50 bg-slate-950/95 backdrop-blur-2xl border-b border-white/10">
+              <div className="w-full px-3 sm:px-4 md:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 sm:gap-4">
+                <div className="flex items-center gap-2 sm:gap-3 md:gap-4 min-w-0 flex-1">
                   <ProgressRing progress={currentExerciseIndex + 1} total={todayExercises.length} />
-                  <div>
-                    <p className="text-white/60 text-sm font-medium">Workout Session</p>
-                    <p className="text-white text-xl font-bold">Exercise {currentExerciseIndex + 1}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-white/60 text-[10px] sm:text-xs md:text-sm font-medium truncate">Workout Session</p>
+                    <p className="text-white text-sm sm:text-base md:text-lg lg:text-xl font-bold truncate">Exercise {currentExerciseIndex + 1}</p>
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setShowSkipConfirm(true)}
-                    className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 rounded-xl font-bold text-white shadow-lg hover:shadow-emerald-500/50 transition-all flex items-center gap-2"
+                    className="px-3 sm:px-4 md:px-6 py-2 sm:py-2.5 md:py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 rounded-lg sm:rounded-xl font-bold text-white shadow-lg hover:shadow-emerald-500/50 transition-all flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm md:text-base"
                   >
-                    <SkipForward className="w-5 h-5" />
-                    Next
+                    <SkipForward className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5" />
+                    <span className="hidden sm:inline">Next</span>
                   </motion.button>
                   
                   <button
                     onClick={() => setIsWorkoutStarted(false)}
-                    className="p-3 bg-white/10 hover:bg-white/20 rounded-2xl backdrop-blur-md transition-all hover:scale-110 group"
+                    className="p-2 sm:p-2.5 md:p-3 bg-white/10 hover:bg-white/20 rounded-xl sm:rounded-2xl backdrop-blur-md transition-all hover:scale-110 group flex-shrink-0"
                   >
-                    <X className="w-6 h-6 text-white group-hover:rotate-90 transition-transform" />
+                    <X className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-white group-hover:rotate-90 transition-transform" />
                   </button>
                 </div>
               </div>
             </motion.div>
 
-            <div className="flex-1 p-4 sm:p-6 lg:p-8">
-              <div className="max-w-5xl mx-auto">
+            <div className="flex-1 p-3 sm:p-4 md:p-6 lg:p-8 w-full overflow-x-hidden">
+              <div className="w-full max-w-5xl mx-auto">
                 {/* Exercise Header */}
-                <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-gradient-to-br from-emerald-500/10 via-teal-500/10 to-transparent backdrop-blur-2xl rounded-3xl p-6 sm:p-8 border border-emerald-500/30 shadow-2xl mb-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <motion.h1 key={currentEx.name} initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="text-3xl sm:text-5xl font-black text-white leading-tight mb-3">
+                <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-gradient-to-br from-emerald-500/10 via-teal-500/10 to-transparent backdrop-blur-2xl rounded-2xl sm:rounded-3xl p-4 sm:p-5 md:p-6 lg:p-8 border border-emerald-500/30 shadow-2xl mb-4 sm:mb-5 md:mb-6 w-full overflow-hidden">
+                  <div className="flex flex-col sm:flex-row items-start justify-between gap-3 sm:gap-4 mb-3 sm:mb-4">
+                    <div className="flex-1 min-w-0 w-full">
+                      <motion.h1 key={currentEx.name} initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-black text-white leading-tight mb-2 sm:mb-3 break-words">
                         {currentEx.name}
                       </motion.h1>
-                      <div className="flex items-center gap-3 mb-4">
-                        <span className="px-4 py-2 bg-emerald-500/20 rounded-full text-emerald-400 font-bold text-lg">{currentEx.sets} sets</span>
-                        <X className="w-4 h-4 text-white/40" />
-                        <span className="px-4 py-2 bg-teal-500/20 rounded-full text-teal-400 font-bold text-lg">{currentEx.reps} reps</span>
+                      <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4 flex-wrap">
+                        <span className="px-3 sm:px-4 py-1.5 sm:py-2 bg-emerald-500/20 rounded-full text-emerald-400 font-bold text-sm sm:text-base md:text-lg whitespace-nowrap">{currentEx.sets} sets</span>
+                        <X className="w-3 h-3 sm:w-4 sm:h-4 text-white/40 flex-shrink-0" />
+                        <span className="px-3 sm:px-4 py-1.5 sm:py-2 bg-teal-500/20 rounded-full text-teal-400 font-bold text-sm sm:text-base md:text-lg whitespace-nowrap">{currentEx.reps} reps</span>
                       </div>
                     </div>
-                    <PRBadge pr={safePR} size="lg" />
+                    <div className="w-full sm:w-auto flex justify-center sm:justify-end flex-shrink-0">
+                      <PRBadge pr={safePR} size="lg" />
+                    </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-3 gap-2 sm:gap-3 w-full">
                     <StatCard icon={Target} label="Target" value={currentEx.muscles || "Full Body"} color="emerald" />
                     <StatCard icon={Award} label="Best" value={safePR > 0 ? `${safePR.toFixed(1)}kg` : "No PR"} color="amber" />
                     <StatCard icon={Calendar} label="Sessions" value={sortedLogs.length} color="blue" />
                   </div>
                 </motion.div>
 
-                {/* GIF - Now Safe with Inline SVG Fallback */}
-                <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.1 }} className="relative mb-6 rounded-3xl overflow-hidden shadow-2xl">
+                {/* GIF */}
+                <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.1 }} className="relative mb-4 sm:mb-5 md:mb-6 rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl w-full">
                   <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 opacity-50 blur-xl" />
-                  <div className="relative bg-slate-900/90 backdrop-blur-xl rounded-3xl overflow-hidden border-2 border-emerald-500/30">
+                  <div className="relative bg-slate-900/90 backdrop-blur-xl rounded-2xl sm:rounded-3xl overflow-hidden border-2 border-emerald-500/30 w-full">
                     <img 
                       src={gifSrc} 
                       alt={currentEx.name} 
@@ -313,18 +315,18 @@ export const WorkoutModeOverlay = ({
                         }
                       }}
                     />
-                    <div className="absolute top-4 left-4 w-12 h-12 border-l-4 border-t-4 border-emerald-400 rounded-tl-2xl" />
-                    <div className="absolute bottom-4 right-4 w-12 h-12 border-r-4 border-b-4 border-teal-400 rounded-br-2xl" />
+                    <div className="absolute top-2 left-2 sm:top-4 sm:left-4 w-8 h-8 sm:w-12 sm:h-12 border-l-2 border-t-2 sm:border-l-4 sm:border-t-4 border-emerald-400 rounded-tl-xl sm:rounded-tl-2xl" />
+                    <div className="absolute bottom-2 right-2 sm:bottom-4 sm:right-4 w-8 h-8 sm:w-12 sm:h-12 border-r-2 border-b-2 sm:border-r-4 sm:border-b-4 border-teal-400 rounded-br-xl sm:rounded-br-2xl" />
                   </div>
                 </motion.div>
 
                 {/* Timer */}
-                <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }} className="mb-6">
+                <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }} className="mb-4 sm:mb-5 md:mb-6 w-full">
                   <TimerDisplay seconds={secondsLeft} isResting={isResting} formatTime={formatTime} />
                 </motion.div>
 
                 {/* Set Logger */}
-                <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.3 }} className="mb-6">
+                <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.3 }} className="mb-4 sm:mb-5 md:mb-6 w-full">
                   <SetLogger
                     exercise={currentEx}
                     sets={currentEx.sets || 4}
@@ -334,15 +336,15 @@ export const WorkoutModeOverlay = ({
                 </motion.div>
 
                 {/* Performance History */}
-                <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.4 }} className="bg-gradient-to-br from-slate-900/90 to-slate-800/90 backdrop-blur-2xl rounded-3xl p-6 sm:p-8 border border-white/10 shadow-2xl">
-                  <div className="flex justify-between items-center mb-6">
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 bg-gradient-to-br from-amber-500/30 to-orange-500/30 rounded-2xl">
-                        <TrendingUp className="w-6 h-6 text-amber-400" />
+                <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.4 }} className="bg-gradient-to-br from-slate-900/90 to-slate-800/90 backdrop-blur-2xl rounded-2xl sm:rounded-3xl p-4 sm:p-5 md:p-6 lg:p-8 border border-white/10 shadow-2xl w-full overflow-hidden">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                      <div className="p-2 sm:p-3 bg-gradient-to-br from-amber-500/30 to-orange-500/30 rounded-xl sm:rounded-2xl flex-shrink-0">
+                        <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-amber-400" />
                       </div>
-                      <div>
-                        <h4 className="text-2xl font-black text-white">Performance History</h4>
-                        <p className="text-white/60 text-sm">Track your progress over time</p>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-lg sm:text-xl md:text-2xl font-black text-white truncate">Performance History</h4>
+                        <p className="text-white/60 text-[10px] sm:text-xs md:text-sm truncate">Track your progress over time</p>
                       </div>
                     </div>
                     {sortedLogs.length > 0 && (
@@ -350,34 +352,34 @@ export const WorkoutModeOverlay = ({
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={() => setShowClearConfirm(true)}
-                        className="flex items-center gap-2 bg-gradient-to-r from-red-500/20 to-red-600/20 hover:from-red-500/30 hover:to-red-600/30 text-red-400 px-4 py-3 rounded-xl font-bold text-sm border border-red-500/30 transition-all"
+                        className="flex items-center gap-1.5 sm:gap-2 bg-gradient-to-r from-red-500/20 to-red-600/20 hover:from-red-500/30 hover:to-red-600/30 text-red-400 px-3 sm:px-4 py-2 sm:py-3 rounded-lg sm:rounded-xl font-bold text-xs sm:text-sm border border-red-500/30 transition-all flex-shrink-0"
                       >
-                        <Trash2 className="w-4 h-4" />
-                        Clear All
+                        <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                        <span className="whitespace-nowrap">Clear All</span>
                       </motion.button>
                     )}
                   </div>
                   {/* Logs */}
                   {sortedLogs.length > 0 ? (
-                    <div className="space-y-3">
+                    <div className="space-y-2 sm:space-y-3 w-full">
                       {sortedLogs.slice(0, 5).map((log, i) => (
-                        <motion.div key={i} initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: i * 0.05 }} className="group bg-gradient-to-r from-white/5 to-white/10 hover:from-emerald-500/10 hover:to-teal-500/10 rounded-2xl p-4 border border-white/10 hover:border-emerald-500/30 transition-all">
-                          <div className="flex justify-between items-center">
-                            <div className="flex items-center gap-4">
-                              <div className="flex items-center gap-2">
-                                <Calendar className="w-4 h-4 text-white/40" />
-                                <span className="text-white/80 text-sm font-medium">{new Date(log.date).toLocaleDateString()}</span>
+                        <motion.div key={i} initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: i * 0.05 }} className="group bg-gradient-to-r from-white/5 to-white/10 hover:from-emerald-500/10 hover:to-teal-500/10 rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-white/10 hover:border-emerald-500/30 transition-all w-full overflow-hidden">
+                          <div className="flex justify-between items-center gap-2 w-full">
+                            <div className="flex items-center gap-2 sm:gap-3 md:gap-4 min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-shrink">
+                                <Calendar className="w-3 h-3 sm:w-4 sm:h-4 text-white/40 flex-shrink-0" />
+                                <span className="text-white/80 text-[10px] sm:text-xs md:text-sm font-medium truncate">{new Date(log.date).toLocaleDateString()}</span>
                               </div>
-                              <ChevronRight className="w-4 h-4 text-white/20" />
+                              <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4 text-white/20 flex-shrink-0 hidden sm:block" />
                             </div>
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2 sm:gap-3 md:gap-4 flex-shrink-0">
                               <div className="text-right">
-                                <p className="font-black text-white text-lg">{log.weight}kg × {log.reps}</p>
-                                <p className="text-amber-400 text-sm font-bold">1RM: {log.oneRm.toFixed(1)}kg</p>
+                                <p className="font-black text-white text-sm sm:text-base md:text-lg whitespace-nowrap">{log.weight}kg × {log.reps}</p>
+                                <p className="text-amber-400 text-[10px] sm:text-xs md:text-sm font-bold whitespace-nowrap">1RM: {log.oneRm.toFixed(1)}kg</p>
                               </div>
                               {log.oneRm === safePR && safePR > 0 && (
-                                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="p-2 bg-amber-500/20 rounded-lg">
-                                  <Award className="w-5 h-5 text-amber-400" />
+                                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="p-1.5 sm:p-2 bg-amber-500/20 rounded-lg flex-shrink-0">
+                                  <Award className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 text-amber-400" />
                                 </motion.div>
                               )}
                             </div>
@@ -386,39 +388,39 @@ export const WorkoutModeOverlay = ({
                       ))}
                     </div>
                   ) : (
-                    <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-center py-12">
-                      <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-full flex items-center justify-center">
-                        <TrendingUp className="w-10 h-10 text-emerald-400" />
+                    <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-center py-8 sm:py-12">
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-3 sm:mb-4 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-full flex items-center justify-center">
+                        <TrendingUp className="w-8 h-8 sm:w-10 sm:h-10 text-emerald-400" />
                       </div>
-                      <p className="text-white/60 text-lg font-semibold">No logs yet</p>
-                      <p className="text-white/40 text-sm mt-2">Start logging to track your progress!</p>
+                      <p className="text-white/60 text-base sm:text-lg font-semibold">No logs yet</p>
+                      <p className="text-white/40 text-xs sm:text-sm mt-2">Start logging to track your progress!</p>
                     </motion.div>
                   )}
                 </motion.div>
 
                 {/* Big Next Button */}
-                <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.5 }} className="flex justify-center items-center gap-6 mt-10 mb-6">
+                <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.5 }} className="flex justify-center items-center gap-4 sm:gap-6 mt-6 sm:mt-8 md:mt-10 mb-4 sm:mb-6 w-full">
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setShowSkipConfirm(true)}
-                    className="relative px-12 py-6 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-2xl shadow-2xl shadow-emerald-500/50 group overflow-hidden"
+                    className="relative px-8 sm:px-10 md:px-12 py-4 sm:py-5 md:py-6 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-xl sm:rounded-2xl shadow-2xl shadow-emerald-500/50 group overflow-hidden w-full max-w-sm"
                   >
                     <motion.div
                       animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0, 0.5] }}
                       transition={{ duration: 2, repeat: Infinity }}
-                      className="absolute inset-0 bg-white rounded-2xl"
+                      className="absolute inset-0 bg-white rounded-xl sm:rounded-2xl"
                     />
-                    <div className="relative z-10 flex items-center gap-3">
-                      <SkipForward className="w-8 h-8 text-white drop-shadow-lg" />
-                      <span className="text-2xl font-black text-white">Next Exercise</span>
+                    <div className="relative z-10 flex items-center justify-center gap-2 sm:gap-3">
+                      <SkipForward className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-white drop-shadow-lg" />
+                      <span className="text-lg sm:text-xl md:text-2xl font-black text-white">Next Exercise</span>
                     </div>
                   </motion.button>
                 </motion.div>
 
                 {/* Progress Bar */}
-                <motion.div initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} className="mb-8">
-                  <div className="bg-white/10 rounded-full h-2 overflow-hidden backdrop-blur-xl">
+                <motion.div initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} className="mb-6 sm:mb-8 w-full">
+                  <div className="bg-white/10 rounded-full h-1.5 sm:h-2 overflow-hidden backdrop-blur-xl w-full">
                     <motion.div
                       initial={{ width: 0 }}
                       animate={{ width: `${((currentExerciseIndex + 1) / todayExercises.length) * 100}%` }}
@@ -426,9 +428,9 @@ export const WorkoutModeOverlay = ({
                       className="h-full bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 shadow-lg shadow-emerald-500/50"
                     />
                   </div>
-                  <div className="flex justify-between items-center mt-3">
-                    <p className="text-white/60 text-sm font-medium">{currentExerciseIndex + 1} of {todayExercises.length} exercises</p>
-                    <p className="text-emerald-400 text-sm font-bold">{Math.round(((currentExerciseIndex + 1) / todayExercises.length) * 100)}% Complete</p>
+                  <div className="flex justify-between items-center mt-2 sm:mt-3 w-full gap-2">
+                    <p className="text-white/60 text-[10px] sm:text-xs md:text-sm font-medium truncate">{currentExerciseIndex + 1} of {todayExercises.length} exercises</p>
+                    <p className="text-emerald-400 text-[10px] sm:text-xs md:text-sm font-bold whitespace-nowrap">{Math.round(((currentExerciseIndex + 1) / todayExercises.length) * 100)}% Complete</p>
                   </div>
                 </motion.div>
               </div>
