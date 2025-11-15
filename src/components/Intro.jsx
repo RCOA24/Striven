@@ -47,7 +47,7 @@ const Intro = ({ onComplete }) => {
         />
       </div>
 
-      <style jsx>{`
+      <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Clash+Display:wght@700&family=Satoshi:wght@500;700&display=swap');
 
         .font-display { font-family: 'Clash Display', sans-serif; }

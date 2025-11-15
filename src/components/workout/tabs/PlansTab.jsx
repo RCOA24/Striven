@@ -237,7 +237,7 @@ const EmptyState = ({ onCreate }) => (
   </motion.div>
 );
 
-export const PlansTab = ({ plans, activePlan, activatePlan, openEditPlan, deletePlan }) => {
+export const PlansTab = ({ plans, activePlan, activatePlan, openEditPlan, deletePlan, setShowCreatePlan }) => {
   const sortedPlans = [...plans].sort((a, b) => {
     // Active plan first
     if (activePlan?.id === a.id) return -1;
@@ -268,7 +268,12 @@ export const PlansTab = ({ plans, activePlan, activatePlan, openEditPlan, delete
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          onClick={() => openEditPlan({ id: null, name: '', days: [] })}
+          onClick={() => {
+            console.log('PlansTab: Create New Plan clicked');
+            openEditPlan({ id: null, name: '', days: [] });
+            // fallback: ensure modal is shown if parent setter was passed directly
+            try { setShowCreatePlan?.(true); } catch { /* noop */ }
+          }}
           className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 rounded-xl p-6 text-white font-bold text-xl shadow-lg shadow-emerald-500/30 transition-all flex items-center justify-center gap-3"
         >
           <Plus className="w-6 h-6" />
@@ -279,7 +284,11 @@ export const PlansTab = ({ plans, activePlan, activatePlan, openEditPlan, delete
 
       {/* Plans Grid */}
       {plans.length === 0 ? (
-        <EmptyState onCreate={() => openEditPlan({ id: null, name: '', days: [] })} />
+        <EmptyState onCreate={() => {
+          console.log('PlansTab: EmptyState Create button clicked');
+          openEditPlan({ id: null, name: '', days: [] });
+          try { setShowCreatePlan?.(true); } catch { /* noop */ }
+        }} />
       ) : (
         <motion.div 
           layout

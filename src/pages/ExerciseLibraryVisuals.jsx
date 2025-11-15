@@ -142,7 +142,7 @@ export default function ExerciseLibraryVisuals() {
         />
       </div>
 
-      <style jsx>{`
+      <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Clash+Display:wght@600;700&family=Satoshi:wght@400;500;700&display=swap');
         .font-display { font-family: 'Clash Display', sans-serif; }
         .font-body { font-family: 'Satoshi', sans-serif; }

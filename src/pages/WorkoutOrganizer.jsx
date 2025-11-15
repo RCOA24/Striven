@@ -292,7 +292,7 @@ export default function WorkoutOrganizer() {
       } finally {
         setPlanLoading(false);
       }
-    }, 600);
+    }, 900);
 
     return () => clearTimeout(delay);
   }, [planSearch, planCurrentPage]);
