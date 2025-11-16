@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import LicenseModal from '../components/LicenseModal';
 
-const GOAL_STEPS = 5;   // unified goal
+const GOAL_STEPS = 10000;   // unified goal
 
 /* -------------------------------------------------------------------------- */
 /*                               ACTIVITY CARD                               */
