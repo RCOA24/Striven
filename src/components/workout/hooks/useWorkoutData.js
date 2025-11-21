@@ -57,6 +57,7 @@ export const useWorkoutData = () => {
 
   const loadAllData = async () => {
     try {
+      // 1. Load raw DB data immediately (Fastest TTI)
       const [todayRaw = [], favsRaw = [], allPlans = [], active] = await Promise.all([
         getTodayWorkout().catch(() => []),
         getFavorites().catch(() => []),
@@ -64,30 +65,22 @@ export const useWorkoutData = () => {
         getActivePlan().catch(() => null)
       ]);
 
-      const todayEnriched = await Promise.all(todayRaw.map(enrichWithGif));
-      setTodayExercises(todayEnriched);
-
-      const favsEnriched = await Promise.all(favsRaw.map(enrichWithGif));
-      setFullFavorites(favsEnriched);
-
-      const plansEnriched = await Promise.all(
-        allPlans.map(async (plan) => {
-          try {
-            const days = await Promise.all(
-              (plan.days || []).map(async (day) => ({
-                ...day,
-                exercises: await Promise.all((day.exercises || []).map(enrichWithGif))
-              }))
-            );
-            return { ...plan, days };
-          } catch {
-            return plan;
-          }
-        })
-      );
-      setPlans(plansEnriched);
+      // Render raw data immediately so UI is not empty
+      setTodayExercises(todayRaw);
+      setFullFavorites(favsRaw);
+      setPlans(allPlans);
       setActivePlan(active);
 
+      // 2. Enrich High Priority items (Today & Favorites)
+      const [todayEnriched, favsEnriched] = await Promise.all([
+        Promise.all(todayRaw.map(enrichWithGif)),
+        Promise.all(favsRaw.map(enrichWithGif))
+      ]);
+
+      setTodayExercises(todayEnriched);
+      setFullFavorites(favsEnriched);
+
+      // Calculate history based on enriched today data
       const history = {};
       for (const ex of todayEnriched) {
         const exId = ex.exerciseId || ex.id;
@@ -104,6 +97,25 @@ export const useWorkoutData = () => {
         }
       }
       setExerciseHistory(history);
+
+      // 3. Enrich Plans (Lower Priority / Background)
+      // This is the heaviest operation, so we do it last to not block the main UI
+      const plansEnriched = await Promise.all(
+        allPlans.map(async (plan) => {
+          try {
+            const days = await Promise.all(
+              (plan.days || []).map(async (day) => ({
+                ...day,
+                exercises: await Promise.all((day.exercises || []).map(enrichWithGif))
+              }))
+            );
+            return { ...plan, days };
+          } catch {
+            return plan;
+          }
+        })
+      );
+      setPlans(plansEnriched);
 
     } catch (err) {
       const now = Date.now();

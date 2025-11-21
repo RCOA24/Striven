@@ -52,6 +52,7 @@ class ApiState {
     this.lastFailureTime = null;
     this.cache = new Map();
     this.cacheTimestamps = new Map();
+    this.inflightRequests = new Map(); // ← NEW: Request deduplication map
 
     // Load persisted cache on startup
     if (CONFIG.cache.persist) this.loadPersistedCache();
@@ -498,37 +499,52 @@ export const fetchExerciseDetails = async (id, useCache = true) => {
     }
   }
 
+  // ← NEW: In-flight request deduplication
+  if (apiState.inflightRequests.has(cacheKey)) {
+    return apiState.inflightRequests.get(cacheKey);
+  }
+
+  const fetchPromise = (async () => {
+    try {
+      const url = buildUrl(`/exercises/${id}`);
+      console.log('Fetching exercise details:', id);
+
+      const res = await fetchWithRetry(url);
+      const json = await parseApiResponse(res);
+      
+      const ex = json.data;
+      const details = {
+        id: ex.exerciseId || ex.id,
+        name: ex.name,
+        description: ex.instructions?.join(' ') || '',
+        category: ex.bodyParts?.[0] || 'General',
+        muscles: ex.targetMuscles?.join(', ') || 'Multiple',
+        musclesSecondary: ex.secondaryMuscles?.join(', ') || null,
+        equipment: ex.equipments?.join(', ') || 'Bodyweight',
+        images: ex.images?.map(img => ({ image: img })) || [{ image: ex.gifUrl }],
+        videos: ex.videos?.map(vid => ({ video: vid })) || [],
+        previewImage: ex.gifUrl || ex.image,
+        aliases: ex.aliases || [],
+        license: 'CC0'
+      };
+
+      apiState.setCache(cacheKey, details);
+      console.log('Exercise details loaded successfully');
+
+      return details;
+
+    } catch (err) {
+      console.error('Exercise details fetch failed:', err);
+      return null;
+    }
+  })();
+
+  apiState.inflightRequests.set(cacheKey, fetchPromise);
+
   try {
-    const url = buildUrl(`/exercises/${id}`);
-    console.log('Fetching exercise details:', id);
-
-    const res = await fetchWithRetry(url);
-    const json = await parseApiResponse(res);
-    
-    const ex = json.data;
-    const details = {
-      id: ex.exerciseId || ex.id,
-      name: ex.name,
-      description: ex.instructions?.join(' ') || '',
-      category: ex.bodyParts?.[0] || 'General',
-      muscles: ex.targetMuscles?.join(', ') || 'Multiple',
-      musclesSecondary: ex.secondaryMuscles?.join(', ') || null,
-      equipment: ex.equipments?.join(', ') || 'Bodyweight',
-      images: ex.images?.map(img => ({ image: img })) || [{ image: ex.gifUrl }],
-      videos: ex.videos?.map(vid => ({ video: vid })) || [],
-      previewImage: ex.gifUrl || ex.image,
-      aliases: ex.aliases || [],
-      license: 'CC0'
-    };
-
-    apiState.setCache(cacheKey, details);
-    console.log('Exercise details loaded successfully');
-
-    return details;
-
-  } catch (err) {
-    console.error('Exercise details fetch failed:', err);
-    return null;
+    return await fetchPromise;
+  } finally {
+    apiState.inflightRequests.delete(cacheKey);
   }
 };
 

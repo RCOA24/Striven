@@ -3,8 +3,6 @@ import { motion, Reorder } from 'framer-motion';
 import { Dumbbell, Moon, Plus } from 'lucide-react';
 import { ExerciseItem } from './ExerciseItem';
 
-const MAX_VISIBLE_EXERCISES = 10;
-
 /**
  * Exercise list component for a specific workout day
  * Features:
@@ -13,10 +11,9 @@ const MAX_VISIBLE_EXERCISES = 10;
  * - Rest day state display
  * - Exercise indicators
  */
-export const PlanExerciseList = ({ exercises, dayName, isRest, onReorder, onRemove }) => {
-  const visible = useMemo(() => exercises.slice(0, MAX_VISIBLE_EXERCISES), [exercises]);
-  const hiddenCount = useMemo(() => exercises.length - MAX_VISIBLE_EXERCISES, [exercises.length]);
-
+export const PlanExerciseList = React.memo(({ exercises, dayName, isRest, onReorder, onRemove }) => {
+  // Removed slicing to allow full list visibility while relying on React.memo for performance
+  
   const handleReorder = useCallback((newOrder) => {
     onReorder(newOrder);
   }, [onReorder]);
@@ -93,7 +90,7 @@ export const PlanExerciseList = ({ exercises, dayName, isRest, onReorder, onRemo
         ) : (
           <div className="space-y-2 pb-20">
             <Reorder.Group axis="y" values={exercises} onReorder={handleReorder} className="space-y-2">
-              {visible.map((ex, i) => (
+              {exercises.map((ex, i) => (
                 <ExerciseItem 
                   key={`${ex.id || ex.exerciseId}-${i}`} 
                   ex={ex} 
@@ -102,20 +99,9 @@ export const PlanExerciseList = ({ exercises, dayName, isRest, onReorder, onRemo
                 />
               ))}
             </Reorder.Group>
-
-            {hiddenCount > 0 && (
-              <div className="mt-3 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-center">
-                <p className="text-emerald-300 text-sm font-semibold">
-                  +{hiddenCount} more exercise{hiddenCount !== 1 ? 's' : ''}
-                </p>
-                <p className="text-xs text-emerald-400/60 mt-1">
-                  Scroll to see all
-                </p>
-              </div>
-            )}
           </div>
         )}
       </div>
     </div>
   );
-};
+});

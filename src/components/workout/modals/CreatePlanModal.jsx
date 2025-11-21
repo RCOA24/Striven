@@ -133,6 +133,7 @@ export const CreatePlanModal = ({
           transition={{ duration: 0.15 }}
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 p-0 sm:p-4"
           onClick={e => e.target === e.currentTarget && handleClose()}
+          style={{ willChange: 'opacity' }}
         >
           <motion.div
             ref={modalRef}
@@ -149,7 +150,8 @@ export const CreatePlanModal = ({
             "
             style={{ 
               transform: 'translateZ(0)',
-              backfaceVisibility: 'hidden'
+              backfaceVisibility: 'hidden',
+              willChange: 'transform, opacity'
             }}
             onClick={e => e.stopPropagation()}
           >

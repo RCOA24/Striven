@@ -6,7 +6,7 @@ const STATIC_FALLBACK = '/fallback-exercise.gif';
  * Reusable component for safely displaying exercise images
  * with fallback handling and loading states
  */
-export const SafeExerciseImage = ({ src, alt, className }) => {
+export const SafeExerciseImage = React.memo(({ src, alt, className }) => {
   const imgRef = useRef(null);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -44,4 +44,4 @@ export const SafeExerciseImage = ({ src, alt, className }) => {
       />
     </div>
   );
-};
+});

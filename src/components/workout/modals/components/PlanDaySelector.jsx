@@ -10,7 +10,7 @@ const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'S
  * Enhanced weekly schedule selector component
  * Displays desktop sidebar and mobile horizontal scroll
  */
-export const PlanDaySelector = ({ days, selectedDayIndex, onSelect, onToggleRest }) => {
+export const PlanDaySelector = React.memo(({ days, selectedDayIndex, onSelect, onToggleRest }) => {
   const scrollRef = useRef(null);
   
   const getWeekDates = useCallback(() => {
@@ -268,4 +268,4 @@ export const PlanDaySelector = ({ days, selectedDayIndex, onSelect, onToggleRest
       </div>
     </div>
   );
-};
+});

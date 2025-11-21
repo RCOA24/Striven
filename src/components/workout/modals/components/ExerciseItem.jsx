@@ -7,7 +7,7 @@ import { SafeExerciseImage } from './SafeExerciseImage';
  * Individual exercise item component with drag-and-drop support
  * Displays exercise details and provides remove functionality
  */
-export const ExerciseItem = ({ ex, index, onRemove }) => {
+export const ExerciseItem = React.memo(({ ex, index, onRemove }) => {
   const controls = useDragControls();
   
   const handleRemove = useCallback(() => {
@@ -25,7 +25,8 @@ export const ExerciseItem = ({ ex, index, onRemove }) => {
       className="group rounded-xl bg-emerald-400/20 ring-1 ring-white/10 active:ring-emerald-400/30 transition-colors shadow-lg"
       style={{ 
         transform: 'translateZ(0)',
-        backfaceVisibility: 'hidden'
+        backfaceVisibility: 'hidden',
+        contain: 'layout style'
       }}
     >
       <div 
@@ -89,4 +90,4 @@ export const ExerciseItem = ({ ex, index, onRemove }) => {
       </div>
     </Reorder.Item>
   );
-};
+});

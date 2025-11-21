@@ -9,7 +9,7 @@ import { SafeExerciseImage } from './SafeExerciseImage';
  * Enhanced search results component with pagination
  * Displays exercise search results with add functionality
  */
-export const SearchResults = ({
+export const SearchResults = React.memo(({
   search, setSearch, results, totalCount,
   currentPage, totalPages, loading, onAdd, onPageChange
 }) => {
@@ -207,4 +207,4 @@ export const SearchResults = ({
       )}
     </div>
   );
-};
+});
