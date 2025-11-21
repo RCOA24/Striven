@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Search, Loader2, X, Plus, ChevronLeft, ChevronRight, TrendingUp, AlertCircle
@@ -20,10 +20,26 @@ export const SearchResults = ({
     setTimeout(() => inputRef.current?.focus(), 100); 
   }, []);
 
+  const handleClearSearch = useCallback(() => {
+    setSearch('');
+  }, [setSearch]);
+
+  const handlePagePrev = useCallback(() => {
+    if (currentPage > 1 && !loading) {
+      onPageChange(currentPage - 1);
+    }
+  }, [currentPage, loading, onPageChange]);
+
+  const handlePageNext = useCallback(() => {
+    if (currentPage < totalPages && !loading) {
+      onPageChange(currentPage + 1);
+    }
+  }, [currentPage, totalPages, loading, onPageChange]);
+
   return (
-    <div className="flex flex-col h-full min-h-0 bg-gradient-to-b from-black/40 to-transparent">
+    <div className="flex flex-col h-full min-h-0 bg-black/40">
       {/* ═══ COMPACT SEARCH BAR ═══ */}
-      <div className="flex-shrink-0 p-3 sm:p-4 bg-gradient-to-b from-black/60 to-transparent backdrop-blur-xl border-b border-white/10">
+      <div className="flex-shrink-0 p-3 sm:p-4 bg-black/60 border-b border-white/10">
         <div className="relative">
           <Search className={`
             absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors
@@ -42,20 +58,18 @@ export const SearchResults = ({
               bg-white/10 border border-white/20
               focus:border-emerald-500 focus:bg-white/15
               focus:ring-2 focus:ring-emerald-500/20
-              transition-all duration-200 outline-none
+              transition-colors duration-200 outline-none
               text-white placeholder-white/40 font-medium text-sm
             "
           />
           {search && (
-            <motion.button
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={() => setSearch('')}
+            <button
+              onClick={handleClearSearch}
               className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 hover:bg-white/20 rounded-lg transition-colors"
+              style={{ touchAction: 'manipulation' }}
             >
               <X className="w-3.5 h-3.5 text-white/60" />
-            </motion.button>
+            </button>
           )}
         </div>
 
@@ -73,7 +87,14 @@ export const SearchResults = ({
       </div>
 
       {/* ═══ RESULTS LIST ═══ */}
-      <div className="flex-1 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+      <div 
+        className="flex-1 overflow-y-auto overscroll-contain" 
+        style={{ 
+          WebkitOverflowScrolling: 'touch',
+          transform: 'translateZ(0)',
+          willChange: 'scroll-position'
+        }}
+      >
         {loading && results.length === 0 ? (
           <div className="space-y-2 p-3">
             {[...Array(6)].map((_, i) => (
@@ -88,7 +109,7 @@ export const SearchResults = ({
           </div>
         ) : search.trim() === '' ? (
           <div className="text-center py-16 px-4">
-            <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-full flex items-center justify-center">
+            <div className="w-16 h-16 mx-auto mb-3 bg-emerald-500/20 rounded-full flex items-center justify-center">
               <Search className="w-8 h-8 text-emerald-400" />
             </div>
             <h3 className="text-base font-semibold text-white mb-1">
@@ -100,7 +121,7 @@ export const SearchResults = ({
           </div>
         ) : results.length === 0 ? (
           <div className="text-center py-16 px-4">
-            <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-red-500/20 to-orange-500/20 rounded-full flex items-center justify-center">
+            <div className="w-16 h-16 mx-auto mb-3 bg-red-500/20 rounded-full flex items-center justify-center">
               <AlertCircle className="w-8 h-8 text-red-400" />
             </div>
             <h3 className="text-base font-semibold text-white mb-1">
@@ -113,19 +134,16 @@ export const SearchResults = ({
         ) : (
           <div className="space-y-1.5 p-2 pb-20">
             {results.map((ex, i) => (
-              <motion.button
+              <button
                 key={`${ex.id}-${i}`}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: i * 0.01 }}
-                whileTap={{ scale: 0.98 }}
                 onClick={() => onAdd(ex)}
                 className="
                   w-full flex items-center gap-2.5 p-2.5 rounded-lg
                   bg-white/5 active:bg-emerald-500/10
                   border border-white/10 active:border-emerald-500/30
-                  transition-all text-left
+                  transition-colors text-left
                 "
+                style={{ touchAction: 'manipulation' }}
               >
                 <SafeExerciseImage
                   src={ex.gifUrl}
@@ -143,7 +161,7 @@ export const SearchResults = ({
                 </div>
 
                 <Plus className="w-5 h-5 text-emerald-400 flex-shrink-0" />
-              </motion.button>
+              </button>
             ))}
           </div>
         )}
@@ -151,16 +169,17 @@ export const SearchResults = ({
 
       {/* ═══ COMPACT PAGINATION ═══ */}
       {totalPages > 1 && (
-        <div className="flex-shrink-0 bg-gradient-to-t from-black to-black/80 p-2 border-t border-white/10 backdrop-blur-xl">
+        <div className="flex-shrink-0 bg-black p-2 border-t border-white/10">
           <div className="flex items-center justify-center gap-2">
             <button
-              onClick={() => onPageChange(currentPage - 1)}
+              onClick={handlePagePrev}
               disabled={currentPage === 1 || loading}
               className="
                 p-2 rounded-lg bg-white/10 active:bg-white/20
                 disabled:opacity-30 disabled:cursor-not-allowed
-                transition-all border border-white/20
+                transition-colors border border-white/20
               "
+              style={{ touchAction: 'manipulation' }}
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -172,13 +191,14 @@ export const SearchResults = ({
             </div>
             
             <button
-              onClick={() => onPageChange(currentPage + 1)}
+              onClick={handlePageNext}
               disabled={currentPage === totalPages || loading}
               className="
                 p-2 rounded-lg bg-white/10 active:bg-white/20
                 disabled:opacity-30 disabled:cursor-not-allowed
-                transition-all border border-white/20
+                transition-colors border border-white/20
               "
+              style={{ touchAction: 'manipulation' }}
             >
               <ChevronRight className="w-4 h-4" />
             </button>

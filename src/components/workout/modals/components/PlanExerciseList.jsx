@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { motion, Reorder } from 'framer-motion';
 import { Dumbbell, Moon, Plus } from 'lucide-react';
 import { ExerciseItem } from './ExerciseItem';
@@ -14,13 +14,23 @@ const MAX_VISIBLE_EXERCISES = 10;
  * - Exercise indicators
  */
 export const PlanExerciseList = ({ exercises, dayName, isRest, onReorder, onRemove }) => {
-  const visible = exercises.slice(0, MAX_VISIBLE_EXERCISES);
-  const hiddenCount = exercises.length - MAX_VISIBLE_EXERCISES;
+  const visible = useMemo(() => exercises.slice(0, MAX_VISIBLE_EXERCISES), [exercises]);
+  const hiddenCount = useMemo(() => exercises.length - MAX_VISIBLE_EXERCISES, [exercises.length]);
+
+  const handleReorder = useCallback((newOrder) => {
+    onReorder(newOrder);
+  }, [onReorder]);
+
+  const handleRemove = useCallback((i) => {
+    onRemove(i);
+  }, [onRemove]);
+
+  const estimatedDuration = useMemo(() => exercises.length * 5, [exercises.length]);
 
   return (
-    <div className="flex-1 overflow-hidden flex flex-col bg-gradient-to-b from-black/20 to-transparent min-h-0">
+    <div className="flex-1 overflow-hidden flex flex-col bg-black/20 min-h-0">
       {/* ═══ COMPACT HEADER ═══ */}
-      <div className="flex-shrink-0 p-3 sm:p-4 bg-gradient-to-b from-gray-900/95 to-transparent backdrop-blur-sm border-b border-white/10">
+      <div className="flex-shrink-0 p-3 sm:p-4 bg-gray-900/95 border-b border-white/10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="p-1.5 bg-emerald-500/20 rounded-lg">
@@ -32,7 +42,7 @@ export const PlanExerciseList = ({ exercises, dayName, isRest, onReorder, onRemo
               </h3>
               {!isRest && exercises.length > 0 && (
                 <p className="text-[11px] text-white/60">
-                  {exercises.length} ex • ~{exercises.length * 5} min
+                  {exercises.length} ex • ~{estimatedDuration} min
                 </p>
               )}
             </div>
@@ -48,11 +58,18 @@ export const PlanExerciseList = ({ exercises, dayName, isRest, onReorder, onRemo
       </div>
 
       {/* ═══ SCROLLABLE LIST ═══ */}
-      <div className="flex-1 overflow-y-auto overscroll-contain p-2 sm:p-3" style={{ WebkitOverflowScrolling: 'touch' }}>
+      <div 
+        className="flex-1 overflow-y-auto overscroll-contain p-2 sm:p-3" 
+        style={{ 
+          WebkitOverflowScrolling: 'touch',
+          transform: 'translateZ(0)',
+          willChange: 'scroll-position'
+        }}
+      >
         {isRest ? (
           <div className="flex items-center justify-center h-full min-h-[300px]">
             <div className="text-center py-12">
-              <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-gray-800/50 to-gray-900/50 flex items-center justify-center border border-gray-700/50">
+              <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gray-800/50 flex items-center justify-center border border-gray-700/50">
                 <Moon className="w-10 h-10 text-gray-500" />
               </div>
               <h4 className="text-lg font-semibold text-gray-400 mb-2">Rest Day</h4>
@@ -64,7 +81,7 @@ export const PlanExerciseList = ({ exercises, dayName, isRest, onReorder, onRemo
         ) : exercises.length === 0 ? (
           <div className="flex items-center justify-center h-full min-h-[300px]">
             <div className="text-center py-12">
-              <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-emerald-500/10 to-teal-500/10 flex items-center justify-center border border-emerald-500/20">
+              <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
                 <Dumbbell className="w-10 h-10 text-emerald-400/40" />
               </div>
               <h4 className="text-lg font-semibold text-white mb-2">No Exercises</h4>
@@ -75,19 +92,19 @@ export const PlanExerciseList = ({ exercises, dayName, isRest, onReorder, onRemo
           </div>
         ) : (
           <div className="space-y-2 pb-20">
-            <Reorder.Group axis="y" values={exercises} onReorder={onReorder} className="space-y-2">
+            <Reorder.Group axis="y" values={exercises} onReorder={handleReorder} className="space-y-2">
               {visible.map((ex, i) => (
                 <ExerciseItem 
                   key={`${ex.id || ex.exerciseId}-${i}`} 
                   ex={ex} 
                   index={i} 
-                  onRemove={onRemove} 
+                  onRemove={handleRemove} 
                 />
               ))}
             </Reorder.Group>
 
             {hiddenCount > 0 && (
-              <div className="mt-3 p-3 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/30 rounded-lg text-center">
+              <div className="mt-3 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-center">
                 <p className="text-emerald-300 text-sm font-semibold">
                   +{hiddenCount} more exercise{hiddenCount !== 1 ? 's' : ''}
                 </p>

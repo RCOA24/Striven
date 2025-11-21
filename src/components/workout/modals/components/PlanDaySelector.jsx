@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
   Calendar, ChevronLeft, ChevronRight, Moon, Check, Target, Zap
@@ -12,7 +12,8 @@ const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'S
  */
 export const PlanDaySelector = ({ days, selectedDayIndex, onSelect, onToggleRest }) => {
   const scrollRef = useRef(null);
-  const getWeekDates = () => {
+  
+  const getWeekDates = useCallback(() => {
     const today = new Date();
     const day = today.getDay();
     const diffToMon = day === 0 ? -6 : 1 - day;
@@ -31,26 +32,37 @@ export const PlanDaySelector = ({ days, selectedDayIndex, onSelect, onToggleRest
         isToday: d.toDateString() === today.toDateString(),
       };
     });
-  };
+  }, []);
 
-  const weekDates = getWeekDates();
-  const weekStart = weekDates[0];
-  const weekEnd = weekDates[6];
+  const weekDates = useMemo(() => getWeekDates(), [getWeekDates]);
+  const weekStart = useMemo(() => weekDates[0], [weekDates]);
+  const weekEnd = useMemo(() => weekDates[6], [weekDates]);
 
-  const scrollToDay = (i) => {
+  const scrollToDay = useCallback((i) => {
     if (scrollRef.current) {
       const el = scrollRef.current.children[i];
       el?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
     }
-  };
+  }, []);
 
-  useEffect(() => scrollToDay(selectedDayIndex), [selectedDayIndex]);
+  useEffect(() => scrollToDay(selectedDayIndex), [selectedDayIndex, scrollToDay]);
 
-  const totalExercises = days.reduce((sum, d) => sum + (d.isRest ? 0 : d.exercises.length), 0);
-  const activeDays = days.filter(d => !d.isRest && d.exercises.length > 0).length;
+  const totalExercises = useMemo(() => 
+    days.reduce((sum, d) => sum + (d.isRest ? 0 : d.exercises.length), 0),
+    [days]
+  );
+  const activeDays = useMemo(() => 
+    days.filter(d => !d.isRest && d.exercises.length > 0).length,
+    [days]
+  );
+
+  const handleToggleRest = useCallback((e, i) => {
+    e.stopPropagation();
+    onToggleRest(i);
+  }, [onToggleRest]);
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-b from-emerald-950/40 to-transparent">
+    <div className="h-full flex flex-col bg-emerald-950/40">
       {/* ═══ DESKTOP SIDEBAR ═══ */}
       <div className="hidden lg:flex lg:flex-col h-full">
         <div className="flex-shrink-0 p-4 border-b border-emerald-500/20 space-y-2">
@@ -92,15 +104,16 @@ export const PlanDaySelector = ({ days, selectedDayIndex, onSelect, onToggleRest
                 key={d.name}
                 onClick={() => !isRest && onSelect(i)}
                 className={`
-                  w-full text-left p-3 transition-all
+                  w-full text-left p-3 transition-colors
                   border-b border-white/5 relative flex items-center gap-2.5
                   ${isSel && !isRest
-                    ? 'bg-gradient-to-r from-emerald-500/20 to-emerald-500/10 text-emerald-300'
+                    ? 'bg-emerald-500/20 text-emerald-300'
                     : isRest
                     ? 'bg-gray-900/50 text-gray-500 cursor-default opacity-60'
                     : 'hover:bg-white/5 text-white/80'
                   }
                 `}
+                style={{ touchAction: 'manipulation' }}
               >
                 {isSel && !isRest && (
                   <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-400" />
@@ -143,11 +156,12 @@ export const PlanDaySelector = ({ days, selectedDayIndex, onSelect, onToggleRest
                 </div>
 
                 <button
-                  onClick={(e) => { e.stopPropagation(); onToggleRest(i); }}
+                  onClick={(e) => handleToggleRest(e, i)}
                   className={`
-                    p-1.5 rounded-lg transition-all
+                    p-1.5 rounded-lg transition-colors
                     ${isRest ? 'bg-gray-700/50 text-gray-400' : 'bg-white/5 text-white/50 hover:bg-white/10'}
                   `}
+                  style={{ touchAction: 'manipulation' }}
                 >
                   <Moon className="w-3.5 h-3.5" />
                 </button>
@@ -158,7 +172,7 @@ export const PlanDaySelector = ({ days, selectedDayIndex, onSelect, onToggleRest
       </div>
 
       {/* ═══ MOBILE LIST VIEW ═══ */}
-      <div className="lg:hidden flex-1 overflow-y-auto p-3 space-y-2">
+      <div className="lg:hidden flex-1 overflow-y-auto p-3 space-y-2" style={{ WebkitOverflowScrolling: 'touch' }}>
         <div className="mb-3 text-center">
           <p className="text-xs text-white/60 mb-2">
             {weekStart.month} {weekStart.date} – {weekEnd.month} {weekEnd.date}
