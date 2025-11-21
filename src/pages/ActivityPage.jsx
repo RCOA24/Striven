@@ -46,7 +46,7 @@ const ActivityCard = ({ activity, onDelete }) => {
       <motion.div 
         initial={{ opacity: 0, y: 20 }} 
         animate={{ opacity: 1, y: 0 }}
-        className={`relative ${COLORS.card} rounded-2xl p-5 mb-4 active:scale-[0.99] transition-transform touch-manipulation`}
+        className={`relative ${COLORS.card} rounded-2xl p-5 h-full active:scale-[0.99] transition-transform touch-manipulation`}
       >
         {/* Top Row: Icon & Date */}
         <div className="flex justify-between items-start mb-4">
@@ -274,94 +274,115 @@ const ActivityPage = ({ activities = [], onDeleteActivity, onRefresh }) => {
   return (
     <div className={`min-h-screen ${COLORS.bg} text-white font-sans pb-12`}>
       
-      {/* Title Header */}
-      <div className="pt-12 pb-6 px-6">
-        <h1 className="text-4xl font-black tracking-tight text-white">History</h1>
-        <p className={`${COLORS.textSub} font-medium`}>Your recent workouts</p>
-      </div>
-
-      <div className="max-w-2xl mx-auto px-4">
-        
-        {/* Summary Cards */}
-        {filteredActivities.length > 0 && (
-          <div className="grid grid-cols-3 gap-3 mb-6">
-            <div className={`${COLORS.card} rounded-2xl p-3 flex flex-col justify-between min-h-[90px]`}>
-              <div className="flex justify-between items-start">
-                <span className="text-[10px] font-bold uppercase text-[#8e8e93]">Steps</span>
-                <Footprints size={14} className={COLORS.exercise} />
-              </div>
-              <div className="text-xl font-bold font-mono tracking-tight tabular-nums">{stats.steps.toLocaleString()}</div>
-            </div>
-
-            <div className={`${COLORS.card} rounded-2xl p-3 flex flex-col justify-between min-h-[90px]`}>
-              <div className="flex justify-between items-start">
-                <span className="text-[10px] font-bold uppercase text-[#8e8e93]">Dist</span>
-                <MapPin size={14} className={COLORS.stand} />
-              </div>
-              <div className="text-xl font-bold font-mono tracking-tight tabular-nums">{stats.dist.toFixed(1)}<span className="text-xs ml-0.5">km</span></div>
-            </div>
-
-             <div className={`${COLORS.card} rounded-2xl p-3 flex flex-col justify-between min-h-[90px]`}>
-              <div className="flex justify-between items-start">
-                <span className="text-[10px] font-bold uppercase text-[#8e8e93]">Cals</span>
-                <Flame size={14} className={COLORS.move} />
-              </div>
-              <div className="text-xl font-bold font-mono tracking-tight tabular-nums">{Math.round(stats.cal)}</div>
-            </div>
-          </div>
-        )}
-
-        {/* Calendar */}
-        <CalendarView 
-          activities={activities} 
-          selectedDate={selectedDate} 
-          onDateSelect={setSelectedDate} 
-        />
-
-        {/* Active Filter Bar */}
-        {selectedDate && (
-          <div className="flex items-center justify-between bg-[#2c2c2e] rounded-xl p-4 mb-6 animate-in fade-in slide-in-from-top-4">
-            <div className="flex items-center gap-3">
-              <Calendar size={18} className="text-[#a4ff00]" />
-              <span className="font-bold text-sm">
-                {selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-              </span>
-            </div>
-            <button 
-              onClick={() => setSelectedDate(null)} 
-              className="text-xs font-bold text-[#a4ff00] uppercase tracking-wide px-2 py-1 hover:bg-white/10 rounded-lg"
-            >
-              Clear
-            </button>
-          </div>
-        )}
-
-        {/* List */}
-        <div className="space-y-4">
-          <h2 className="text-lg font-bold text-white px-1">
-            {filteredActivities.length > 0 ? 'Workouts' : ''}
-          </h2>
-          
-          {filteredActivities.length === 0 ? (
-            <div className="text-center py-12">
-               <div className="w-16 h-16 rounded-full bg-[#1c1c1e] flex items-center justify-center mx-auto mb-4">
-                  <Calendar className="text-[#8e8e93]" size={32} />
-               </div>
-               <h3 className="text-white font-bold text-lg">No Workouts</h3>
-               <p className="text-[#8e8e93] text-sm mt-1">There is no activity data for this period.</p>
-            </div>
-          ) : (
-            filteredActivities.map((act) => (
-              <ActivityCard key={act.id} activity={act} onDelete={handleDelete} />
-            ))
-          )}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+        {/* Title Header */}
+        <div className="mb-8">
+            <h1 className="text-4xl font-black tracking-tight text-white">History</h1>
+            <p className={`${COLORS.textSub} font-medium`}>Your recent workouts</p>
         </div>
 
-        {/* Footer */}
-        <div className="text-center py-8">
-          <button onClick={() => setShowLicense(true)} className="text-[#48484a] text-xs font-medium hover:text-white transition-colors">
-            Striven v1.0 • License
-          </button>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            {/* Left Column: Stats & Calendar */}
+            <div className="lg:col-span-5 xl:col-span-4 space-y-6 lg:sticky lg:top-8">
+                {/* Summary Cards */}
+                {filteredActivities.length > 0 && (
+                <div className="grid grid-cols-3 gap-3">
+                    <div className={`${COLORS.card} rounded-2xl p-3 flex flex-col justify-between min-h-[90px]`}>
+                    <div className="flex justify-between items-start">
+                        <span className="text-[10px] font-bold uppercase text-[#8e8e93]">Steps</span>
+                        <Footprints size={14} className={COLORS.exercise} />
+                    </div>
+                    <div className="text-xl font-bold font-mono tracking-tight tabular-nums">{stats.steps.toLocaleString()}</div>
+                    </div>
+
+                    <div className={`${COLORS.card} rounded-2xl p-3 flex flex-col justify-between min-h-[90px]`}>
+                    <div className="flex justify-between items-start">
+                        <span className="text-[10px] font-bold uppercase text-[#8e8e93]">Dist</span>
+                        <MapPin size={14} className={COLORS.stand} />
+                    </div>
+                    <div className="text-xl font-bold font-mono tracking-tight tabular-nums">{stats.dist.toFixed(1)}<span className="text-xs ml-0.5">km</span></div>
+                    </div>
+
+                    <div className={`${COLORS.card} rounded-2xl p-3 flex flex-col justify-between min-h-[90px]`}>
+                    <div className="flex justify-between items-start">
+                        <span className="text-[10px] font-bold uppercase text-[#8e8e93]">Cals</span>
+                        <Flame size={14} className={COLORS.move} />
+                    </div>
+                    <div className="text-xl font-bold font-mono tracking-tight tabular-nums">{Math.round(stats.cal)}</div>
+                    </div>
+                </div>
+                )}
+
+                {/* Calendar */}
+                <CalendarView 
+                activities={activities} 
+                selectedDate={selectedDate} 
+                onDateSelect={setSelectedDate} 
+                />
+            </div>
+
+            {/* Right Column: Activity List */}
+            <div className="lg:col-span-7 xl:col-span-8">
+                {/* Active Filter Bar */}
+                {selectedDate && (
+                <div className="flex items-center justify-between bg-[#2c2c2e] rounded-xl p-4 mb-6 animate-in fade-in slide-in-from-top-4">
+                    <div className="flex items-center gap-3">
+                    <Calendar size={18} className="text-[#a4ff00]" />
+                    <span className="font-bold text-sm">
+                        {selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
+                    </div>
+                    <button 
+                    onClick={() => setSelectedDate(null)} 
+                    className="text-xs font-bold text-[#a4ff00] uppercase tracking-wide px-2 py-1 hover:bg-white/10 rounded-lg"
+                    >
+                    Clear
+                    </button>
+                </div>
+                )}
+
+                {/* List */}
+                <div>
+                    <h2 className="text-lg font-bold text-white px-1 mb-4">
+                        {filteredActivities.length > 0 ? 'Workouts' : ''}
+                    </h2>
+                    
+                    {filteredActivities.length === 0 ? (
+                        <div className="text-center py-12 bg-[#1c1c1e] rounded-2xl border border-[#2c2c2e]">
+                        <div className="w-16 h-16 rounded-full bg-[#2c2c2e] flex items-center justify-center mx-auto mb-4">
+                            <Calendar className="text-[#8e8e93]" size={32} />
+                        </div>
+                        <h3 className="text-white font-bold text-lg">No Workouts</h3>
+                        <p className="text-[#8e8e93] text-sm mt-1">There is no activity data for this period.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                            {filteredActivities.map((act) => (
+                                <ActivityCard key={act.id} activity={act} onDelete={handleDelete} />
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+
+        {/* App Info */}
+        <div className="px-4 text-center mt-8 border-t border-white/5 pt-8">
+          <div className="bg-zinc-900/50 rounded-xl p-6 border border-white/5">
+            <h3 className="text-white font-bold text-lg mb-1 font-apple">Striven</h3>
+            <p className="text-zinc-500 text-sm mb-4">Version 1.0.0</p>
+            <button
+              onClick={() => setShowLicense(true)}
+              className="text-emerald-500 text-sm font-medium hover:underline"
+            >
+              License & Credits
+            </button>
+            <p className="text-zinc-600 text-xs mt-4">
+              Privacy-First Fitness Tracker<br/>
+              © 2025 Rodney Austria
+            </p>
+          </div>
         </div>
       </div>
 

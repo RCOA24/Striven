@@ -14,6 +14,7 @@ import {
   Target, TrendingUp, Flame, ChevronRight, Minus, Plus, X, Trophy, Calendar, MapPin, Activity
 } from 'lucide-react';
 import { db } from '../utils/db';
+import LicenseModal from '../components/LicenseModal';
 
 /* -------------------------------------------------------------------------- */
 /*                             APPLE STYLE CONSTANTS                          */
@@ -98,6 +99,7 @@ const StatsPage = () => {
   const activities = useLiveQuery(() => db.activities.toArray(), []) || [];
   const goalsFromDb = useLiveQuery(() => db.goals.toArray(), []) || [];
   const [editingGoal, setEditingGoal] = useState(null);
+  const [showLicense, setShowLicense] = useState(false);
 
   // Date Helpers
   const today = new Date();
@@ -158,26 +160,25 @@ const StatsPage = () => {
   }, [activities]);
 
   return (
-    /* ADDED pb-32 TO ENSURE SCROLL CLEARANCE ABOVE NAV BAR */
     <div className="min-h-screen bg-black text-white font-sans selection:bg-white/20 pb-32">
-      
       {/* HEADER */}
-      <div className="px-6 pt-12 pb-6 max-w-4xl mx-auto flex justify-between items-end border-b border-white/10 mb-6">
+      <div className="px-6 pt-12 pb-6 max-w-7xl mx-auto flex justify-between items-end border-b border-white/10 mb-6">
         <div>
           <h2 className="text-sm font-bold text-[#8e8e93] tracking-wide mb-1">{dateString}</h2>
           <h1 className="text-4xl font-bold tracking-tight">Summary</h1>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 space-y-4">
-
-        {/* 1. MAIN ACTIVITY RINGS */}
-        <BentoCard className="flex flex-col md:flex-row items-center justify-between gap-8">
-          <div className="flex-1 space-y-1 text-center md:text-left">
+      {/* MAIN WRAPPER WIDTH EXPANDED */}
+      <div className="max-w-7xl mx-auto px-4 space-y-8">
+        
+        {/* ACTIVITY RINGS CARD - improved wrapping on xl */}
+        <BentoCard className="flex flex-col md:flex-row md:items-center md:justify-between gap-8 xl:grid xl:grid-cols-5">
+          <div className="flex-1 space-y-1 text-center md:text-left xl:col-span-2">
             <h3 className="text-xl font-semibold">Activity</h3>
             <p className="text-[#8e8e93]">Close your rings to stay on track.</p>
           </div>
-          <div className="flex items-center justify-center gap-4 md:gap-6 scale-90 md:scale-100">
+          <div className="flex items-center justify-center gap-6 flex-wrap xl:col-span-3">
              <div className="flex flex-col items-center gap-2">
               <ActivityRing progress={(weeklyStats.calories / getGoal('calories')) * 100} colorConfig={APPLE_COLORS.move} icon={Flame} size={80} />
               <span className="text-[10px] font-bold text-[#fa114f] tracking-widest">MOVE</span>
@@ -193,8 +194,8 @@ const StatsPage = () => {
           </div>
         </BentoCard>
 
-        {/* 2. METRICS GRID ROW 1 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* COMBINED METRICS GRID (was two separate grids) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           <BentoCard onClick={() => setEditingGoal({ type: 'calories', value: getGoal('calories') })}>
              <div className="flex justify-between items-start mb-2">
                <div className="flex items-center gap-2 text-[#fa114f] font-bold text-sm uppercase tracking-wider">
@@ -228,11 +229,8 @@ const StatsPage = () => {
              </div>
              <p className="text-right text-xs text-[#8e8e93] mt-2">Goal: {getGoal('steps').toLocaleString()}</p>
           </BentoCard>
-        </div>
 
-        {/* 3. METRICS GRID ROW 2 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-           <BentoCard>
+          <BentoCard>
              <div className="flex justify-between items-start mb-4">
                <div className="flex items-center gap-2 text-[#bf5af2] font-bold text-sm uppercase tracking-wider">
                  <Calendar size={16} /> Active Days
@@ -272,8 +270,8 @@ const StatsPage = () => {
            </BentoCard>
         </div>
 
-        {/* 4. AWARDS */}
-        <BentoCard className="bg-gradient-to-br from-[#1c1c1e] to-[#2c2c2e] border border-yellow-500/10">
+        {/* PERSONAL RECORDS FULL WIDTH */}
+        <BentoCard className="bg-gradient-to-br from-[#1c1c1e] to-[#2c2c2e] border border-yellow-500/10 xl:col-span-4">
           <div className="flex items-center gap-2 text-yellow-500 font-bold text-sm uppercase tracking-wider mb-6">
             <Trophy size={16} fill="currentColor" /> Personal Records
           </div>
@@ -373,7 +371,27 @@ const StatsPage = () => {
           />
         </div>
       )}
-
+      
+        {/* App Info Footer */}
+        <div className="mt-12">
+          <div className="px-4 text-center">
+            <div className="bg-zinc-900/50 rounded-xl p-6 border border-white/5">
+              <h3 className="text-white font-bold text-lg mb-1 font-apple">Striven</h3>
+              <p className="text-zinc-500 text-sm mb-4">Version 1.0.0</p>
+              <button
+                onClick={() => setShowLicense(true)}
+                className="text-emerald-500 text-sm font-medium hover:underline"
+              >
+                License & Credits
+              </button>
+              <p className="text-zinc-600 text-xs mt-4">
+                Privacy-First Fitness Tracker<br/>
+                © 2025 Rodney Austria
+              </p>
+            </div>
+          </div>
+        </div>
+      <LicenseModal isOpen={showLicense} onClose={() => setShowLicense(false)} />
     </div>
   );
 };

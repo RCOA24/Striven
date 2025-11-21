@@ -1,171 +1,146 @@
-/**
- * Striven - Privacy-First Fitness Tracker
- * Copyright (c) 2025 Rodney Austria
- * Licensed under the MIT License
- */
-
-import React, { useState } from 'react';
-import { Footprints, Flame, Clock, Target, Activity, Check, Play, Pause, RotateCcw, ChevronRight, TrendingUp, Award } from 'lucide-react';
+import React, { useState, useMemo, memo } from 'react';
+import { 
+  Footprints, 
+  Flame, 
+  Timer,
+  MapPin,
+  Target, 
+  Check, 
+  Play, 
+  Pause, 
+  RotateCcw, 
+  ChevronRight, 
+  TrendingUp 
+} from 'lucide-react';
 import LicenseModal from '../components/LicenseModal';
 
-// Step Counter Component with Modern Circular Progress
+// --- Components ---
+
 const StepCounter = ({ steps, goal }) => {
   const percentage = Math.min((steps / goal) * 100, 100);
-  const radius = 130;
+  const radius = 120;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (percentage / 100) * circumference;
 
   return (
-    <div className="relative flex items-center justify-center w-full aspect-square max-w-[300px] mx-auto mb-8">
-      {/* Outer glow ring */}
-      <div className="absolute inset-0 rounded-full bg-gradient-to-br from-emerald-500/20 to-green-500/20 blur-2xl animate-pulse-slow"></div>
-      
-      <svg className="transform -rotate-90 w-full h-full" viewBox="0 0 300 300">
-        {/* Background track */}
-        <circle 
-          cx="150" cy="150" r={radius} 
-          stroke="rgba(255, 255, 255, 0.05)" 
-          strokeWidth="16" 
-          fill="none" 
-        />
-
+    <div className="relative flex items-center justify-center w-full aspect-square max-w-[280px] lg:max-w-[400px] mx-auto mb-8 lg:mb-0 group">
+      <svg className="transform -rotate-90 w-full h-full overflow-visible" viewBox="0 0 300 300">
+        <circle cx="150" cy="150" r={radius} stroke="#27272a" strokeWidth="24" fill="none" className="opacity-50" />
         
+        <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="2" result="blur" />
+          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+        </filter>
         
-        {/* Progress circle */}
         <circle
           cx="150" cy="150" r={radius}
-          stroke="url(#modernGradient)" 
-          strokeWidth="16" 
+          stroke="url(#appleGradient)" 
+          strokeWidth="24" 
           fill="none"
           strokeDasharray={circumference} 
           strokeDashoffset={strokeDashoffset}
           strokeLinecap="round" 
-          className="transition-all duration-1000 ease-out"
-          style={{ filter: 'drop-shadow(0 0 12px rgba(16, 185, 129, 0.8))' }}
-        />
-        
-        {/* Inner decorative ring */}
-        <circle 
-          cx="150" cy="150" r={radius - 30} 
-          stroke="rgba(255, 255, 255, 0.03)" 
-          strokeWidth="1" 
-          fill="none"
-          strokeDasharray="4 4"
+          className="transition-[stroke-dashoffset] duration-[1.5s] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[stroke-dashoffset]"
+          style={{ filter: 'drop-shadow(0 0 6px rgba(52, 211, 153, 0.3))' }}
         />
         
         <defs>
-          <linearGradient id="modernGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#10b981" />
-            <stop offset="50%" stopColor="#22c55e" />
-            <stop offset="100%" stopColor="#34d399" />
+          <linearGradient id="appleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#34D399" />
+            <stop offset="100%" stopColor="#10B981" />
           </linearGradient>
         </defs>
       </svg>
       
-      {/* Center content */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <div className="relative mb-3">
-          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500 to-green-500 rounded-full blur-lg opacity-60"></div>
-          <div className="relative bg-gradient-to-br from-emerald-500 to-green-600 p-4 rounded-full shadow-2xl">
-            <Footprints className="w-10 h-10 text-white" />
-          </div>
-        </div>
-        
-        <div className="text-5xl font-bold text-white mb-1 tracking-tight">
-          {steps.toLocaleString()}
-        </div>
-        <div className="text-sm text-white/60 font-semibold uppercase tracking-wider mb-3">steps today</div>
-        
-        <div className="flex items-center space-x-2 bg-white/10 backdrop-blur-md rounded-full px-4 py-2 border border-white/20">
-          <Target className="w-4 h-4 text-emerald-400" />
-          <span className="text-sm text-white/80 font-semibold">
-            {percentage.toFixed(0)}% of {goal >= 1000 ? `${(goal / 1000).toFixed(0)}K` : goal}
-          </span>
+        <div className="flex flex-col items-center animate-fadeIn">
+            <Footprints className="w-8 h-8 lg:w-12 lg:h-12 text-emerald-500 mb-2" />
+            <div className="text-6xl lg:text-8xl font-bold text-white tracking-tight font-sans tabular-nums">
+            {steps.toLocaleString()}
+            </div>
+            <div className="text-sm lg:text-lg text-zinc-400 font-medium uppercase tracking-wide mt-1">steps</div>
         </div>
       </div>
     </div>
   );
 };
 
-// Modern Metric Card Component
-const MetricCard = ({ icon: Icon, label, value, gradient, trend }) => (
-  <div className="group relative">
-    <div className="absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 from-white/10 to-transparent rounded-2xl blur-xl transition-all duration-500"></div>
-    <div className="relative bg-gradient-to-br from-white/[0.08] to-white/[0.02] backdrop-blur-xl rounded-2xl p-5 border border-white/10 hover:border-white/20 transition-all duration-300 hover-lift">
-      <div className="flex items-start justify-between mb-3">
-        <div className={`bg-gradient-to-br ${gradient} p-3 rounded-xl shadow-lg`}>
-          <Icon className="w-5 h-5 text-white" />
-        </div>
-        {trend && (
-          <div className="flex items-center space-x-1 bg-emerald-500/20 px-2 py-1 rounded-full">
-            <TrendingUp className="w-3 h-3 text-emerald-400" />
-            <span className="text-xs text-emerald-400 font-semibold">{trend}</span>
-          </div>
-        )}
-      </div>
-      <div className="text-2xl font-bold text-white mb-1">{value}</div>
-      <div className="text-xs text-white/50 font-medium uppercase tracking-wider">{label}</div>
-    </div>
-  </div>
-);
+const MetricCard = memo(({ icon: Icon, label, value, iconColor, bgColor }) => {
+  const isLongText = value.length > 6;
 
-// Modern Control Button Component
+  return (
+    <div className="relative group h-full">
+      <div className="bg-zinc-900 rounded-[2rem] p-4 sm:p-5 border border-zinc-800/50 hover:bg-zinc-800 transition-colors duration-300 h-full flex flex-col justify-between">
+        <div className="flex items-start justify-between mb-3">
+          <div className={`p-2 rounded-full ${bgColor} bg-opacity-15`}>
+            {Icon ? (
+              <Icon className={`w-5 h-5 ${iconColor}`} strokeWidth={2.5} />
+            ) : (
+              <div className="w-5 h-5" />
+            )}
+          </div>
+        </div>
+        <div className="flex flex-col">
+          <span 
+            className={`
+              font-bold text-white tabular-nums 
+              ${isLongText ? 'text-xl tracking-tighter' : 'text-2xl tracking-tight'} 
+              leading-none
+            `}
+          >
+            {value}
+          </span>
+          <span className="text-[10px] sm:text-xs text-zinc-500 font-semibold uppercase tracking-wider mt-2">{label}</span>
+        </div>
+      </div>
+    </div>
+  );
+});
+
 const ControlButton = ({ onClick, children, variant = 'primary', icon: Icon, disabled, isMain }) => {
   const variants = {
-    primary: "bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white shadow-xl shadow-emerald-500/50 hover:shadow-2xl hover:shadow-emerald-500/60 border-0",
-    secondary: "bg-white/[0.08] hover:bg-white/[0.12] text-white backdrop-blur-xl border border-white/20 hover:border-white/30 shadow-lg",
-    danger: "bg-gradient-to-r from-red-500/30 to-rose-500/30 hover:from-red-500/40 hover:to-rose-500/40 text-white backdrop-blur-xl border border-red-400/40 hover:border-red-400/60",
-    success: "bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-xl shadow-blue-500/50 hover:shadow-2xl hover:shadow-blue-500/60 border-0"
+    primary: "bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_20px_rgba(16,185,129,0.2)]",
+    secondary: "bg-zinc-800 hover:bg-zinc-700 text-white",
+    danger: "bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20",
+    success: "bg-blue-500 hover:bg-blue-400 text-white"
   };
-
-  const sizeClasses = isMain 
-    ? "py-5 text-base font-bold" 
-    : "py-3.5 text-sm font-semibold";
 
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`flex-1 rounded-2xl transition-all duration-300 flex items-center justify-center space-x-2.5 transform hover:scale-105 active:scale-95 ${variants[variant]} ${sizeClasses} ${disabled ? 'opacity-50 cursor-not-allowed hover:scale-100' : ''}`}
+      className={`
+        relative overflow-hidden rounded-full transition-all duration-200 ease-out
+        flex items-center justify-center gap-2 font-bold tracking-wide
+        active:scale-[0.98] transform-gpu
+        ${variants[variant]} 
+        ${isMain ? "py-5 text-lg w-full" : "py-4 text-sm w-full"}
+        ${disabled ? 'opacity-50 cursor-not-allowed active:scale-100' : ''}
+      `}
     >
-      {Icon && <Icon className={`${isMain ? 'w-6 h-6' : 'w-5 h-5'}`} />}
+      {Icon && <Icon className={isMain ? 'w-6 h-6' : 'w-5 h-5'} strokeWidth={2.5} />}
       <span>{children}</span>
     </button>
   );
 };
 
-// Stats Summary Card
 const StatsSummary = ({ steps, goal }) => {
   const percentage = Math.min((steps / goal) * 100, 100);
-  const isGoalReached = steps >= goal;
   
   return (
-    <div className="bg-gradient-to-br from-white/[0.08] to-white/[0.02] backdrop-blur-xl rounded-2xl p-5 border border-white/10 mb-6">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center space-x-3">
-          <div className="bg-gradient-to-br from-purple-500 to-pink-600 p-2.5 rounded-xl">
-            <Award className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <div className="text-sm text-white/50 font-medium uppercase tracking-wider">Daily Progress</div>
-            <div className="text-lg font-bold text-white">{percentage.toFixed(0)}% Complete</div>
-          </div>
+    <div className="bg-zinc-900 rounded-[2rem] p-6 mb-6 border border-zinc-800/50">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Target className="w-5 h-5 text-emerald-500" />
+          <span className="text-zinc-400 font-semibold text-sm">Daily Goal</span>
         </div>
-        {isGoalReached && (
-          <div className="bg-emerald-500/20 px-3 py-1.5 rounded-full border border-emerald-400/30">
-            <span className="text-xs text-emerald-400 font-bold uppercase tracking-wider">Goal Reached!</span>
-          </div>
-        )}
+        <span className="text-white font-bold">{percentage.toFixed(0)}%</span>
       </div>
-      
-      {/* Progress bar */}
-      <div className="relative h-3 bg-white/5 rounded-full overflow-hidden">
+      <div className="relative h-4 bg-zinc-800 rounded-full overflow-hidden">
         <div 
-          className="absolute inset-y-0 left-0 bg-gradient-to-r from-emerald-500 to-green-500 rounded-full transition-all duration-1000 ease-out"
+          className="absolute inset-y-0 left-0 bg-emerald-500 rounded-full transition-all duration-1000 ease-out will-change-transform"
           style={{ width: `${percentage}%` }}
-        >
-          <div className="absolute inset-0 bg-white/20 animate-shimmer"></div>
-        </div>
+        />
       </div>
     </div>
   );
@@ -189,165 +164,157 @@ const Dashboard = ({
   const dailyStepsGoal = 10000;
   const [showLicense, setShowLicense] = useState(false);
 
-  // Calculate weekly average from total steps
-  const weeklyAverage = weeklyStats.activeDays > 0 
-    ? Math.round(weeklyStats.totalSteps / weeklyStats.activeDays)
-    : 0;
+  const weeklyAverage = useMemo(() => 
+    weeklyStats.activeDays > 0 
+      ? Math.round(weeklyStats.totalSteps / weeklyStats.activeDays)
+      : 0
+  , [weeklyStats]);
 
   return (
-    <div className="min-h-screen w-full px-4 py-8 relative">
-      {/* Animated background elements */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl animate-float"></div>
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '1s' }}></div>
+    /* 
+       UPDATED WRAPPER:
+       Removed min-h-screen and bg-black as these are handled by MainLayout.
+       The content will flow naturally within the MainLayout's scrollable area.
+    */
+
+       
+    <div className="w-full font-sans selection:bg-emerald-500/30 flex flex-col">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 flex flex-col">
+        
+        {/* Header */}
+        <header className="flex justify-between items-center mb-8 py-2">
+          
+          <h1 className="text-3xl font-bold tracking-tight">Striven</h1>
+          
+          <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center">
+            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+          </div>
+        </header>
+        
+
+        {/* Main Content - Responsive Grid */}
+        <main className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 items-start">
+          
+          {/* Left Column: Step Counter (Centered on Desktop) */}
+          <div className="flex flex-col items-center justify-center lg:h-full lg:sticky lg:top-8">
+            <StepCounter steps={steps} goal={dailyStepsGoal} />
+          </div>
+
+          {/* Right Column: Metrics & Controls */}
+          <div className="flex flex-col gap-6 w-full max-w-md mx-auto lg:max-w-none">
+            <div className="grid grid-cols-3 gap-3 h-32">
+              <MetricCard 
+                icon={MapPin} 
+                label="Distance" 
+                value={`${distance.toFixed(2)}km`}
+                iconColor="text-white-400"
+                bgColor="bg-cyan-500"
+              />
+              <MetricCard 
+                icon={Flame} 
+                label="Kcal" 
+                value={`${calories.toFixed(0)}`}
+                iconColor="text-white-400"
+                bgColor="bg-rose-500"
+              />
+              <MetricCard 
+                icon={Timer} 
+                label="Time" 
+                value={formattedTime}
+                iconColor="text-white-400"
+                bgColor="bg-orange-500"
+              />
+            </div>
+
+            <StatsSummary steps={steps} goal={dailyStepsGoal} />
+
+            <div className="space-y-3 mt-2">
+              {!isTracking ? (
+                <ControlButton onClick={startTracking} isMain icon={Play} variant="primary">
+                  Start Workout
+                </ControlButton>
+              ) : (
+                <div className="space-y-3 animate-slideUpFade">
+                  {isPaused ? (
+                    <ControlButton onClick={resumeTracking} isMain icon={Play} variant="primary">
+                      Resume
+                    </ControlButton>
+                  ) : (
+                    <ControlButton onClick={pauseTracking} isMain icon={Pause} variant="secondary">
+                      Pause
+                    </ControlButton>
+                  )}
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <ControlButton onClick={stopAndSave} variant="success" icon={Check} disabled={steps === 0}>
+                      Finish
+                    </ControlButton>
+                    <ControlButton onClick={reset} variant="danger" icon={RotateCcw}>
+                      Reset
+                    </ControlButton>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <button 
+              onClick={onNavigateToStats}
+              className="w-full bg-zinc-900 rounded-2xl p-4 flex items-center justify-between active:bg-zinc-800 transition-colors group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="bg-purple-500/20 p-2.5 rounded-full text-purple-400">
+                  <TrendingUp className="w-5 h-5" />
+                </div>
+                <div className="text-left">
+                  <div className="text-sm font-bold text-white">Weekly Trends</div>
+                  <div className="text-xs text-zinc-500">Avg: {weeklyAverage.toLocaleString()} steps</div>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-zinc-600 group-hover:text-white transition-colors" />
+            </button>
+          </div>
+        </main>
+
+        {/* App Info Footer */}
+        <div className="mt-12">
+          <div className="px-4 text-center">
+            <div className="bg-zinc-900/50 rounded-xl p-6 border border-white/5">
+              <h3 className="text-white font-bold text-lg mb-1 font-apple">Striven</h3>
+              <p className="text-zinc-500 text-sm mb-4">Version 1.0.0</p>
+              <button
+                onClick={() => setShowLicense(true)}
+                className="text-emerald-500 text-sm font-medium hover:underline"
+              >
+                License & Credits
+              </button>
+              <p className="text-zinc-600 text-xs mt-4">
+                Privacy-First Fitness Tracker<br/>
+                © 2025 Rodney Austria
+              </p>
+            </div>
+          </div>
+        </div>
+
+        
       </div>
 
-      <div className="w-full max-w-2xl mx-auto relative z-10">
-      
-
-        {/* Main Card */}
-        <div className="glass-dark rounded-3xl shadow-2xl p-6 sm:p-8 mb-6 animate-slideInUp">
-          {/* Step Counter */}
-          <StepCounter steps={steps} goal={dailyStepsGoal} />
-
-          {/* Stats Summary */}
-          <StatsSummary steps={steps} goal={dailyStepsGoal} />
-
-          {/* Metrics Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-            <MetricCard 
-              icon={Footprints} 
-              label="Distance" 
-              value={`${distance.toFixed(2)} km`}
-              gradient="from-blue-500 to-cyan-600"
-            />
-            <MetricCard 
-              icon={Flame} 
-              label="Calories" 
-              value={`${calories.toFixed(0)}`}
-              gradient="from-orange-500 to-red-600"
-            />
-            <MetricCard 
-              icon={Clock} 
-              label="Active Time" 
-              value={formattedTime}
-              gradient="from-purple-500 to-pink-600"
-            />
-          </div>
-
-          {/* Controls */}
-          <div className="space-y-3 mb-6">
-            {!isTracking ? (
-              <div className="flex justify-center">
-                <button
-                  onClick={startTracking}
-                  className="inline-flex items-center justify-center space-x-2.5 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white shadow-xl shadow-emerald-500/50 hover:shadow-2xl hover:shadow-emerald-500/60 rounded-2xl px-8 py-5 text-base font-bold transition-all duration-300 transform hover:scale-105 active:scale-95"
-                >
-                  <Play className="w-6 h-6" />
-                  <span>Start Tracking</span>
-                </button>
-              </div>
-            ) : isPaused ? (
-              <>
-                <div className="flex justify-center">
-                  <button
-                    onClick={resumeTracking}
-                    className="inline-flex items-center justify-center space-x-2.5 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white shadow-xl shadow-emerald-500/50 hover:shadow-2xl hover:shadow-emerald-500/60 rounded-2xl px-8 py-5 text-base font-bold transition-all duration-300 transform hover:scale-105 active:scale-95"
-                  >
-                    <Play className="w-6 h-6" />
-                    <span>Resume Tracking</span>
-                  </button>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <ControlButton onClick={stopAndSave} variant="success" icon={Check} disabled={steps === 0}>
-                    Finish & Save
-                  </ControlButton>
-                  <ControlButton onClick={reset} variant="danger" icon={RotateCcw}>
-                    Reset
-                  </ControlButton>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="flex justify-center">
-                  <button
-                    onClick={pauseTracking}
-                    className="inline-flex items-center justify-center space-x-2.5 bg-white/[0.08] hover:bg-white/[0.12] text-white backdrop-blur-xl border border-white/20 hover:border-white/30 shadow-lg rounded-2xl px-8 py-5 text-base font-bold transition-all duration-300 transform hover:scale-105 active:scale-95"
-                  >
-                    <Pause className="w-6 h-6" />
-                    <span>Pause Tracking</span>
-                  </button>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <ControlButton onClick={stopAndSave} variant="success" icon={Check} disabled={steps === 0}>
-                    Finish & Save
-                  </ControlButton>
-                  <ControlButton onClick={reset} variant="danger" icon={RotateCcw}>
-                    Reset
-                  </ControlButton>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Status Indicator */}
-          <div className="flex items-center justify-center">
-            <div className="inline-flex items-center space-x-3 bg-white/5 backdrop-blur-md rounded-full px-6 py-3 border border-white/10">
-              <div className="relative">
-                <span className={`block w-3 h-3 rounded-full ${
-                  isTracking && !isPaused ? 'bg-emerald-400' : 
-                  isPaused ? 'bg-yellow-400' : 'bg-white/40'
-                }`}></span>
-                {isTracking && !isPaused && (
-                  <span className="absolute inset-0 w-3 h-3 rounded-full bg-emerald-400 animate-ping"></span>
-                )}
-              </div>
-              <span className="text-white/80 text-sm font-semibold">
-                {isTracking && !isPaused && 'Tracking Active'}
-                {isTracking && isPaused && 'Paused'}
-                {!isTracking && 'Ready to Start'}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Stats Footer */}
-        <div className="glass-dark rounded-2xl p-4 mb-6 animate-fadeIn">
-          <button 
-            onClick={onNavigateToStats}
-            className="w-full flex items-center justify-between hover:bg-white/5 transition-all duration-300 rounded-xl p-1 group"
-          >
-            <div className="flex items-center space-x-3">
-              <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-lg group-hover:scale-110 transition-transform duration-300">
-                <Activity className="w-4 h-4 text-white" />
-              </div>
-              <div className="text-left">
-                <div className="text-xs text-white/50 font-medium">Weekly Average</div>
-                <div className="text-sm font-bold text-white">
-                  {weeklyAverage > 0 ? `${weeklyAverage.toLocaleString()} steps` : 'No data yet'}
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center space-x-1 text-white/60 group-hover:text-white transition-colors">
-              <span className="text-sm font-medium">View Details</span>
-              <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
-            </div>
-          </button>
-        </div>
-
-        {/* Footer */}
-        <div className="text-center">
-          <button
-            onClick={() => setShowLicense(true)}
-            className="text-white/40 hover:text-white/60 text-xs font-medium transition-colors underline decoration-dotted"
-          >
-            © 2025 Rodney Austria - View License
-          </button>
-        </div>
-      </div>
+      <style jsx global>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        .animate-slideUpFade {
+          animation: fadeIn 0.4s ease-out forwards;
+        }
+      `}</style>
 
       <LicenseModal isOpen={showLicense} onClose={() => setShowLicense(false)} />
     </div>
+
+    
   );
 };
 
