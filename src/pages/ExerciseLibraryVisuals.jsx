@@ -11,7 +11,7 @@ import React, { useState, useEffect, useCallback, useRef, useContext } from 'rea
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Dumbbell, Loader2, AlertCircle, ChevronLeft, ChevronRight, 
-  Keyboard, Timer, ChevronRight as ChevronRightIcon 
+  Keyboard, Timer, ChevronRight as ChevronRightIcon, Search 
 } from 'lucide-react';
 import { fetchExercises, fetchExerciseDetails, getCategories } from '../api/exercises';
 import ExerciseFilters from '../components/ExerciseFilters';
@@ -20,10 +20,10 @@ import ExerciseModal from '../components/ExerciseModal';
 import { getTodayWorkout } from '../utils/db';
 
 // Context to access setCurrentPage from App.jsx
-import { AppContext } from '../App'; // ← Make sure this exists! (see note below)
+import { AppContext } from '../App'; 
 
 export default function ExerciseLibraryVisuals() {
-  const { setCurrentPage } = useContext(AppContext); // ← Gets navigation function
+  const { setCurrentPage } = useContext(AppContext); 
 
   const [exercises, setExercises] = useState([]);
   const [filteredExercises, setFilteredExercises] = useState([]);
@@ -31,6 +31,7 @@ export default function ExerciseLibraryVisuals() {
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState(''); // New debounced state
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedExercise, setSelectedExercise] = useState(null);
   const [page, setPage] = useState(0);
@@ -40,7 +41,7 @@ export default function ExerciseLibraryVisuals() {
   const [todayWorkoutCount, setTodayWorkoutCount] = useState(0);
   const containerRef = useRef(null);
 
-  const LIMIT = 25;
+  const LIMIT = 10; // Exercises per page
 
   // Load categories
   useEffect(() => {
@@ -67,6 +68,14 @@ export default function ExerciseLibraryVisuals() {
     return () => clearInterval(interval);
   }, []);
 
+  // Debounce Search Logic to prevent API spam
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
   // Fetch exercises
   const fetchPage = useCallback(async (pageNum) => {
     setLoading(true);
@@ -75,7 +84,7 @@ export default function ExerciseLibraryVisuals() {
     try {
       const result = await fetchExercises(pageNum, {
         bodyPart: selectedCategory !== 'All' ? selectedCategory : null,
-        search: searchQuery.trim() || null,
+        search: debouncedSearch.trim() || null, // Use debounced value
         limit: LIMIT
       });
 
@@ -100,11 +109,11 @@ export default function ExerciseLibraryVisuals() {
     } finally {
       setLoading(false);
     }
-  }, [selectedCategory, searchQuery]);
+  }, [selectedCategory, debouncedSearch]); // Depend on debouncedSearch
 
   useEffect(() => {
     fetchPage(0);
-  }, [selectedCategory, searchQuery]);
+  }, [selectedCategory, debouncedSearch]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -132,79 +141,125 @@ export default function ExerciseLibraryVisuals() {
     }
   };
 
+  // Memoize the grid to prevent re-renders when the 3s timer updates the workout count
+  const memoizedGrid = React.useMemo(() => (
+    <AnimatePresence mode="wait">
+      {loading ? (
+        <motion.div
+          key="loader"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="text-center py-24"
+        >
+          <Loader2 className="w-12 h-12 text-emerald-400 animate-spin mx-auto mb-4" />
+          <p className="text-white/60 text-lg">Loading page {page + 1}...</p>
+        </motion.div>
+      ) : (
+        <motion.div
+          key={page}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          transition={{ duration: 0.3 }}
+        >
+          <ExerciseGrid
+            exercises={filteredExercises}
+            loading={false}
+            onCardClick={handleCardClick}
+          />
+        </motion.div>
+      )}
+    </AnimatePresence>
+  ), [loading, page, filteredExercises]);
+
   return (
-        <div className="min-h-screen bg-gradient-to-br from-black-900 via-black-900 to-black-900 relative overflow-hidden">
-      {/* Animated Background */}
-      <div className="absolute inset-0 -z-10">
-        <motion.div
-          animate={{ scale: [1, 1.3, 1], opacity: [0.3, 0.5, 0.3] }}
-          transition={{ duration: 10, repeat: Infinity }}
-          className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-400/10 rounded-full blur-3xl"
-        />
-        <motion.div
-          animate={{ scale: [1.2, 1, 1.2], opacity: [0.4, 0.6, 0.4] }}
-          transition={{ duration: 8, repeat: Infinity, delay: 2 }}
-          className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-green-500/10 rounded-full blur-3xl"
-        />
+    <div className="min-h-screen bg-black text-white relative overflow-x-hidden selection:bg-emerald-500/30">
+      {/* Optimized Background - Static CSS blur is lighter on mobile GPU than JS animation */}
+      <div className="fixed inset-0 -z-10 pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[100px] opacity-40" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[100px] opacity-40" />
       </div>
 
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Clash+Display:wght@600;700&family=Satoshi:wght@400;500;700&display=swap');
-        .font-display { font-family: 'Clash Display', sans-serif; }
-        .font-body { font-family: 'Satoshi', sans-serif; }
+        @import url('https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;500;600;700&display=swap');
+        .font-apple { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        
+        /* Hide scrollbar for horizontal filters */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      <div className="px-4 py-10 md:px-8 lg:px-16 max-w-7xl mx-auto" ref={containerRef}>
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -40 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="text-center mb-12"
-        >
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-white flex items-center justify-center gap-4 mb-4">
-            <Dumbbell className="w-10 h-10 text-emerald-400" />
-            Exercise Library
-          </h1>
-          <p className="text-white/60 font-body text-lg mb-8">
-            {totalCount > 0 ? `${totalCount.toLocaleString()} exercises` : '1,300+ exercises'} • Page {page + 1} of {totalPages}
-          </p>
-
-          {/* INSTANT NAVIGATION BUTTON — USES YOUR APP'S ROUTING */}
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setCurrentPage('organizer')}
-            className="relative bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 px-10 py-5 rounded-2xl text-black font-bold text-xl shadow-2xl hover:shadow-emerald-500/50 transition-all flex items-center gap-4 mx-auto group cursor-pointer"
-          >
-            <Timer className="w-8 h-8 group-hover:rotate-12 transition-transform" />
-            Open Workout Organizer
-            <ChevronRightIcon className="w-6 h-6 group-hover:translate-x-2 transition-transform" />
-
-            {todayWorkoutCount > 0 && (
-              <motion.span
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                className="absolute -top-3 -right-3 bg-rose-500 text-white text-xs rounded-full w-9 h-9 flex items-center justify-center font-bold shadow-lg animate-pulse"
-              >
-                {todayWorkoutCount}
-              </motion.span>
-            )}
-          </motion.button>
-
-          {searchQuery && (
-            <p className="text-white/40 text-sm mt-6">
-              Found {filteredExercises.length} result{filteredExercises.length !== 1 ? 's' : ''} for "{searchQuery}"
+      <div className="px-4 pt-6 pb-24 md:px-6 lg:px-8 max-w-7xl mx-auto font-apple" ref={containerRef}>
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight mb-2">
+              Library
+            </h1>
+            <p className="text-white/60 font-medium">
+              {totalCount > 0 ? `${totalCount.toLocaleString()} Exercises` : 'Loading...'}
             </p>
+          </div>
+
+          {/* Search Bar - Apple Style */}
+          <div className="relative w-full md:w-72 group">
+            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+              <Search className="h-4 w-4 text-white/40 group-focus-within:text-emerald-400 transition-colors" />
+            </div>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search exercises..."
+              className="w-full bg-white/10 border border-white/5 focus:border-emerald-500/50 rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all"
+            />
+          </div>
+        </div>
+
+        {/* Featured Card: Workout Organizer */}
+        <motion.button
+          whileTap={{ scale: 0.98 }}
+          onClick={() => setCurrentPage('organizer')}
+          className="w-full relative overflow-hidden bg-gradient-to-br from-emerald-900/40 to-black border border-white/10 rounded-3xl p-6 mb-10 text-left group shadow-2xl shadow-black/50"
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+          
+          <div className="relative z-10 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="bg-emerald-500/20 p-3 rounded-2xl text-emerald-400">
+                <Timer className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-white">Current Workout</h3>
+                <p className="text-white/50 text-sm">
+                  {todayWorkoutCount > 0 
+                    ? `${todayWorkoutCount} exercises in progress` 
+                    : 'Start a new session'}
+                </p>
+              </div>
+            </div>
+            <div className="bg-white/10 p-2 rounded-full text-white/60 group-hover:bg-white/20 group-hover:text-white transition-all">
+              <ChevronRightIcon className="w-5 h-5" />
+            </div>
+          </div>
+          
+          {todayWorkoutCount > 0 && (
+            <div className="absolute top-4 right-4">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+              </span>
+            </div>
           )}
-        </motion.div>
+        </motion.button>
 
         {/* Error */}
         {error && (
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-2xl mb-8 max-w-3xl mx-auto flex items-center gap-3"
+            className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-2xl mb-8 flex items-center gap-3"
           >
             <AlertCircle className="w-5 h-5" />
             <span className="text-sm font-medium">{error}</span>
@@ -212,100 +267,54 @@ export default function ExerciseLibraryVisuals() {
           </motion.div>
         )}
 
-        {/* Filters */}
-        <ExerciseFilters
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          categories={categories}
-          selectedCategory={selectedCategory}
-          setSelectedCategory={setSelectedCategory}
-        />
+        {/* Categories - Horizontal Scroll (Apple Style Pills) */}
+        <div className="mb-8 -mx-4 px-4 md:mx-0 md:px-0 overflow-x-auto no-scrollbar">
+          <div className="flex gap-2 min-w-max pb-2">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => {
+                  setSelectedCategory(cat);
+                  setPage(0);
+                }}
+                className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ${
+                  selectedCategory === cat
+                    ? 'bg-white text-black shadow-lg shadow-white/10 scale-105'
+                    : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                {cat.charAt(0).toUpperCase() + cat.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
 
-        {/* Results Info */}
-        {!loading && filteredExercises.length > 0 && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center mb-6 text-white/50 text-sm">
-            {selectedCategory !== 'All' || searchQuery
-              ? `Showing ${filteredExercises.length} filtered exercise${filteredExercises.length !== 1 ? 's' : ''}`
-              : `Page ${page + 1} • ${LIMIT} per page`}
-          </motion.div>
-        )}
+        {/* Exercise Grid (Memoized) */}
+        {memoizedGrid}
 
-        {/* Exercise Grid */}
-        <AnimatePresence mode="wait">
-          {loading ? (
-            <motion.div
-              key="loader"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="text-center py-24"
-            >
-              <Loader2 className="w-12 h-12 text-emerald-400 animate-spin mx-auto mb-4" />
-              <p className="text-white/60 text-lg">Loading page {page + 1}...</p>
-            </motion.div>
-          ) : (
-            <motion.div
-              key={page}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
-            >
-              <ExerciseGrid
-                exercises={filteredExercises}
-                loading={false}
-                onCardClick={handleCardClick}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Pagination */}
+        {/* Pagination - Apple Style */}
         {totalPages > 1 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col items-center mt-12 mb-8"
-          >
-            <div className="text-white/60 text-sm mb-4 flex items-center gap-2">
-              <Keyboard className="w-4 h-4" />
-              <span>Use ← → arrows to navigate</span>
-            </div>
+          <div className="flex items-center justify-center gap-6 mt-12">
+            <button
+              onClick={goToPrevPage}
+              disabled={page === 0 || loading}
+              className="p-4 rounded-full bg-white/5 text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95"
+            >
+              <ChevronLeft className="w-6 h-6" />
+            </button>
 
-            <div className="flex items-center gap-4">
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={goToPrevPage}
-                disabled={page === 0 || loading}
-                className={`p-4 rounded-full transition-all ${
-                  page === 0
-                    ? 'bg-white/5 text-white/30 cursor-not-allowed'
-                    : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 shadow-lg hover:shadow-emerald-500/25'
-                }`}
-              >
-                <ChevronLeft className="w-8 h-8" />
-              </motion.button>
+            <span className="text-sm font-medium text-white/40">
+              Page <span className="text-white">{page + 1}</span> of {totalPages}
+            </span>
 
-              <div className="bg-white/10 backdrop-blur-md px-6 py-3 rounded-full border border-white/20 text-white font-bold text-lg min-w-[140px] text-center">
-                Page {page + 1} <span className="text-white/50">/ {totalPages}</span>
-              </div>
-
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={goToNextPage}
-                disabled={page >= totalPages - 1 || loading}
-                className={`p-4 rounded-full transition-all ${
-                  page >= totalPages - 1
-                    ? 'bg-white/5 text-white/30 cursor-not-allowed'
-                    : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 shadow-lg hover:shadow-emerald-500/25'
-                }`}
-              >
-                <ChevronRight className="w-8 h-8" />
-              </motion.button>
-            </div>
-          </motion.div>
+            <button
+              onClick={goToNextPage}
+              disabled={page >= totalPages - 1 || loading}
+              className="p-4 rounded-full bg-white/5 text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95"
+            >
+              <ChevronRight className="w-6 h-6" />
+            </button>
+          </div>
         )}
 
         {/* Empty State */}
@@ -331,7 +340,7 @@ export default function ExerciseLibraryVisuals() {
                     setSearchQuery('');
                     setSelectedCategory('All');
                   }}
-                  className="bg-gradient-to-r from-emerald-500 to-green-600 px-6 py-3 rounded-xl text-black font-medium"
+                  className="bg-white text-black px-6 py-3 rounded-xl font-medium"
                 >
                   Clear Filters
                 </motion.button>
@@ -341,18 +350,14 @@ export default function ExerciseLibraryVisuals() {
         )}
       </div>
 
-      {/* Loading Details */}
+      {/* Loading Details Overlay */}
       {loadingDetails && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md"
-        >
-          <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20">
-            <Loader2 className="w-10 h-10 text-emerald-400 animate-spin mx-auto mb-3" />
-            <p className="text-white text-center">Loading details...</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-zinc-900 rounded-2xl p-6 shadow-2xl border border-white/10 flex flex-col items-center">
+            <Loader2 className="w-8 h-8 text-emerald-400 animate-spin mb-3" />
+            <p className="text-white/80 text-sm font-medium">Loading details...</p>
           </div>
-        </motion.div>
+        </div>
       )}
 
       {/* Exercise Modal */}

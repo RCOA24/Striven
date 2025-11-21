@@ -341,7 +341,7 @@ export const fetchExercises = async (page = 0, options = {}) => {
     search = '',
     muscles = null,
     equipment = null,
-    limit = 25,
+    limit = 10,
     sortBy = 'name',
     sortOrder = 'asc',
     useCache = true

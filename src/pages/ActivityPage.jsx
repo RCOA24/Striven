@@ -5,229 +5,134 @@
  */
 
 import React, { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Calendar,
-  Footprints,
-  TrendingUp,
-  Zap,
-  Clock,
-  Trash2,
-  ChevronLeft,
-  ChevronRight,
-  Filter,
-  Target,
-  Award,
-  Flame,
-  X,
+  Calendar, Footprints, TrendingUp, Flame, Trash2,
+  ChevronLeft, ChevronRight, MapPin
 } from 'lucide-react';
 import LicenseModal from '../components/LicenseModal';
 
-const GOAL_STEPS = 10000;   // unified goal
+const GOAL_STEPS = 10000;
+
+// --- Apple Design Constants ---
+const COLORS = {
+  bg: 'bg-black',
+  card: 'bg-[#1c1c1e]',
+  move: 'text-[#fa114f]',    // Red
+  exercise: 'text-[#a4ff00]',// Green
+  stand: 'text-[#00c7fc]',   // Blue
+  gold: 'text-[#ffd60a]',    // Gold
+  textSub: 'text-[#8e8e93]',
+  border: 'border-[#2c2c2e]'
+};
 
 /* -------------------------------------------------------------------------- */
-/*                               ACTIVITY CARD                               */
+/*                             ACTIVITY CARD                                  */
 /* -------------------------------------------------------------------------- */
 const ActivityCard = ({ activity, onDelete }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
 
   const formatDate = (dateString) => {
     const d = new Date(dateString);
     return d.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+      weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
     });
   };
 
-  const formatDuration = (seconds) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-
-    if (hrs > 0) return `${hrs}h ${mins}m`;
-    if (mins > 0) return `${mins}m ${secs}s`;
-    return `${secs}s`;
-  };
-
-  const handleDelete = async () => {
-    setIsDeleting(true);
-    await onDelete(activity.id);
-    setShowDeleteConfirm(false);
-  };
-
-  const goalPercentage = Math.min((activity.steps / GOAL_STEPS) * 100, 100);
-  const goalReached = activity.steps >= GOAL_STEPS;
+  const goalPercent = Math.min((activity.steps / GOAL_STEPS) * 100, 100);
 
   return (
     <>
-      <div className="group relative animate-slideInUp">
-        <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/0 via-emerald-500/10 to-emerald-500/0 rounded-3xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-
-        <div className="relative bg-gradient-to-br from-white/[0.12] to-white/[0.05] backdrop-blur-2xl rounded-3xl p-6 border border-white/20 hover:border-white/30 transition-all duration-300 shadow-xl hover:shadow-2xl hover:scale-[1.02] transform">
-          {/* Header */}
-          <div className="flex items-start justify-between mb-5">
-            <div className="flex-1">
-              <div className="flex items-center space-x-3 mb-3">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-green-500 rounded-2xl blur-md opacity-60"></div>
-                  <div className="relative bg-gradient-to-br from-emerald-400 to-green-500 p-3 rounded-2xl">
-                    <Footprints className="w-6 h-6 text-white" />
-                  </div>
-                </div>
-                <div>
-                  <div className="text-white font-bold text-2xl">
-                    {activity.steps.toLocaleString()}
-                  </div>
-                  <div className="text-xs text-white/60 uppercase tracking-wider font-semibold">steps</div>
-                </div>
-              </div>
-
-              {/* Goal Progress / Medal */}
-              {goalReached ? (
-                <div className="flex items-center justify-center space-x-3 py-3">
-                  <div className="relative">
-                    <div className="absolute inset-0 bg-gradient-to-br from-yellow-400 to-amber-600 rounded-full blur-xl opacity-80 animate-pulse"></div>
-                    <div className="relative bg-gradient-to-br from-yellow-400 to-amber-600 p-3 rounded-full shadow-xl">
-                      <Award className="w-8 h-8 text-white" />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-yellow-400 font-bold text-lg">Goal Achieved!</div>
-                    <div className="text-white/70 text-sm">10,000 steps completed</div>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="bg-white/10 rounded-full h-2 overflow-hidden mb-2">
-                    <div
-                      className="h-full bg-gradient-to-r from-emerald-400 to-green-500 rounded-full transition-all duration-1000 relative"
-                      style={{ width: `${goalPercentage}%` }}
-                    >
-                      <div className="absolute inset-0 bg-white/30 animate-shimmer"></div>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-white/70">{goalPercentage.toFixed(0)}% of daily goal</span>
-                    <span className="text-white/50 text-xs">10,000 steps</span>
-                  </div>
-                </>
-              )}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }} 
+        animate={{ opacity: 1, y: 0 }}
+        className={`relative ${COLORS.card} rounded-2xl p-5 mb-4 active:scale-[0.99] transition-transform touch-manipulation`}
+      >
+        {/* Top Row: Icon & Date */}
+        <div className="flex justify-between items-start mb-4">
+          <div className="flex gap-3">
+            <div className="w-10 h-10 rounded-full bg-[#a4ff00]/10 flex items-center justify-center text-[#a4ff00]">
+              <Footprints size={20} fill="currentColor" />
             </div>
-
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="p-2.5 hover:bg-red-500/20 rounded-xl transition-all group/delete ml-4 hover:scale-110"
-              title="Delete activity"
-            >
-              <Trash2 className="w-5 h-5 text-white/40 group-hover/delete:text-red-400 transition-colors" />
-            </button>
-          </div>
-
-          {/* Date & Time */}
-          <div className="flex items-center space-x-2 mb-5 text-sm text-white/50">
-            <Clock className="w-4 h-4" />
-            <span>{formatDate(activity.date)}</span>
-          </div>
-
-          {/* Stats Grid */}
-          <div className="grid grid-cols-3 gap-3">
-            {/* Distance */}
-            <div className="relative group/stat">
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-2xl blur-lg opacity-0 group-hover/stat:opacity-100 transition-opacity"></div>
-              <div className="relative bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-2xl p-4 text-center border border-blue-400/20 hover:border-blue-400/40 transition-all">
-                <div className="bg-gradient-to-br from-blue-400 to-cyan-500 p-2 rounded-xl w-fit mx-auto mb-2">
-                  <TrendingUp className="w-4 h-4 text-white" />
-                </div>
-                <div className="text-white font-bold text-lg mb-1">{activity.distance.toFixed(2)}</div>
-                <div className="text-white/50 text-xs uppercase tracking-wider font-semibold">km</div>
-              </div>
-            </div>
-
-            {/* Calories */}
-            <div className="relative group/stat">
-              <div className="absolute inset-0 bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-2xl blur-lg opacity-0 group-hover/stat:opacity-100 transition-opacity"></div>
-              <div className="relative bg-gradient-to-br from-orange-500/10 to-red-500/10 rounded-2xl p-4 text-center border border-orange-400/20 hover:border-orange-400/40 transition-all">
-                <div className="bg-gradient-to-br from-orange-400 to-red-500 p-2 rounded-xl w-fit mx-auto mb-2">
-                  <Flame className="w-4 h-4 text-white" />
-                </div>
-                <div className="text-white font-bold text-lg mb-1">{Math.round(activity.calories)}</div>
-                <div className="text-white/50 text-xs uppercase tracking-wider font-semibold">kcal</div>
-              </div>
-            </div>
-
-            {/* Duration */}
-            <div className="relative group/stat">
-              <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-2xl blur-lg opacity-0 group-hover/stat:opacity-100 transition-opacity"></div>
-              <div className="relative bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-2xl p-4 text-center border border-purple-400/20 hover:border-purple-400/40 transition-all">
-                <div className="bg-gradient-to-br from-purple-400 to-pink-500 p-2 rounded-xl w-fit mx-auto mb-2">
-                  <Clock className="w-4 h-4 text-white" />
-                </div>
-                <div className="text-white font-bold text-lg mb-1">{formatDuration(activity.duration)}</div>
-                <div className="text-white/50 text-xs uppercase tracking-wider font-semibold">time</div>
-              </div>
+            <div>
+              <div className="text-white font-bold text-lg leading-tight">Walking</div>
+              <div className={`${COLORS.textSub} text-xs font-medium`}>{formatDate(activity.date)}</div>
             </div>
           </div>
+          
+          <button 
+            onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(true); }}
+            className="w-8 h-8 rounded-full bg-[#3a3a3c] flex items-center justify-center text-[#ff453a] active:opacity-50"
+          >
+            <Trash2 size={16} />
+          </button>
         </div>
-      </div>
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setShowDeleteConfirm(false)}></div>
+        {/* Stats Grid */}
+        <div className="grid grid-cols-3 gap-4 mb-4">
+           <div>
+             <div className="text-2xl font-bold text-white font-mono tracking-tight tabular-nums">
+               {activity.steps.toLocaleString()}
+             </div>
+             <div className={`${COLORS.textSub} text-[10px] font-bold uppercase tracking-wider`}>Steps</div>
+           </div>
+           <div>
+             <div className="text-2xl font-bold text-[#fa114f] font-mono tracking-tight tabular-nums">
+               {Math.round(activity.calories)}
+             </div>
+             <div className={`${COLORS.textSub} text-[10px] font-bold uppercase tracking-wider`}>KCAL</div>
+           </div>
+           <div>
+             <div className="text-2xl font-bold text-[#00c7fc] font-mono tracking-tight tabular-nums">
+               {activity.distance.toFixed(2)}
+             </div>
+             <div className={`${COLORS.textSub} text-[10px] font-bold uppercase tracking-wider`}>KM</div>
+           </div>
+        </div>
 
-          <div className="relative bg-gradient-to-br from-slate-900/95 to-slate-800/95 backdrop-blur-xl rounded-3xl p-8 max-w-md w-full border border-white/20 shadow-2xl animate-scaleIn">
-            <button
+        {/* Progress Bar */}
+        <div className="w-full bg-[#3a3a3c] h-1.5 rounded-full overflow-hidden">
+          <motion.div 
+            initial={{ width: 0 }}
+            animate={{ width: `${goalPercent}%` }}
+            className="h-full bg-[#a4ff00] rounded-full"
+          />
+        </div>
+      </motion.div>
+
+      {/* Delete Confirmation Sheet */}
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setShowDeleteConfirm(false)}
-              className="absolute top-4 right-4 p-2 hover:bg-white/10 rounded-xl transition-colors"
+              className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+              className={`fixed bottom-0 left-0 right-0 ${COLORS.card} rounded-t-[2rem] p-6 z-50 border-t ${COLORS.border}`}
             >
-              <X className="w-5 h-5 text-white/60" />
-            </button>
-
-            <div className="flex items-center space-x-4 mb-6">
-              <div className="relative">
-                <div className="absolute inset-0 bg-red-500 rounded-2xl blur-xl opacity-60"></div>
-                <div className="relative bg-gradient-to-br from-red-500 to-rose-600 p-4 rounded-2xl">
-                  <Trash2 className="w-8 h-8 text-white" />
-                </div>
+              <h3 className="text-xl font-bold text-white text-center mb-2">Delete Activity?</h3>
+              <p className={`${COLORS.textSub} text-center text-sm mb-6`}>This action cannot be undone.</p>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 py-3.5 bg-[#3a3a3c] rounded-xl font-bold text-white active:scale-95 transition-transform"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => { onDelete(activity.id); setShowDeleteConfirm(false); }}
+                  className="flex-1 py-3.5 bg-[#ff453a] rounded-xl font-bold text-white active:scale-95 transition-transform shadow-lg shadow-red-900/20"
+                >
+                  Delete
+                </button>
               </div>
-              <div>
-                <h3 className="text-2xl font-bold text-white mb-1">Delete Activity?</h3>
-                <p className="text-white/60 text-sm">This action cannot be undone</p>
-              </div>
-            </div>
-
-            <div className="bg-white/5 rounded-2xl p-4 mb-6 border border-white/10">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-white/70 text-sm">Steps</span>
-                <span className="text-white font-bold">{activity.steps.toLocaleString()}/(&#x27;)</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-white/70 text-sm">Date</span>
-                <span className="text-white font-medium text-sm">{formatDate(activity.date)}</span>
-              </div>
-            </div>
-
-            <div className="flex space-x-3">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 px-6 py-4 bg-white/10 hover:bg-white/20 text-white rounded-2xl font-semibold transition-all hover:scale-105 active:scale-95"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={isDeleting}
-                className="flex-1 px-6 py-4 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white rounded-2xl font-semibold transition-all hover:scale-105 active:scale-95 shadow-lg shadow-red-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isDeleting ? 'Deleting...' : 'Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </>
   );
 };
@@ -244,150 +149,97 @@ const CalendarView = ({ activities, selectedDate, onDateSelect }) => {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const daysArray = [];
-
-    const startWeekDay = firstDay.getDay();
-    for (let i = 0; i < startWeekDay; i++) daysArray.push(null);
-    for (let d = 1; d <= lastDay.getDate(); d++) {
-      daysArray.push(new Date(year, month, d));
-    }
+    for (let i = 0; i < firstDay.getDay(); i++) daysArray.push(null);
+    for (let d = 1; d <= lastDay.getDate(); d++) daysArray.push(new Date(year, month, d));
     return daysArray;
   }, [currentMonth]);
 
-  const getActivitiesForDate = (date) => {
-    if (!date) return [];
-    return activities.filter(
-      (a) => new Date(a.date).toDateString() === date.toDateString()
-    );
-  };
+  const isSelected = (d) => selectedDate && d && d.toDateString() === selectedDate.toDateString();
+  const isToday = (d) => d && d.toDateString() === new Date().toDateString();
 
-  const previousMonth = () => {
-    setCurrentMonth(
-      new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1)
-    );
-  };
-  const nextMonth = () => {
-    setCurrentMonth(
-      new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1)
-    );
-  };
+  const getDayStatus = (date) => {
+    if (!date) return null;
+    const dayActivities = activities.filter(a => new Date(a.date).toDateString() === date.toDateString());
+    if (dayActivities.length === 0) return null;
 
-  const isToday = (date) =>
-    date && date.toDateString() === new Date().toDateString();
-
-  const isSelected = (date) =>
-    date && selectedDate && date.toDateString() === selectedDate.toDateString();
+    const totalSteps = dayActivities.reduce((acc, curr) => acc + curr.steps, 0);
+    return totalSteps >= GOAL_STEPS ? 'goal' : 'active';
+  };
 
   return (
-    <div className="relative group">
-      <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-blue-500/10 rounded-3xl blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+    <div className={`${COLORS.card} rounded-[2rem] p-5 mb-6`}>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6 px-2">
+        <h3 className="text-xl font-bold text-white">
+          {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+        </h3>
+        <div className="flex gap-1">
+          <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))} className="p-2 rounded-full hover:bg-[#3a3a3c] text-[#a4ff00]">
+            <ChevronLeft size={20} />
+          </button>
+          <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))} className="p-2 rounded-full hover:bg-[#3a3a3c] text-[#a4ff00]">
+            <ChevronRight size={20} />
+          </button>
+        </div>
+      </div>
 
-      <div className="relative bg-gradient-to-br from-white/[0.12] to-white/[0.05] backdrop-blur-2xl rounded-3xl p-6 border border-white/20 shadow-xl">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-3">
-            <div className="bg-gradient-to-br from-purple-500 to-blue-600 p-2.5 rounded-xl">
-              <Calendar className="w-5 h-5 text-white" />
-            </div>
-            <h3 className="text-white font-bold text-xl">
-              {currentMonth.toLocaleDateString('en-US', {
-                month: 'long',
-                year: 'numeric',
-              })}
-            </h3>
-          </div>
-          <div className="flex space-x-2">
+      {/* Grid Labels */}
+      <div className="grid grid-cols-7 gap-1 mb-2 text-center">
+        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => (
+          <div key={d} className="text-[10px] font-bold text-[#8e8e93] uppercase">{d}</div>
+        ))}
+      </div>
+
+      {/* Days Grid */}
+      <div className="grid grid-cols-7 gap-1 mb-6">
+        {daysInMonth.map((date, i) => {
+          if (!date) return <div key={`e-${i}`} />;
+          
+          const status = getDayStatus(date);
+          const selected = isSelected(date);
+          const today = isToday(date);
+          
+          return (
             <button
-              onClick={previousMonth}
-              className="p-2.5 hover:bg-white/10 rounded-xl transition-all hover:scale-110 active:scale-95"
+              key={date.toISOString()}
+              onClick={() => onDateSelect(date)}
+              className={`
+                relative h-10 w-10 rounded-full flex items-center justify-center text-sm font-bold transition-all
+                ${selected 
+                  ? 'bg-white text-black scale-105 shadow-lg shadow-white/20' // CHANGED: White for selection
+                  : today 
+                    ? 'bg-[#ff453a] text-white' 
+                    : 'text-white hover:bg-[#3a3a3c]'
+                }
+              `}
             >
-              <ChevronLeft className="w-5 h-5 text-white" />
+              {date.getDate()}
+              
+              {/* Indicators (Only show if NOT selected to keep UI clean) */}
+              {!selected && status === 'goal' && (
+                 <div className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-[#ffd60a] shadow-[0_0_4px_#ffd60a]" />
+              )}
+              {!selected && status === 'active' && (
+                 <div className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-[#a4ff00]" />
+              )}
             </button>
-            <button
-              onClick={nextMonth}
-              className="p-2.5 hover:bg-white/10 rounded-xl transition-all hover:scale-110 active:scale-95"
-            >
-              <ChevronRight className="w-5 h-5 text-white" />
-            </button>
-          </div>
+          );
+        })}
+      </div>
+
+      {/* Legend */}
+      <div className="flex items-center justify-center gap-6 pt-4 border-t border-white/5">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-[#ff453a]" />
+          <span className="text-[10px] font-bold text-[#8e8e93] uppercase tracking-wide">Today</span>
         </div>
-
-        {/* Weekday labels */}
-        <div className="grid grid-cols-7 gap-2 mb-3">
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-            <div
-              key={d}
-              className="text-center text-xs font-bold text-white/60 py-2 uppercase tracking-wider"
-            >
-              {d}
-            </div>
-          ))}
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-[#a4ff00]" />
+          <span className="text-[10px] font-bold text-[#8e8e93] uppercase tracking-wide">Active</span>
         </div>
-
-        {/* Days grid */}
-        <div className="grid grid-cols-7 gap-2">
-          {daysInMonth.map((date, i) => {
-            if (!date) return <div key={`empty-${i}`} className="aspect-square" />;
-
-            const dayActs = getActivitiesForDate(date);
-            const hasActivities = dayActs.length > 0;
-            const totalSteps = dayActs.reduce((s, a) => s + a.steps, 0);
-            const goalReached = totalSteps >= GOAL_STEPS;
-
-            return (
-              <button
-                key={date.toISOString()}
-                onClick={() => onDateSelect(date)}
-                className={`
-                  aspect-square rounded-xl p-2 transition-all relative transform hover:scale-110 flex flex-col items-center justify-center
-                  ${isSelected(date)
-                    ? 'bg-gradient-to-br from-purple-500-500 to-blue-500 text-white shadow-lg shadow-purple-500/50 scale-105'
-                    : isToday(date)
-                    ? 'bg-white/20 text-white border-2 border-white/50 font-bold'
-                    : goalReached
-                    ? 'bg-gradient-to-br from-yellow-500/40 to-amber-600/40 text-white border border-yellow-400/40 shadow-lg shadow-yellow-500/30 hover:from-yellow-500/50 hover:to-amber-600/50'
-                    : hasActivities
-                    ? 'bg-gradient-to-br from-emerald-500/20 to-green-500/20 text-white border border-emerald-400/20 hover:from-emerald-500/30 hover:to-green-500/30'
-                    : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
-                  }
-                `}
-              >
-                <span className="text-sm font-semibold">{date.getDate()}</span>
-
-                {/* Trophy or dot */}
-                {hasActivities && (
-                  <div className="absolute bottom-1 left-1/2 -translate-x-1/2">
-                    {goalReached ? (
-                      <div className="relative">
-                        <div className="absolute inset-0 bg-yellow-400 blur-md opacity-70 animate-pulse" />
-                        <Award className="relative w-4 h-4 text-yellow-300 drop-shadow-lg z-10" />
-                      </div>
-                    ) : (
-                      <div className="w-2 h-2 bg-emerald-400 rounded-full shadow-lg shadow-emerald-400/50" />
-                    )}
-                  </div>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Legend */}
-        <div className="flex items-center justify-center space-x-6 mt-6 text-xs text-white/70">
-          <div className="flex items-center space-x-2">
-            <div className="w-4 h-4 bg-white/20 rounded-lg border-2 border-white/50"></div>
-            <span className="font-medium">Today</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-4 h-4 bg-gradient-to-br from-emerald-500/30 to-green-500/30 rounded-lg border border-emerald-400/30"></div>
-            <span className="font-medium">Active</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="relative">
-              <div className="absolute inset-0 bg-yellow-400 blur-sm opacity-70"></div>
-              <Award className="w-4 h-4 text-yellow-400 relative z-10" />
-            </div>
-            <span className="font-medium">Goal Reached</span>
-          </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-[#ffd60a] shadow-[0_0_6px_rgba(255,214,10,0.5)]" />
+          <span className="text-[10px] font-bold text-[#8e8e93] uppercase tracking-wide">Goal Reached</span>
         </div>
       </div>
     </div>
@@ -397,31 +249,14 @@ const CalendarView = ({ activities, selectedDate, onDateSelect }) => {
 /* -------------------------------------------------------------------------- */
 /*                               MAIN PAGE                                    */
 /* -------------------------------------------------------------------------- */
-const ActivityPage = ({
-  activities = [],
-  onDeleteActivity,
-  onRefresh,
-}) => {
+const ActivityPage = ({ activities = [], onDeleteActivity, onRefresh }) => {
   const [selectedDate, setSelectedDate] = useState(null);
-  const [filterMode, setFilterMode] = useState('all');
   const [showLicense, setShowLicense] = useState(false);
 
   const filteredActivities = useMemo(() => {
-    if (filterMode === 'all' || !selectedDate) return activities;
-    return activities.filter(
-      (a) => new Date(a.date).toDateString() === selectedDate.toDateString()
-    );
-  }, [activities, selectedDate, filterMode]);
-
-  const handleDateSelect = (date) => {
-    setSelectedDate(date);
-    setFilterMode('date');
-  };
-
-  const clearFilter = () => {
-    setSelectedDate(null);
-    setFilterMode('all');
-  };
+    if (!selectedDate) return activities;
+    return activities.filter(a => new Date(a.date).toDateString() === selectedDate.toDateString());
+  }, [activities, selectedDate]);
 
   const handleDelete = async (id) => {
     if (onDeleteActivity) {
@@ -430,162 +265,102 @@ const ActivityPage = ({
     }
   };
 
-  const totalSteps = filteredActivities.reduce((s, a) => s + a.steps, 0);
-  const totalDistance = filteredActivities.reduce((s, a) => s + a.distance, 0);
-  const totalCalories = filteredActivities.reduce((s, a) => s + a.calories, 0);
+  const stats = {
+    steps: filteredActivities.reduce((s, a) => s + a.steps, 0),
+    dist: filteredActivities.reduce((s, a) => s + a.distance, 0),
+    cal: filteredActivities.reduce((s, a) => s + a.calories, 0)
+  };
 
   return (
-    <div className="min-h-screen w-full px-4 py-8 relative">
-      {/* Animated BG blobs */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-20 left-10 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl animate-float"></div>
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }}></div>
-        <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '4s' }}></div>
+    <div className={`min-h-screen ${COLORS.bg} text-white font-sans pb-12`}>
+      
+      {/* Title Header */}
+      <div className="pt-12 pb-6 px-6">
+        <h1 className="text-4xl font-black tracking-tight text-white">History</h1>
+        <p className={`${COLORS.textSub} font-medium`}>Your recent workouts</p>
       </div>
 
-      <div className="w-full max-w-4xl mx-auto space-y-6 relative z-10">
-        {/* Header */}
-        <div className="mb-8 animate-slideInDown">
-          <div className="flex items-center space-x-4 mb-3">
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-green-500 rounded-3xl blur-xl opacity-60"></div>
-              <div className="relative bg-gradient-to-br from-emerald-400 to-green-500 p-4 rounded-3xl shadow-2xl">
-                <Calendar className="w-8 h-8 text-white" />
-              </div>
-            </div>
-            <div>
-              <h1 className="text-4xl sm:text-5xl font-bold text-white mb-1">Activity History</h1>
-              <p className="text-white/60 font-medium">Track your fitness journey</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Summary Stats */}
+      <div className="max-w-2xl mx-auto px-4">
+        
+        {/* Summary Cards */}
         {filteredActivities.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 animate-fadeIn">
-            {/* Steps */}
-            <div className="relative group">
-              <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/20 to-green-500/20 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              <div className="relative bg-gradient-to-br from-white/[0.12] to-white/[0.05] backdrop-blur-xl rounded-2xl p-5 border border-white/20 hover:border-emerald-400/40 transition-all">
-                <div className="flex items-center space-x-3 mb-2">
-                  <div className="bg-gradient-to-br from-emerald-400 to-green-500 p-2 rounded-xl">
-                    <Footprints className="w-5 h-5 text-white" />
-                  </div>
-                  <span className="text-white/60 text-sm font-semibold uppercase tracking-wider">Total Steps</span>
-                </div>
-                <div className="text-3xl font-bold text-white">{totalSteps.toLocaleString()}</div>
+          <div className="grid grid-cols-3 gap-3 mb-6">
+            <div className={`${COLORS.card} rounded-2xl p-3 flex flex-col justify-between min-h-[90px]`}>
+              <div className="flex justify-between items-start">
+                <span className="text-[10px] font-bold uppercase text-[#8e8e93]">Steps</span>
+                <Footprints size={14} className={COLORS.exercise} />
               </div>
+              <div className="text-xl font-bold font-mono tracking-tight tabular-nums">{stats.steps.toLocaleString()}</div>
             </div>
 
-            {/* Distance */}
-            <div className="relative group">
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              <div className="relative bg-gradient-to-br from-white/[0.12] to-white/[0.05] backdrop-blur-xl rounded-2xl p-5 border border-white/20 hover:border-blue-400/40 transition-all">
-                <div className="flex items-center space-x-3 mb-2">
-                  <div className="bg-gradient-to-br from-blue-400 to-cyan-500 p-2 rounded-xl">
-                    <TrendingUp className="w-5 h-5 text-white" />
-                  </div>
-                  <span className="text-white/60 text-sm font-semibold uppercase tracking-wider">Distance</span>
-                </div>
-                <div className="text-3xl font-bold text-white">{totalDistance.toFixed(1)} km</div>
+            <div className={`${COLORS.card} rounded-2xl p-3 flex flex-col justify-between min-h-[90px]`}>
+              <div className="flex justify-between items-start">
+                <span className="text-[10px] font-bold uppercase text-[#8e8e93]">Dist</span>
+                <MapPin size={14} className={COLORS.stand} />
               </div>
+              <div className="text-xl font-bold font-mono tracking-tight tabular-nums">{stats.dist.toFixed(1)}<span className="text-xs ml-0.5">km</span></div>
             </div>
 
-            {/* Calories */}
-            <div className="relative group">
-              <div className="absolute inset-0 bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              <div className="relative bg-gradient-to-br from-white/[0.12] to-white/[0.05] backdrop-blur-xl rounded-2xl p-5 border border-white/20 hover:border-orange-400/40 transition-all">
-                <div className="flex items-center space-x-3 mb-2">
-                  <div className="bg-gradient-to-br from-orange-400 to-red-500 p-2 rounded-xl">
-                    <Flame className="w-4 h-4 text-white" />
-                  </div>
-                  <span className="text-white/60 text-sm font-semibold uppercase tracking-wider">Calories</span>
-                </div>
-                <div className="text-3xl font-bold text-white">{Math.round(totalCalories).toLocaleString()}</div>
+             <div className={`${COLORS.card} rounded-2xl p-3 flex flex-col justify-between min-h-[90px]`}>
+              <div className="flex justify-between items-start">
+                <span className="text-[10px] font-bold uppercase text-[#8e8e93]">Cals</span>
+                <Flame size={14} className={COLORS.move} />
               </div>
+              <div className="text-xl font-bold font-mono tracking-tight tabular-nums">{Math.round(stats.cal)}</div>
             </div>
           </div>
         )}
 
         {/* Calendar */}
-        <div className="animate-slideInUp">
-          <CalendarView
-            activities={activities}
-            selectedDate={selectedDate}
-            onDateSelect={handleDateSelect}
-          />
-        </div>
+        <CalendarView 
+          activities={activities} 
+          selectedDate={selectedDate} 
+          onDateSelect={setSelectedDate} 
+        />
 
-        {/* Filter status */}
-        {filterMode === 'date' && selectedDate && (
-          <div className="bg-gradient-to-r from-purple-500/20 to-blue-500/20 backdrop-blur-xl rounded-2xl p-5 border border-purple-400/30 flex items-center justify-between animate-slideInUp">
-            <div className="flex items-center space-x-3">
-              <div className="bg-gradient-to-br from-purple-500 to-blue-600 p-2 rounded-xl">
-                <Filter className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-white font-semibold">
-                {selectedDate.toLocaleDateString('en-US', {
-                  month: 'long',
-                  day: 'numeric',
-                  year: 'numeric',
-                })}
+        {/* Active Filter Bar */}
+        {selectedDate && (
+          <div className="flex items-center justify-between bg-[#2c2c2e] rounded-xl p-4 mb-6 animate-in fade-in slide-in-from-top-4">
+            <div className="flex items-center gap-3">
+              <Calendar size={18} className="text-[#a4ff00]" />
+              <span className="font-bold text-sm">
+                {selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
               </span>
             </div>
-            <button
-              onClick={clearFilter}
-              className="px-5 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl font-semibold transition-all hover:scale-105 active:scale-95 border border-white/20"
+            <button 
+              onClick={() => setSelectedDate(null)} 
+              className="text-xs font-bold text-[#a4ff00] uppercase tracking-wide px-2 py-1 hover:bg-white/10 rounded-lg"
             >
-              Show All
+              Clear
             </button>
           </div>
         )}
 
-        {/* Activities list */}
+        {/* List */}
         <div className="space-y-4">
+          <h2 className="text-lg font-bold text-white px-1">
+            {filteredActivities.length > 0 ? 'Workouts' : ''}
+          </h2>
+          
           {filteredActivities.length === 0 ? (
-            <div className="bg-gradient-to-br from-white/[0.12] to-white/[0.05] backdrop-blur-2xl rounded-3xl p-16 border border-white/20 text-center animate-fadeIn">
-              <div className="relative inline-block mb-6">
-                <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-white/10 rounded-full blur-2xl"></div>
-                <div className="relative bg-gradient-to-br from-white/10 to-white/5 p-8 rounded-full">
-                  <Footprints className="w-20 h-20 text-white/30" />
-                </div>
-              </div>
-              <h3 className="text-2xl font-bold text-white mb-3">
-                {filterMode === 'date' ? 'No Activities on This Date' : 'No Activities Yet'}
-              </h3>
-              <p className="text-white/60 text-lg max-w-md mx-auto">
-                {filterMode === 'date'
-                  ? 'Select a different date or clear the filter to see all activities.'
-                  : 'Start tracking your steps to see your activity history here!'}
-              </p>
+            <div className="text-center py-12">
+               <div className="w-16 h-16 rounded-full bg-[#1c1c1e] flex items-center justify-center mx-auto mb-4">
+                  <Calendar className="text-[#8e8e93]" size={32} />
+               </div>
+               <h3 className="text-white font-bold text-lg">No Workouts</h3>
+               <p className="text-[#8e8e93] text-sm mt-1">There is no activity data for this period.</p>
             </div>
           ) : (
-            <>
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-white flex items-center space-x-3">
-                  <Target className="w-7 h-7 text-emerald-400" />
-                  <span>
-                    {filteredActivities.length} {filteredActivities.length === 1 ? 'Activity' : 'Activities'}
-                  </span>
-                </h2>
-              </div>
-
-              {filteredActivities.map((act, idx) => (
-                <div key={act.id} style={{ animationDelay: `${idx * 0.1}s` }}>
-                  <ActivityCard activity={act} onDelete={handleDelete} />
-                </div>
-              ))}
-            </>
+            filteredActivities.map((act) => (
+              <ActivityCard key={act.id} activity={act} onDelete={handleDelete} />
+            ))
           )}
         </div>
 
         {/* Footer */}
-        <div className="text-center pt-8">
-          <button
-            onClick={() => setShowLicense(true)}
-            className="text-white/40 hover:text-white/60 text-sm font-medium transition-colors underline decoration-dotted"
-          >
-            © 2025 Rodney Austria - View License
+        <div className="text-center py-8">
+          <button onClick={() => setShowLicense(true)} className="text-[#48484a] text-xs font-medium hover:text-white transition-colors">
+            Striven v1.0 • License
           </button>
         </div>
       </div>

@@ -2,127 +2,101 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Pause, SkipForward, TrendingUp, Trash2, X, AlertTriangle, 
-  Play, Timer, Zap, Award, Calendar, Target, ChevronRight, ImageOff
+  SkipForward, TrendingUp, Trash2, X, AlertTriangle, 
+  Target, Award, Calendar, ChevronRight, Zap, Clock, Dumbbell
 } from 'lucide-react';
 import { PRBadge } from '../ui/PRBadge';
 import { TimerDisplay } from '../ui/TimerDisplay';
 import SetLogger from '../ui/SetLogger';
 import { clearExercisePR } from '../../../utils/db';
 
-// Inline SVG Fallback (No external request, no spam)
-const FALLBACK_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400" fill="none">
-  <rect width="600" height="400" fill="%23111111"/>
-  <path d="M150 100 L450 100 L450 300 L150 300 Z" stroke="%23ffffff" stroke-width="4" fill="none"/>
-  <circle cx="300" cy="200" r="60" stroke="%23ffffff" stroke-width="4" fill="none"/>
-  <path d="M270 180 L270 220 M330 180 L330 220" stroke="%23ffffff" stroke-width="6" stroke-linecap="round"/>
-  <text x="300" y="350" font-family="system-ui, sans-serif" font-size="28" font-weight="bold" fill="%23ffffff" text-anchor="middle">No GIF Available</text>
-  <text x="300" y="380" font-family="system-ui, sans-serif" font-size="18" fill="%23666" text-anchor="middle">Exercise demo not found</text>
-</svg>`;
+// --- CONSTANTS & ASSETS ---
 
-// Animated Progress Ring
+const FALLBACK_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400" fill="none"><rect width="600" height="400" fill="%231c1c1e"/><path d="M300 150 L300 250" stroke="%233a3a3c" stroke-width="4"/><path d="M250 200 L350 200" stroke="%233a3a3c" stroke-width="4"/><text x="300" y="320" font-family="system-ui" font-size="14" fill="%238e8e93" text-anchor="middle">No Preview Available</text></svg>`;
+
+// --- REUSABLE COMPONENTS ---
+
+// Apple-style Circular Progress (SVG Optimized)
 const ProgressRing = ({ progress, total }) => {
-  const percentage = (progress / total) * 100;
-  const circumference = 2 * Math.PI * 45;
-  const strokeDashoffset = circumference - (percentage / 100) * circumference;
+  const radius = 24;
+  const stroke = 4;
+  const normalizedRadius = radius - stroke / 2;
+  const circumference = normalizedRadius * 2 * Math.PI;
+  const strokeDashoffset = circumference - ((progress / total) * circumference);
 
   return (
-    <div className="relative w-16 h-16 sm:w-20 sm:h-20 md:w-28 md:h-28">
-      <svg className="transform -rotate-90 w-full h-full">
-        <circle cx="50%" cy="50%" r="45%" stroke="currentColor" strokeWidth="8" fill="none" className="text-white/10" />
+    <div className="relative w-12 h-12 flex items-center justify-center">
+      <svg height={radius * 2} width={radius * 2} className="transform -rotate-90">
+        <circle
+          stroke="#3a3a3c"
+          strokeWidth={stroke}
+          fill="transparent"
+          r={normalizedRadius}
+          cx={radius}
+          cy={radius}
+        />
         <motion.circle
-          cx="50%" cy="50%" r="45%" stroke="url(#gradient)" strokeWidth="8" fill="none"
-          strokeLinecap="round" strokeDasharray={circumference}
+          stroke="#a4ff00" // Apple Fitness Green
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          fill="transparent"
+          r={normalizedRadius}
+          cx={radius}
+          cy={radius}
           initial={{ strokeDashoffset: circumference }}
           animate={{ strokeDashoffset }}
           transition={{ duration: 0.5, ease: "easeOut" }}
+          style={{ strokeDasharray: circumference + ' ' + circumference }}
         />
-        <defs>
-          <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#10b981" />
-            <stop offset="100%" stopColor="#14b8a6" />
-          </linearGradient>
-        </defs>
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-xl sm:text-2xl md:text-3xl font-black text-white">{progress}</span>
-        <span className="text-[9px] sm:text-[10px] md:text-xs text-white/60 font-semibold">of {total}</span>
+      <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white">
+        {progress}/{total}
       </div>
     </div>
   );
 };
 
-// Exercise Stats Card
-const StatCard = ({ icon: Icon, label, value, color = "emerald" }) => (
-  <motion.div whileHover={{ scale: 1.02 }} className={`bg-gradient-to-br from-${color}-500/20 to-${color}-600/10 backdrop-blur-xl rounded-xl sm:rounded-2xl p-2.5 sm:p-3 md:p-4 border border-${color}-500/30`}>
-    <div className="flex items-center gap-2 sm:gap-3">
-      <div className={`p-1.5 sm:p-2 bg-${color}-500/30 rounded-lg sm:rounded-xl flex-shrink-0`}>
-        <Icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 text-${color}-400`} />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-white/60 text-[9px] sm:text-[10px] md:text-xs font-medium truncate">{label}</p>
-        <p className="text-white text-xs sm:text-sm md:text-base lg:text-lg font-bold truncate">{value}</p>
-      </div>
+// Apple-style Stat Tile
+const StatTile = ({ icon: Icon, label, value, color = "#a4ff00" }) => (
+  <div className="flex-1 bg-[#1c1c1e] rounded-2xl p-3 flex flex-col items-start justify-between min-h-[80px]">
+    <div className="flex w-full justify-between items-start mb-1">
+      <span className="text-[10px] font-bold uppercase tracking-wider text-[#8e8e93]">{label}</span>
+      <Icon size={14} style={{ color }} />
     </div>
-  </motion.div>
+    <div className="text-lg sm:text-xl font-bold text-white font-mono tracking-tight truncate w-full">
+      {value}
+    </div>
+  </div>
 );
 
-// Beautiful Skip Confirmation Modal
-const SkipConfirmModal = ({ isOpen, onClose, onConfirm, current, next }) => {
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[10002]"
-          />
-          <motion.div
-            initial={{ y: -100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -100, opacity: 0 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed inset-x-0 top-24 max-w-md mx-auto z-[10003]"
-          >
-            <div className="bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-white/10">
-              <div className="p-6 text-center">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-r from-emerald-400 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/30">
-                  <SkipForward className="w-9 h-9 text-white" />
-                </div>
-                <h2 className="text-2xl font-bold text-white mb-2">Skip to next exercise?</h2>
-              </div>
-              <div className="px-6 pb-4 text-white/80 space-y-2">
-                <p className="flex items-center gap-2">
-                  <span className="font-medium">Current:</span> {current}
-                </p>
-                <p className="flex items-center gap-2">
-                  <span className="font-medium">Next:</span> {next}
-                </p>
-              </div>
-              <div className="flex gap-3 p-6 bg-white/5">
-                <button
-                  onClick={onClose}
-                  className="flex-1 py-3 rounded-xl bg-white/10 hover:bg-white/20 backdrop-blur-md text-white font-semibold transition-all hover:scale-105 active:scale-95"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => { onConfirm(); onClose(); }}
-                  className="flex-1 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-bold shadow-lg shadow-emerald-500/30 transition-all hover:scale-105 active:scale-95"
-                >
-                  Yes, Skip
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
-  );
-};
+// Modern iOS Action Sheet / Modal
+const ModalSheet = ({ isOpen, onClose, title, children, actions }) => (
+  <AnimatePresence>
+    {isOpen && (
+      <>
+        <motion.div 
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          onClick={onClose}
+          className="fixed inset-0 bg-black/80 z-[10002] backdrop-blur-sm"
+        />
+        <motion.div
+          initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+          transition={{ type: "spring", damping: 25, stiffness: 300 }}
+          className="fixed bottom-0 left-0 right-0 z-[10003] bg-[#1c1c1e] rounded-t-[2rem] border-t border-white/10 overflow-hidden max-w-md mx-auto"
+        >
+          <div className="p-6">
+            <div className="w-12 h-1.5 bg-[#3a3a3c] rounded-full mx-auto mb-6" />
+            <h2 className="text-2xl font-bold text-white text-center mb-2">{title}</h2>
+            <div className="mb-8">{children}</div>
+            <div className="flex gap-3">{actions}</div>
+          </div>
+        </motion.div>
+      </>
+    )}
+  </AnimatePresence>
+);
+
+// --- MAIN COMPONENT ---
 
 export const WorkoutModeOverlay = ({
   isWorkoutStarted,
@@ -136,46 +110,32 @@ export const WorkoutModeOverlay = ({
   exerciseHistory,
   openLogModal,
   refreshHistory,
-  showToast // NEW PROP
+  showToast
 }) => {
   const containerRef = useRef(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showSkipConfirm, setShowSkipConfirm] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
   
+  // Data Preparation
   const currentEx = todayExercises?.[currentExerciseIndex];
   let currentExId = currentEx?.exerciseId || currentEx?.id;
-  let currentHistory = exerciseHistory?.[currentExId];
+  let currentHistory = exerciseHistory?.[currentExId] || { logs: [], pr: 0 };
 
-  if (!currentHistory || !currentHistory.logs) {
-    const alternateId = currentEx?.id || currentEx?.exerciseId;
+  // Fallback ID check
+  if ((!currentHistory.logs || currentHistory.logs.length === 0) && currentEx) {
+    const alternateId = currentEx.id;
     if (alternateId !== currentExId && exerciseHistory?.[alternateId]) {
-      currentExId = alternateId;
-      currentHistory = exerciseHistory[alternateId];
+       currentHistory = exerciseHistory[alternateId];
+       currentExId = alternateId;
     }
   }
 
-  if (!currentHistory || !currentHistory.logs) {
-    currentHistory = { logs: [], pr: 0 };
-  }
+  const safePR = parseFloat(currentHistory.pr) || 0;
+  const sortedLogs = [...(currentHistory.logs || [])].sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  const safePR = (() => {
-    const pr = currentHistory.pr;
-    if (pr === null || pr === undefined || pr === '') return 0;
-    const parsed = typeof pr === 'string' ? parseFloat(pr) : pr;
-    return !isNaN(parsed) && parsed > 0 ? parsed : 0;
-  })();
-
-  const sortedLogs = Array.isArray(currentHistory.logs) 
-    ? [...currentHistory.logs].sort((a, b) => new Date(b.date) - new Date(a.date))
-    : [];
-
-  // Memoized safe GIF URL
+  // GIF Handling
   const gifSrc = useMemo(() => {
-    const url = currentEx?.gifUrl;
-    if (typeof url === 'string' && url.trim() !== '' && url.startsWith('http')) {
-      return url;
-    }
+    if (currentEx?.gifUrl && currentEx.gifUrl.startsWith('http')) return currentEx.gifUrl;
     return FALLBACK_SVG;
   }, [currentEx?.gifUrl]);
 
@@ -183,323 +143,206 @@ export const WorkoutModeOverlay = ({
     containerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentExerciseIndex]);
 
+  // Handlers
   const handleClearPR = async () => {
-    if (!currentExId) {
-      if (showToast) showToast('No exercise selected', 'error');
-      setShowClearConfirm(false);
-      return;
-    }
-    
+    if (!currentExId) return;
     try {
       await clearExercisePR(currentExId);
-      if (typeof refreshHistory === 'function') {
-        await refreshHistory();
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-      
-      if (showToast) {
-        showToast('All logs cleared!', 'success', 'trash');
-      }
+      if (refreshHistory) await refreshHistory();
+      showToast?.('History cleared', 'success');
       setShowClearConfirm(false);
-    } catch (error) {
-      console.error('Error in handleClearPR:', error);
-      if (showToast) {
-        showToast(`Failed to clear PR: ${error.message}`, 'error');
-      }
-      setShowClearConfirm(false);
+    } catch (e) {
+      console.error(e);
+      showToast?.('Failed to clear', 'error');
     }
   };
 
   if (!isWorkoutStarted || !currentEx) return null;
 
-  const nextExerciseName = todayExercises[currentExerciseIndex + 1]?.name || 'Workout Complete';
-
   return (
     <AnimatePresence>
       {isWorkoutStarted && (
-        <>
-          {/* Backdrop */}
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[8000] bg-slate-950 overflow-hidden">
-            <div className="absolute inset-0 overflow-hidden">
-              <motion.div
-                animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
-                transition={{ duration: 8, repeat: Infinity }}
-                className="absolute -top-1/2 -left-1/2 w-full h-full bg-emerald-500/20 rounded-full blur-3xl"
-              />
-              <motion.div
-                animate={{ scale: [1.2, 1, 1.2], opacity: [0.2, 0.4, 0.2] }}
-                transition={{ duration: 10, repeat: Infinity }}
-                className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-teal-500/20 rounded-full blur-3xl"
-              />
-            </div>
-          </motion.div>
-
-          {/* Main Content */}
-          <motion.div
-            ref={containerRef}
-            initial={{ y: 100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 100, opacity: 0 }}
-            transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className="fixed inset-0 z-[8001] flex flex-col overflow-y-auto overflow-x-hidden"
-          >
-            {/* Top Bar */}
-            <motion.div initial={{ y: -100 }} animate={{ y: 0 }} className="sticky top-0 z-50 bg-slate-950/95 backdrop-blur-2xl border-b border-white/10">
-              <div className="w-full px-3 sm:px-4 md:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 sm:gap-4">
-                <div className="flex items-center gap-2 sm:gap-3 md:gap-4 min-w-0 flex-1">
-                  <ProgressRing progress={currentExerciseIndex + 1} total={todayExercises.length} />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-white/60 text-[10px] sm:text-xs md:text-sm font-medium truncate">Workout Session</p>
-                    <p className="text-white text-sm sm:text-base md:text-lg lg:text-xl font-bold truncate">Exercise {currentExerciseIndex + 1}</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setShowSkipConfirm(true)}
-                    className="px-3 sm:px-4 md:px-6 py-2 sm:py-2.5 md:py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 rounded-lg sm:rounded-xl font-bold text-white shadow-lg hover:shadow-emerald-500/50 transition-all flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm md:text-base"
-                  >
-                    <SkipForward className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5" />
-                    <span className="hidden sm:inline">Next</span>
-                  </motion.button>
-                  
-                  <button
-                    onClick={() => setIsWorkoutStarted(false)}
-                    className="p-2 sm:p-2.5 md:p-3 bg-white/10 hover:bg-white/20 rounded-xl sm:rounded-2xl backdrop-blur-md transition-all hover:scale-110 group flex-shrink-0"
-                  >
-                    <X className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-white group-hover:rotate-90 transition-transform" />
-                  </button>
+        <motion.div
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 50 }}
+          className="fixed inset-0 z-[9000] bg-black flex flex-col"
+        >
+          
+          {/* --- NAVBAR --- */}
+          <div className="px-4 pt-12 pb-4 bg-[#1c1c1e] border-b border-white/10 flex items-center justify-between shrink-0 z-50">
+            <div className="flex items-center gap-3">
+              <ProgressRing progress={currentExerciseIndex + 1} total={todayExercises.length} />
+              <div>
+                <div className="text-[#8e8e93] text-xs font-bold uppercase tracking-wide">Current Exercise</div>
+                <div className="text-white text-sm font-bold truncate max-w-[150px] sm:max-w-[250px]">
+                  {currentExerciseIndex + 1} of {todayExercises.length}
                 </div>
               </div>
-            </motion.div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setShowSkipConfirm(true)} className="bg-[#3a3a3c] p-2.5 rounded-full text-white active:scale-95 transition">
+                <SkipForward size={20} />
+              </button>
+              <button onClick={() => setIsWorkoutStarted(false)} className="bg-[#3a3a3c] p-2.5 rounded-full text-[#8e8e93] hover:text-white active:scale-95 transition">
+                <X size={20} />
+              </button>
+            </div>
+          </div>
 
-            <div className="flex-1 p-3 sm:p-4 md:p-6 lg:p-8 w-full overflow-x-hidden">
-              <div className="w-full max-w-5xl mx-auto">
-                {/* Exercise Header */}
-                <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-gradient-to-br from-emerald-500/10 via-teal-500/10 to-transparent backdrop-blur-2xl rounded-2xl sm:rounded-3xl p-4 sm:p-5 md:p-6 lg:p-8 border border-emerald-500/30 shadow-2xl mb-4 sm:mb-5 md:mb-6 w-full overflow-hidden">
-                  <div className="flex flex-col sm:flex-row items-start justify-between gap-3 sm:gap-4 mb-3 sm:mb-4">
-                    <div className="flex-1 min-w-0 w-full">
-                      <motion.h1 key={currentEx.name} initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-black text-white leading-tight mb-2 sm:mb-3 break-words">
-                        {currentEx.name}
-                      </motion.h1>
-                      <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4 flex-wrap">
-                        <span className="px-3 sm:px-4 py-1.5 sm:py-2 bg-emerald-500/20 rounded-full text-emerald-400 font-bold text-sm sm:text-base md:text-lg whitespace-nowrap">{currentEx.sets} sets</span>
-                        <X className="w-3 h-3 sm:w-4 sm:h-4 text-white/40 flex-shrink-0" />
-                        <span className="px-3 sm:px-4 py-1.5 sm:py-2 bg-teal-500/20 rounded-full text-teal-400 font-bold text-sm sm:text-base md:text-lg whitespace-nowrap">{currentEx.reps} reps</span>
-                      </div>
-                    </div>
-                    <div className="w-full sm:w-auto flex justify-center sm:justify-end flex-shrink-0">
-                      <PRBadge pr={safePR} size="lg" />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 sm:gap-3 w-full">
-                    <StatCard icon={Target} label="Target" value={currentEx.muscles || "Full Body"} color="emerald" />
-                    <StatCard icon={Award} label="Best" value={safePR > 0 ? `${safePR.toFixed(1)}kg` : "No PR"} color="amber" />
-                    <StatCard icon={Calendar} label="Sessions" value={sortedLogs.length} color="blue" />
-                  </div>
-                </motion.div>
+          {/* --- SCROLLABLE CONTENT --- */}
+          <div ref={containerRef} className="flex-1 overflow-y-auto overflow-x-hidden bg-black p-4 pb-32 space-y-6">
+            
+            {/* 1. EXERCISE HEADER CARD */}
+            <div className="space-y-4">
+              <div className="flex justify-between items-start">
+                <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight leading-none">
+                  {currentEx.name}
+                </h1>
+                <PRBadge pr={safePR} />
+              </div>
+              
+              <div className="flex gap-2">
+                <span className="px-3 py-1 rounded bg-[#a4ff00]/10 text-[#a4ff00] text-xs font-bold uppercase tracking-wider">
+                  {currentEx.sets} Sets
+                </span>
+                <span className="px-3 py-1 rounded bg-[#00c7fc]/10 text-[#00c7fc] text-xs font-bold uppercase tracking-wider">
+                  {currentEx.reps} Reps
+                </span>
+              </div>
 
-                {/* GIF */}
-                <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.1 }} className="relative mb-4 sm:mb-5 md:mb-6 rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl w-full">
-                  <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 opacity-50 blur-xl" />
-                  <div className="relative bg-slate-900/90 backdrop-blur-xl rounded-2xl sm:rounded-3xl overflow-hidden border-2 border-emerald-500/30 w-full">
-                    <img 
-                      src={gifSrc} 
-                      alt={currentEx.name} 
-                      className="w-full aspect-video object-contain"
-                      onError={(e) => {
-                        if (e.currentTarget.src !== FALLBACK_SVG) {
-                          e.currentTarget.src = FALLBACK_SVG;
-                        }
-                      }}
-                    />
-                    <div className="absolute top-2 left-2 sm:top-4 sm:left-4 w-8 h-8 sm:w-12 sm:h-12 border-l-2 border-t-2 sm:border-l-4 sm:border-t-4 border-emerald-400 rounded-tl-xl sm:rounded-tl-2xl" />
-                    <div className="absolute bottom-2 right-2 sm:bottom-4 sm:right-4 w-8 h-8 sm:w-12 sm:h-12 border-r-2 border-b-2 sm:border-r-4 sm:border-b-4 border-teal-400 rounded-br-xl sm:rounded-br-2xl" />
-                  </div>
-                </motion.div>
-
-                {/* Timer */}
-                <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }} className="mb-4 sm:mb-5 md:mb-6 w-full">
-                  <TimerDisplay seconds={secondsLeft} isResting={isResting} formatTime={formatTime} />
-                </motion.div>
-
-                {/* Set Logger */}
-                <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.3 }} className="mb-4 sm:mb-5 md:mb-6 w-full">
-                  <SetLogger
-                    exercise={currentEx}
-                    sets={currentEx.sets || 4}
-                    history={currentHistory}
-                    onLogSet={(_, setIndex) => openLogModal(currentExId, setIndex)}
-                  />
-                </motion.div>
-
-                {/* Performance History */}
-                <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.4 }} className="bg-gradient-to-br from-slate-900/90 to-slate-800/90 backdrop-blur-2xl rounded-2xl sm:rounded-3xl p-4 sm:p-5 md:p-6 lg:p-8 border border-white/10 shadow-2xl w-full overflow-hidden">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
-                    <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-                      <div className="p-2 sm:p-3 bg-gradient-to-br from-amber-500/30 to-orange-500/30 rounded-xl sm:rounded-2xl flex-shrink-0">
-                        <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-amber-400" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h4 className="text-lg sm:text-xl md:text-2xl font-black text-white truncate">Performance History</h4>
-                        <p className="text-white/60 text-[10px] sm:text-xs md:text-sm truncate">Track your progress over time</p>
-                      </div>
-                    </div>
-                    {sortedLogs.length > 0 && (
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => setShowClearConfirm(true)}
-                        className="flex items-center gap-1.5 sm:gap-2 bg-gradient-to-r from-red-500/20 to-red-600/20 hover:from-red-500/30 hover:to-red-600/30 text-red-400 px-3 sm:px-4 py-2 sm:py-3 rounded-lg sm:rounded-xl font-bold text-xs sm:text-sm border border-red-500/30 transition-all flex-shrink-0"
-                      >
-                        <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
-                        <span className="whitespace-nowrap">Clear All</span>
-                      </motion.button>
-                    )}
-                  </div>
-                  {/* Logs */}
-                  {sortedLogs.length > 0 ? (
-                    <div className="space-y-2 sm:space-y-3 w-full">
-                      {sortedLogs.slice(0, 5).map((log, i) => (
-                        <motion.div key={i} initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: i * 0.05 }} className="group bg-gradient-to-r from-white/5 to-white/10 hover:from-emerald-500/10 hover:to-teal-500/10 rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-white/10 hover:border-emerald-500/30 transition-all w-full overflow-hidden">
-                          <div className="flex justify-between items-center gap-2 w-full">
-                            <div className="flex items-center gap-2 sm:gap-3 md:gap-4 min-w-0 flex-1">
-                              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-shrink">
-                                <Calendar className="w-3 h-3 sm:w-4 sm:h-4 text-white/40 flex-shrink-0" />
-                                <span className="text-white/80 text-[10px] sm:text-xs md:text-sm font-medium truncate">{new Date(log.date).toLocaleDateString()}</span>
-                              </div>
-                              <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4 text-white/20 flex-shrink-0 hidden sm:block" />
-                            </div>
-                            <div className="flex items-center gap-2 sm:gap-3 md:gap-4 flex-shrink-0">
-                              <div className="text-right">
-                                <p className="font-black text-white text-sm sm:text-base md:text-lg whitespace-nowrap">{log.weight}kg × {log.reps}</p>
-                                <p className="text-amber-400 text-[10px] sm:text-xs md:text-sm font-bold whitespace-nowrap">1RM: {log.oneRm.toFixed(1)}kg</p>
-                              </div>
-                              {log.oneRm === safePR && safePR > 0 && (
-                                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="p-1.5 sm:p-2 bg-amber-500/20 rounded-lg flex-shrink-0">
-                                  <Award className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 text-amber-400" />
-                                </motion.div>
-                              )}
-                            </div>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                  ) : (
-                    <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-center py-8 sm:py-12">
-                      <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-3 sm:mb-4 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-full flex items-center justify-center">
-                        <TrendingUp className="w-8 h-8 sm:w-10 sm:h-10 text-emerald-400" />
-                      </div>
-                      <p className="text-white/60 text-base sm:text-lg font-semibold">No logs yet</p>
-                      <p className="text-white/40 text-xs sm:text-sm mt-2">Start logging to track your progress!</p>
-                    </motion.div>
-                  )}
-                </motion.div>
-
-                {/* Big Next Button */}
-                <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.5 }} className="flex justify-center items-center gap-4 sm:gap-6 mt-6 sm:mt-8 md:mt-10 mb-4 sm:mb-6 w-full">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setShowSkipConfirm(true)}
-                    className="relative px-8 sm:px-10 md:px-12 py-4 sm:py-5 md:py-6 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-xl sm:rounded-2xl shadow-2xl shadow-emerald-500/50 group overflow-hidden w-full max-w-sm"
-                  >
-                    <motion.div
-                      animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0, 0.5] }}
-                      transition={{ duration: 2, repeat: Infinity }}
-                      className="absolute inset-0 bg-white rounded-xl sm:rounded-2xl"
-                    />
-                    <div className="relative z-10 flex items-center justify-center gap-2 sm:gap-3">
-                      <SkipForward className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-white drop-shadow-lg" />
-                      <span className="text-lg sm:text-xl md:text-2xl font-black text-white">Next Exercise</span>
-                    </div>
-                  </motion.button>
-                </motion.div>
-
-                {/* Progress Bar */}
-                <motion.div initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} className="mb-6 sm:mb-8 w-full">
-                  <div className="bg-white/10 rounded-full h-1.5 sm:h-2 overflow-hidden backdrop-blur-xl w-full">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${((currentExerciseIndex + 1) / todayExercises.length) * 100}%` }}
-                      transition={{ duration: 0.5, ease: "easeOut" }}
-                      className="h-full bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 shadow-lg shadow-emerald-500/50"
-                    />
-                  </div>
-                  <div className="flex justify-between items-center mt-2 sm:mt-3 w-full gap-2">
-                    <p className="text-white/60 text-[10px] sm:text-xs md:text-sm font-medium truncate">{currentExerciseIndex + 1} of {todayExercises.length} exercises</p>
-                    <p className="text-emerald-400 text-[10px] sm:text-xs md:text-sm font-bold whitespace-nowrap">{Math.round(((currentExerciseIndex + 1) / todayExercises.length) * 100)}% Complete</p>
-                  </div>
-                </motion.div>
+              {/* Stats Grid */}
+              <div className="grid grid-cols-3 gap-2">
+                <StatTile icon={Target} label="Target" value={currentEx.muscles || "Body"} color="#a4ff00" />
+                <StatTile icon={Award} label="Best" value={safePR > 0 ? `${safePR}kg` : "-"} color="#ffcc00" />
+                <StatTile icon={Clock} label="History" value={sortedLogs.length} color="#bf5af2" />
               </div>
             </div>
-          </motion.div>
 
-          {/* Skip Confirmation Modal */}
-          <SkipConfirmModal
+            {/* 2. MEDIA & TIMER */}
+            <div className="grid grid-cols-1 gap-4">
+              {/* GIF Container - Fixed Aspect Ratio to prevent layout shift */}
+              <div className="w-full aspect-video bg-[#1c1c1e] rounded-2xl overflow-hidden border border-white/10 relative">
+                <img 
+                  src={gifSrc} 
+                  alt="Demo" 
+                  className="w-full h-full object-contain"
+                  onError={(e) => { e.currentTarget.src = FALLBACK_SVG; }}
+                />
+                {isResting && (
+                  <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-10">
+                    <div className="text-center">
+                      <div className="text-[#a4ff00] font-mono text-5xl font-bold tabular-nums mb-2">
+                        {formatTime(secondsLeft)}
+                      </div>
+                      <div className="text-white/60 text-xs uppercase font-bold tracking-widest">Resting</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Timer Component (If not resting, show small timer) */}
+              {!isResting && (
+                <TimerDisplay seconds={secondsLeft} isResting={isResting} formatTime={formatTime} minimal />
+              )}
+            </div>
+
+            {/* 3. LOGGING SECTION */}
+            <div className="bg-[#1c1c1e] rounded-2xl p-1 border border-white/5">
+              <SetLogger
+                exercise={currentEx}
+                sets={currentEx.sets || 4}
+                history={currentHistory}
+                onLogSet={(_, setIndex) => openLogModal(currentExId, setIndex)}
+              />
+            </div>
+
+            {/* 4. HISTORY LIST */}
+            {sortedLogs.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex justify-between items-end px-1">
+                  <h3 className="text-lg font-bold text-white">History</h3>
+                  <button onClick={() => setShowClearConfirm(true)} className="text-xs text-red-500 font-bold uppercase">Clear</button>
+                </div>
+                <div className="space-y-2">
+                  {sortedLogs.slice(0, 3).map((log, i) => (
+                    <div key={i} className="bg-[#1c1c1e] p-4 rounded-xl flex justify-between items-center border border-white/5">
+                      <div className="text-[#8e8e93] text-xs font-medium">
+                        {new Date(log.date).toLocaleDateString()}
+                      </div>
+                      <div className="flex gap-4">
+                        <div className="text-right">
+                          <div className="text-white font-bold text-sm">{log.weight}kg</div>
+                          <div className="text-[#8e8e93] text-[10px] uppercase">Weight</div>
+                        </div>
+                        <div className="text-right w-12">
+                          <div className="text-white font-bold text-sm">{log.reps}</div>
+                          <div className="text-[#8e8e93] text-[10px] uppercase">Reps</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* BOTTOM SPACING FOR NEXT BUTTON */}
+            <div className="h-20" />
+          </div>
+
+          {/* --- FLOATING ACTION BUTTON --- */}
+          <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black via-black to-transparent z-[51]">
+            <button
+              onClick={() => setShowSkipConfirm(true)}
+              className="w-full bg-[#a4ff00] text-black font-bold text-lg py-4 rounded-2xl shadow-lg shadow-lime-900/20 active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
+            >
+              <span>Next Exercise</span>
+              <ChevronRight size={20} strokeWidth={3} />
+            </button>
+          </div>
+
+          {/* --- MODALS --- */}
+          
+          {/* Skip Confirmation */}
+          <ModalSheet
             isOpen={showSkipConfirm}
             onClose={() => setShowSkipConfirm(false)}
-            onConfirm={nextExercise}
-            current={currentEx.name}
-            next={nextExerciseName}
-          />
-
-          {/* Clear PR Modal */}
-          <AnimatePresence>
-            {showClearConfirm && (
+            title="Skip Exercise?"
+            actions={
               <>
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[10000] bg-black/80 backdrop-blur-xl" onClick={() => setShowClearConfirm(false)} />
-                <motion.div
-                  initial={{ scale: 0.8, opacity: 0, y: 50 }}
-                  animate={{ scale: 1, opacity: 1, y: 0 }}
-                  exit={{ scale: 0.8, opacity: 0, y: 50 }}
-                  transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                  className="fixed inset-0 z-[10001] flex items-center justify-center p-4"
-                >
-                  <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-8 max-w-md w-full border-2 border-red-500/30 shadow-2xl shadow-red-500/20">
-                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", delay: 0.1 }} className="flex justify-center mb-6">
-                      <motion.div animate={{ rotate: [0, -10, 10, -10, 0] }} transition={{ duration: 0.5, delay: 0.3 }} className="relative">
-                        <div className="absolute inset-0 bg-red-500/30 blur-2xl rounded-full" />
-                        <div className="relative bg-gradient-to-br from-red-500 to-red-600 p-6 rounded-full shadow-lg">
-                          <AlertTriangle className="w-12 h-12 text-white" />
-                        </div>
-                      </motion.div>
-                    </motion.div>
-                    <h3 className="text-3xl font-black text-white text-center mb-2">Clear All History?</h3>
-                    <p className="text-white/60 text-center text-sm mb-6">This action is permanent and cannot be undone</p>
-                    <div className="bg-gradient-to-r from-red-500/20 via-orange-500/20 to-red-500/20 rounded-2xl p-6 border border-red-500/30 mb-6">
-                      <p className="text-white font-bold text-xl text-center mb-3">{currentEx.name}</p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-white/5 rounded-xl p-3 text-center">
-                          <p className="text-white/60 text-xs mb-1">Current PR</p>
-                          <p className="text-amber-400 font-black text-lg">{safePR > 0 ? `${safePR.toFixed(1)}kg` : "None"}</p>
-                        </div>
-                        <div className="bg-white/5 rounded-xl p-3 text-center">
-                          <p className="text-white/60 text-xs mb-1">Total Logs</p>
-                          <p className="text-white font-black text-lg">{sortedLogs.length}</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-center gap-2 text-red-400 text-sm font-semibold mb-8 bg-red-500/10 rounded-xl p-3">
-                      <Zap className="w-4 h-4" />
-                      <span>All performance data will be deleted</span>
-                    </div>
-                    <div className="flex gap-3">
-                      <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => setShowClearConfirm(false)} className="flex-1 px-6 py-4 bg-white/10 hover:bg-white/20 text-white rounded-2xl font-bold text-lg transition-all border border-white/20">
-                        Cancel
-                      </motion.button>
-                      <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={handleClearPR} className="flex-1 px-6 py-4 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-2xl font-bold text-lg transition-all shadow-xl shadow-red-500/30">
-                        Delete All
-                      </motion.button>
-                    </div>
-                  </div>
-                </motion.div>
+                <button onClick={() => setShowSkipConfirm(false)} className="flex-1 py-4 rounded-xl bg-[#3a3a3c] text-white font-bold">Cancel</button>
+                <button onClick={() => { nextExercise(); setShowSkipConfirm(false); }} className="flex-1 py-4 rounded-xl bg-[#a4ff00] text-black font-bold">Skip</button>
               </>
-            )}
-          </AnimatePresence>
-        </>
+            }
+          >
+            <p className="text-center text-[#8e8e93] mb-4">
+              Are you sure you want to skip <strong>{currentEx.name}</strong>?
+            </p>
+          </ModalSheet>
+
+          {/* Clear History Confirmation */}
+          <ModalSheet
+            isOpen={showClearConfirm}
+            onClose={() => setShowClearConfirm(false)}
+            title="Clear History"
+            actions={
+              <>
+                <button onClick={() => setShowClearConfirm(false)} className="flex-1 py-4 rounded-xl bg-[#3a3a3c] text-white font-bold">Cancel</button>
+                <button onClick={handleClearPR} className="flex-1 py-4 rounded-xl bg-red-500 text-white font-bold">Delete</button>
+              </>
+            }
+          >
+            <div className="flex flex-col items-center text-center gap-4">
+              <div className="bg-red-500/10 p-4 rounded-full text-red-500">
+                <AlertTriangle size={32} />
+              </div>
+              <p className="text-[#8e8e93]">
+                This will permanently delete all performance logs and PRs for <strong>{currentEx.name}</strong>.
+              </p>
+            </div>
+          </ModalSheet>
+
+        </motion.div>
       )}
     </AnimatePresence>
   );

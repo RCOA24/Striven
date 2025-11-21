@@ -1,228 +1,195 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Activity, Footprints, Zap } from 'lucide-react';
+import { Activity, Zap, Footprints, ChevronRight } from 'lucide-react';
+
+// --- Animations Variants (Defined outside to prevent re-creation) ---
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.3,
+      delayChildren: 0.2,
+    },
+  },
+  exit: {
+    opacity: 0,
+    scale: 1.5,
+    filter: "blur(10px)",
+    transition: { duration: 0.8, ease: "easeInOut" }
+  }
+};
+
+const itemVariants = {
+  hidden: { y: 20, opacity: 0 },
+  visible: {
+    y: 0,
+    opacity: 1,
+    transition: {
+      type: "spring",
+      stiffness: 100,
+      damping: 10
+    }
+  }
+};
 
 const Intro = ({ onComplete }) => {
-  const [stage, setStage] = useState(0);
+  // We use a single state to trigger the exit sequence
+  const [isExiting, setIsExiting] = useState(false);
+  const [count, setCount] = useState(0);
 
+  // Sequence Management
   useEffect(() => {
-    const timers = [
-      setTimeout(() => setStage(1), 600),
-      setTimeout(() => setStage(2), 1600),
-      setTimeout(() => setStage(3), 2400),
-      setTimeout(() => setStage(4), 3200),
-      setTimeout(() => setStage(5), 4000),
-      setTimeout(() => onComplete?.(), 4800),
-    ];
-    return () => timers.forEach(clearTimeout);
+    // specific timer for the "steps" counter effect
+    const counterInterval = setInterval(() => {
+      setCount(prev => (prev < 100 ? prev + 4 : 100));
+    }, 30);
+
+    // Sequence timer
+    const sequenceTimer = setTimeout(() => {
+      setIsExiting(true);
+    }, 3500); // Start exit sequence at 3.5s
+
+    const completeTimer = setTimeout(() => {
+      if (onComplete) onComplete();
+    }, 4300); // Unmount/Finish at 4.3s
+
+    return () => {
+      clearInterval(counterInterval);
+      clearTimeout(sequenceTimer);
+      clearTimeout(completeTimer);
+    };
   }, [onComplete]);
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden min-h-screen bg-black flex flex-col">
-      {/* Animated Background Orbs */}
-      <div className="absolute inset-0">
-        <motion.div
-          animate={{
-            scale: [1, 1.4, 1],
-            opacity: [0.15, 0.3, 0.15],
-          }}
-          transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-radial from-[#39ff14]/20 to-transparent rounded-full blur-3xl"
-        />
-        <motion.div
-          animate={{
-            scale: [1.2, 1, 1.2],
-            opacity: [0.2, 0.35, 0.2],
-          }}
-          transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-          className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-gradient-radial from-[#ff2e63]/20 to-transparent rounded-full blur-3xl"
-        />
-        <motion.div
-          animate={{
-            scale: [1, 1.6, 1],
-            opacity: [0.1, 0.25, 0.1],
-          }}
-          transition={{ duration: 5, repeat: Infinity }}
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-gradient-conic from-[#39ff14]/10 via-[#ff2e63]/5 to-[#39ff14]/10 rounded-full blur-3xl"
-        />
-      </div>
-
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black overflow-hidden">
+      
+      {/* --- Global Styles for Fonts --- */}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Clash+Display:wght@700&family=Satoshi:wght@500;700&display=swap');
-
+        @import url('https://fonts.googleapis.com/css2?family=Clash+Display:wght@600;700&family=Satoshi:wght@500;700&display=swap');
         .font-display { font-family: 'Clash Display', sans-serif; }
         .font-body { font-family: 'Satoshi', sans-serif; }
-
-        .bg-gradient-radial {
-          background: radial-gradient(circle at center, var(--tw-gradient-stops));
-        }
-        .bg-gradient-conic {
-          background: conic-gradient(from 0deg, var(--tw-gradient-stops));
-        }
-
-        @keyframes float {
-          0%, 100% { transform: translateY(0) rotate(0deg); }
-          50% { transform: translateY(-20px) rotate(5deg); }
-        }
-        .float { animation: float 6s ease-in-out infinite; }
-
-        @keyframes pulse-slow {
-          0%, 100% { opacity: 0.4; }
-          50% { opacity: 0.7; }
-        }
-        .animate-pulse-slow { animation: pulse-slow 3s ease-in-out infinite; }
-
-        @keyframes gradient {
-          0%, 100% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
+        .glass-panel {
+          background: linear-gradient(145deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.03) 100%);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255,255,255,0.1);
         }
       `}</style>
 
-      <div className="relative w-full h-full flex items-center justify-center">
-        <div className="relative z-10 flex flex-col items-center">
+      {/* --- Ambient Background (GPU Optimized) --- */}
+      <div className="absolute inset-0 pointer-events-none">
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.4 }}
+          transition={{ duration: 2 }}
+          className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,_#39ff14_0%,_transparent_50%)] opacity-20 blur-[100px]"
+        />
+        <motion.div 
+          animate={{ 
+            rotate: [0, 360],
+            scale: [1, 1.2, 1]
+          }}
+          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+          className="absolute -top-1/2 -right-1/2 w-[100vw] h-[100vw] bg-[radial-gradient(circle,_#ff2e63_0%,_transparent_70%)] opacity-10 blur-[120px]"
+        />
+      </div>
 
-          {/* === STAGE 0–1: 3D REALISTIC LOGO === */}
-          <AnimatePresence>
-            {stage >= 0 && (
-              <motion.div
-                initial={{ scale: 0, rotate: -180 }}
-                animate={{ scale: 1, rotate: 0 }}
-                transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
-                className="relative mb-10"
-              >
-                {/* Outer soft glow */}
-                <div className="absolute inset-0 rounded-3xl bg-gradient-radial from-[#39ff14]/30 via-transparent to-transparent blur-3xl animate-pulse-slow" />
-
-                {/* Logo Card */}
-                <div className="relative p-1">
-                  {/* Back-light halo */}
-                  <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-[#39ff14]/40 to-[#ff2e63]/40 blur-2xl opacity-60" />
-
-                  {/* Glass Card */}
-                  <div className="relative bg-gradient-to-br from-green-400 to-emerald-500 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-xl overflow-hidden">
-                    {/* Grain texture */}
-                    <div
-                      className="absolute inset-0 opacity-5 pointer-events-none"
-                      style={{
-                        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23noise)' opacity='0.4'/%3E%3C/svg%3E")`,
-                      }}
-                    />
-
-                    {/* Top-left highlight */}
-                    <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-white/10 to-transparent pointer-events-none" />
-
-                    {/* Icon with heartbeat */}
-                    <motion.div
-                      animate={stage >= 1 ? { scale: [1, 1.07, 1] } : {}}
-                      transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-                      className="relative z-10 flex justify-center items-center"
-                    >
-                      <Activity className="w-24 h-24 text-white drop-shadow-lg" strokeWidth={2.8} />
-                    </motion.div>
-
-                    {/* Inner shadow ring */}
-                    <div className="absolute inset-2 rounded-2xl shadow-inner shadow-black/30 pointer-events-none" />
-                  </div>
-                </div>
-
-                {/* Floating Micro-Icons */}
-                <AnimatePresence>
-                  {stage >= 2 && (
-                    <>
-                      <motion.div
-                        initial={{ opacity: 0, y: 30, rotate: -30 }}
-                        animate={{ opacity: 1, y: 0, rotate: 0 }}
-                        transition={{ delay: 0.3, duration: 0.8 }}
-                        className="absolute -top-6 -left-8"
-                      >
-                        <div className="bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/20 shadow-lg">
-                          <Footprints className="w-6 h-6 text-[#39ff14] drop-shadow" />
-                        </div>
-                      </motion.div>
-
-                      <motion.div
-                        initial={{ opacity: 0, y: -30, rotate: 30 }}
-                        animate={{ opacity: 1, y: 0, rotate: 0 }}
-                        transition={{ delay: 0.5, duration: 0.8 }}
-                        className="absolute -bottom-8 -right-10"
-                      >
-                        <div className="bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/20 shadow-lg">
-                          <Zap className="w-6 h-6 text-[#ff2e63] drop-shadow" />
-                        </div>
-                      </motion.div>
-                    </>
-                  )}
-                </AnimatePresence>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* === STAGE 2: APP NAME === */}
-          <AnimatePresence>
-            {stage >= 2 && (
-              <motion.h1
-                initial={{ opacity: 0, y: 30, filter: 'blur(10px)' }}
-                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
-                className="text-7xl md:text-8xl font-display font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#39ff14] via-white to-[#ff2e63] leading-tight"
-                style={{
-                  backgroundSize: '200%',
-                  animation: 'gradient 4s ease infinite',
-                }}
-              >
-                Striven
-              </motion.h1>
-            )}
-          </AnimatePresence>
-
-          {/* === STAGE 3: TAGLINE === */}
-          <AnimatePresence>
-            {stage >= 3 && (
-              <motion.p
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3, duration: 0.8 }}
-                className="mt-4 text-xl md:text-2xl text-white/60 font-body tracking-wider"
-              >
-                Track your journey
-              </motion.p>
-            )}
-          </AnimatePresence>
-
-          {/* === STAGE 4: FINAL PULSE + LOADER === */}
-          <AnimatePresence>
-            {stage >= 4 && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.2 }}
-                className="mt-16 flex space-x-4"
-              >
-                {[0, 1, 2].map((i) => (
-                  <motion.div
-                    key={i}
-                    className="w-3 h-3 rounded-full"
-                    style={{
-                      background: i === 1 ? '#ff2e63' : '#39ff14',
-                    }}
-                    animate={{
-                      y: [0, -12, 0],
-                      opacity: [0.6, 1, 0.6],
-                    }}
-                    transition={{
-                      duration: 1.2,
-                      repeat: Infinity,
-                      delay: i * 0.2,
-                      ease: "easeInOut",
-                    }}
+      {/* --- Main Content Wrapper --- */}
+      <AnimatePresence mode='wait'>
+        {!isExiting ? (
+          <motion.div
+            key="intro-content"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            className="relative z-10 flex flex-col items-center"
+          >
+            
+            {/* 1. The Logo Container */}
+            <motion.div variants={itemVariants} className="relative mb-8 group">
+              {/* Pulse Effect */}
+              <div className="absolute inset-0 bg-green-500/20 rounded-full blur-xl animate-pulse" />
+              
+              {/* Glass Card Logo */}
+              <div className="relative glass-panel p-8 rounded-3xl shadow-2xl shadow-green-900/20">
+                {/* Progress Ring SVG */}
+                <svg className="absolute inset-0 w-full h-full -rotate-90 p-1" viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="48" stroke="rgba(255,255,255,0.1)" strokeWidth="2" fill="none" />
+                  <motion.circle 
+                    cx="50" cy="50" r="48" 
+                    stroke="#39ff14" 
+                    strokeWidth="2" 
+                    fill="none"
+                    strokeDasharray="301"
+                    strokeDashoffset="301"
+                    strokeLinecap="round"
+                    animate={{ strokeDashoffset: 0 }}
+                    transition={{ duration: 2, ease: "easeInOut" }}
                   />
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
+                </svg>
 
-        </div>
+                {/* Icon */}
+                <motion.div
+                  animate={{ scale: [1, 1.1, 1] }}
+                  transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                >
+                  <Activity className="w-16 h-16 text-white drop-shadow-[0_0_15px_rgba(57,255,20,0.5)]" />
+                </motion.div>
+
+                {/* Floating Badge */}
+                <motion.div 
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.8, type: "spring" }}
+                  className="absolute -top-2 -right-2 bg-[#ff2e63] text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg flex items-center gap-1"
+                >
+                  <Zap size={10} fill="currentColor" /> GO
+                </motion.div>
+              </div>
+            </motion.div>
+
+            {/* 2. Brand Text */}
+            <motion.div variants={itemVariants} className="text-center space-y-2">
+              <h1 className="text-6xl md:text-7xl font-display font-bold text-white tracking-tight">
+                Striven<span className="text-[#39ff14]">.</span>
+              </h1>
+              
+              {/* 3. Tagline & Data Simulation */}
+              <div className="flex items-center justify-center gap-3 text-white/60 font-body">
+                <span className="flex items-center gap-1 text-sm tracking-widest uppercase">
+                  <Footprints size={14} className="text-[#39ff14]" />
+                  Track your Journey
+                </span>
+                <span className="w-1 h-1 bg-white/30 rounded-full" />
+                <span className="font-mono text-[#ff2e63] font-bold min-w-[3ch] text-left">
+                  {count}%
+                </span>
+              </div>
+            </motion.div>
+
+          </motion.div>
+        ) : (
+          /* --- Exit Transition (The "Zoom Through") --- */
+          <motion.div
+            key="exit-transition"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 20 }}
+            transition={{ duration: 0.8, ease: "circIn" }}
+            className="absolute inset-0 z-20 bg-[#39ff14] rounded-full"
+            style={{ pointerEvents: "none" }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Bottom loader bar (Optional subtle detail) */}
+      <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-48 h-1 bg-white/10 rounded-full overflow-hidden">
+        <motion.div 
+          initial={{ x: "-100%" }}
+          animate={{ x: "100%" }}
+          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+          className="w-full h-full bg-gradient-to-r from-transparent via-white/50 to-transparent"
+        />
       </div>
     </div>
   );
