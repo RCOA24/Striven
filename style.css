@@ -1,0 +1,21 @@
+/* Mobile Optimization */
+* {
+    -webkit-tap-highlight-color: transparent; /* Remove tap highlight on mobile */
+}
+
+body {
+    overscroll-behavior-y: none; /* Prevent pull-to-refresh on mobile */
+    user-select: none; /* Prevent text selection like a native app */
+    -webkit-user-select: none;
+}
+
+button, input, select, textarea {
+    user-select: text; /* Allow selection in inputs */
+    -webkit-user-select: text;
+}
+
+/* Ensure buttons are large enough for touch targets */
+button {
+    min-height: 44px;
+    min-width: 44px;
+}

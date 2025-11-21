@@ -570,14 +570,14 @@ export default function WorkoutOrganizer() {
     try {
       const isFavorited = await toggleFavorite(exercise);
       if (isFavorited) {
-        showToast(`Added ${exercise.name} to favorites!`, 'success', 'muscle');
+        showToast(`Added ${exercise.name} to Favorites!`, 'success', 'muscle');
       } else {
-        showToast(`Removed ${exercise.name} from favorites`, 'info', 'trash');
+        showToast(`Removed ${exercise.name} from Favorites`, 'info', 'trash');
       }
       loadAllData();
     } catch (error) {
-      console.error('Toggle favorite error:', error);
-      showToast('Failed to update favorites', 'error');
+      console.error('Toggle Favorite error:', error);
+      showToast('Failed to update Favorites', 'error');
     }
   };
 

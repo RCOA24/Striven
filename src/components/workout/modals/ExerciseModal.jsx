@@ -135,11 +135,11 @@ export default function ExerciseModal({ isOpen, exercise: initialExercise, onClo
     try {
       await onQuickAdd(exercise);
       if (showToast) {
-        showToast(`${exercise.name} added to workout!`, 'success', 'muscle');
+        showToast(`${exercise.name} added to Workout!`, 'success', 'muscle');
       }
     } catch {
       if (showToast) {
-        showToast('Already in today\'s workout', 'error');
+        showToast('Already in today\'s Workout', 'error');
       }
     } finally {
       setAdding(false);
