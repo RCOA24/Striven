@@ -33,10 +33,58 @@ db.version(3).stores({
   favorites: '++id, exerciseId, name, muscles, equipment, category, gifUrl, addedAt',
   todayWorkout: '++id, exerciseId, name, sets, reps, weight, rest, notes, order, addedAt',
   workoutPlans: '++id, name, days, createdAt, isActive',
-  exerciseLogs: '++id, exerciseId, date, set, weight, reps, oneRm' // NEW TABLE
+  exerciseLogs: '++id, exerciseId, date, set, weight, reps, oneRm'
 }).upgrade(() => {
   console.log('Upgraded to v3: Added exerciseLogs for PRs & weight tracking');
 });
+
+// Version 4: FOOD LOGS
+db.version(4).stores({
+  activities: '++id, date, steps, distance, calories, duration, timestamp',
+  weeklyStats: '++id, weekStart, totalSteps, totalDistance, totalCalories, totalDuration',
+  settings: '++id, key, value',
+  goals: '++id, type, target, current, date, completed',
+  favorites: '++id, exerciseId, name, muscles, equipment, category, gifUrl, addedAt',
+  todayWorkout: '++id, exerciseId, name, sets, reps, weight, rest, notes, order, addedAt',
+  workoutPlans: '++id, name, days, createdAt, isActive',
+  exerciseLogs: '++id, exerciseId, date, set, weight, reps, oneRm',
+  foodLogs: '++id, name, calories, protein, carbs, fat, timestamp' // NEW TABLE
+}).upgrade(() => {
+  console.log('Upgraded to v4: Added foodLogs');
+});
+
+/* ==================================================================
+   FOOD LOGS
+================================================================== */
+export const saveFoodLog = async (food) => {
+  try {
+    return await db.foodLogs.add({
+      ...food,
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    console.error('Failed to save food log:', error);
+    throw error;
+  }
+};
+
+export const getFoodLogs = async () => {
+  try {
+    return await db.foodLogs.orderBy('timestamp').reverse().toArray();
+  } catch (error) {
+    console.error('Failed to get food logs:', error);
+    return [];
+  }
+};
+
+export const deleteFoodLog = async (id) => {
+  try {
+    await db.foodLogs.delete(id);
+  } catch (error) {
+    console.error('Failed to delete food log:', error);
+    throw error;
+  }
+};
 
 /* ==================================================================
    FAVORITES

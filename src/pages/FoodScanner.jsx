@@ -1,53 +1,17 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Zap, Clock, Utensils, CheckCircle, RefreshCw, X, ScanLine, StopCircle } from 'lucide-react';
 
-// IMPORTANT: You must run: npm install @tensorflow/tfjs @tensorflow-models/mobilenet
+// 1. Imports from your Dexie DB (Adjust path if necessary)
+import { saveFoodLog, getFoodLogs } from '../utils/db'; 
+
+// 2. TensorFlow Imports
+// Run: npm install @tensorflow/tfjs @tensorflow-models/mobilenet
 import * as tf from '@tensorflow/tfjs';
 import * as mobilenet from '@tensorflow-models/mobilenet';
 
-// --- IndexedDB Helpers (Unchanged) ---
-const DB_NAME = 'striven_food_db';
-const STORE = 'logs';
-
-const dbPromise = new Promise((resolve, reject) => {
-  if (typeof window === 'undefined' || !window.indexedDB) return;
-  const req = indexedDB.open(DB_NAME, 1);
-  req.onupgradeneeded = () => {
-    const db = req.result;
-    if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
-  };
-  req.onsuccess = () => resolve(req.result);
-  req.onerror = () => reject(req.error);
-});
-
-async function saveLog(entry) {
-  try {
-    const db = await dbPromise;
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE, 'readwrite');
-      tx.objectStore(STORE).add({ ...entry, timestamp: Date.now() });
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-  } catch (e) { console.error("DB Save Error", e); }
-}
-
-async function getLogs() {
-  try {
-    const db = await dbPromise;
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE, 'readonly');
-      const req = tx.objectStore(STORE).getAll();
-      req.onsuccess = () => resolve(req.result ? req.result.sort((a, b) => b.timestamp - a.timestamp) : []);
-      req.onerror = () => reject(req.error);
-    });
-  } catch (e) { return []; }
-}
-
-// --- Real Nutrition Fetcher ---
+// --- API Helper: OpenFoodFacts ---
 async function fetchNutrition(query) {
   try {
-    // Using OpenFoodFacts with the detected name
     const res = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=1`);
     const data = await res.json();
     const p = data.products?.[0];
@@ -70,7 +34,7 @@ async function fetchNutrition(query) {
 const FoodScanner = () => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
-  const abortController = useRef(null); // To cancel requests
+  const abortController = useRef(null);
 
   const [model, setModel] = useState(null);
   const [modelLoading, setModelLoading] = useState(true);
@@ -82,14 +46,14 @@ const FoodScanner = () => {
   const [flash, setFlash] = useState(false);
   const [error, setError] = useState(null);
 
-  // 1. Initialize Camera & Load AI Model
+  // --- 1. Initialize Camera & AI ---
   useEffect(() => {
     let stream = null;
 
     const initSystem = async () => {
       try {
-        // Load TensorFlow Model
         console.log("Loading AI Model...");
+        // Load TensorFlow MobileNet
         const loadedModel = await mobilenet.load();
         setModel(loadedModel);
         setModelLoading(false);
@@ -109,7 +73,6 @@ const FoodScanner = () => {
             videoRef.current.play().then(() => setStreamActive(true));
           };
         }
-        
       } catch (err) {
         console.error("Init error:", err);
         setError("Camera access denied or AI model failed to load.");
@@ -118,17 +81,16 @@ const FoodScanner = () => {
     };
 
     initSystem();
-    loadHistory();
+    loadHistory(); // Load from Dexie on mount
 
     return () => {
       if (stream) {
-        const tracks = stream.getTracks();
-        tracks.forEach(track => track.stop());
+        stream.getTracks().forEach(track => track.stop());
       }
     };
   }, []);
 
-  // Toggle Flash Logic
+  // --- 2. Flash Handler ---
   useEffect(() => {
     if (!videoRef.current || !videoRef.current.srcObject) return;
     const track = videoRef.current.srcObject.getVideoTracks()[0];
@@ -139,12 +101,18 @@ const FoodScanner = () => {
     }
   }, [flash]);
 
+  // --- 3. Database Integration ---
   const loadHistory = async () => {
-    const logs = await getLogs();
-    setHistory(logs);
+    try {
+      // Fetching directly from your Dexie DB
+      const logs = await getFoodLogs(); 
+      setHistory(logs);
+    } catch (e) {
+      console.error("Failed to load history", e);
+    }
   };
 
-  // 2. The Scanning Logic
+  // --- 4. Scan Logic ---
   const handleScan = useCallback(async () => {
     if (!videoRef.current || !model || isScanning) return;
     
@@ -153,7 +121,7 @@ const FoodScanner = () => {
     abortController.current = new AbortController(); 
 
     try {
-      // 1. AI Prediction (TensorFlow)
+      // A. Identify Object via TensorFlow
       const predictions = await model.classify(videoRef.current);
       
       if (abortController.current.signal.aborted) return;
@@ -162,17 +130,18 @@ const FoodScanner = () => {
         const bestGuess = predictions[0].className.split(',')[0]; 
         console.log("AI Identified:", bestGuess);
 
-        // 2. Fetch Nutrition based on AI result
+        // B. Fetch Nutrition
         const nutrition = await fetchNutrition(bestGuess);
         
         if (abortController.current.signal.aborted) return;
 
         if (nutrition) {
           setResult(nutrition);
-          await saveLog(nutrition);
-          loadHistory();
+          
+          // C. Save to Dexie DB
+          await saveFoodLog(nutrition);
+          loadHistory(); // Refresh UI
         } else {
-          // Fallback if food detected but not in database
           setResult({ 
             name: bestGuess, 
             calories: '?', 
@@ -214,6 +183,7 @@ const FoodScanner = () => {
     setIsScanning(false);
   };
 
+  // --- Render ---
   return (
     <div className="absolute inset-0 w-full h-full bg-black text-white overflow-hidden flex flex-col">
       
@@ -250,7 +220,7 @@ const FoodScanner = () => {
       {/* Main Viewport Area */}
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center pointer-events-none">
         
-        {/* Error Message Toast */}
+        {/* Error Toast */}
         {error && (
           <div className="absolute top-20 bg-red-500/90 text-white px-6 py-3 rounded-2xl backdrop-blur-xl shadow-xl animate-fade-in pointer-events-auto mx-4 text-center z-50">
             <p className="text-sm font-medium">{error}</p>
@@ -258,16 +228,10 @@ const FoodScanner = () => {
           </div>
         )}
 
-        {/* Scanner Frame - FIXED SIZING HERE */}
+        {/* Scanner Frame */}
         {!result && streamActive && (
           <div className="relative">
-            {/* 
-               CHANGED: w-[70vw] -> w-[70vmin] 
-               This limits size based on the SMALLER screen dimension.
-               Added aspect-square to keep it perfectly square.
-            */}
             <div className={`w-[70vmin] h-[70vmin] max-w-[350px] max-h-[350px] aspect-square border border-white/20 rounded-[2rem] relative overflow-hidden bg-white/5 backdrop-blur-[1px] transition-all duration-300 ${isScanning ? 'scale-105 border-emerald-500/50' : ''}`}>
-              {/* Corners */}
               <div className="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-emerald-500 rounded-tl-2xl" />
               <div className="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-emerald-500 rounded-tr-2xl" />
               <div className="absolute bottom-0 left-0 w-10 h-10 border-b-4 border-l-4 border-emerald-500 rounded-bl-2xl" />
@@ -290,7 +254,6 @@ const FoodScanner = () => {
           <div className="flex flex-col items-center pb-8 px-6">
             <div className="flex items-center justify-between w-full max-w-md px-4">
               
-              {/* History Button */}
               <button 
                 onClick={() => setShowHistory(true)}
                 disabled={isScanning}
@@ -299,10 +262,8 @@ const FoodScanner = () => {
                 <Clock className="w-6 h-6" />
               </button>
 
-              {/* Main Action Button (Scan or Cancel) */}
               <div className="relative">
                 {isScanning ? (
-                  // Cancel Button
                   <button 
                     onClick={cancelScan}
                     className="w-20 h-20 rounded-full bg-red-500/20 border-4 border-red-500 flex items-center justify-center transition-all duration-200 hover:bg-red-500/30 hover:scale-105 animate-pulse"
@@ -313,7 +274,6 @@ const FoodScanner = () => {
                     </div>
                   </button>
                 ) : (
-                  // Scan Button
                   <button 
                     onClick={handleScan}
                     disabled={!streamActive || modelLoading}
@@ -326,7 +286,6 @@ const FoodScanner = () => {
                 )}
               </div>
 
-              {/* Spacer for visual balance */}
               <div className="w-14 h-14" /> 
             </div>
             
@@ -416,7 +375,6 @@ const FoodScanner = () => {
       <canvas ref={canvasRef} className="hidden" />
       
       <style jsx>{`
-        /* Safe Area Utilities for Mobile */
         .pt-safe-top { padding-top: env(safe-area-inset-top, 24px); }
         .pb-safe-bottom { padding-bottom: env(safe-area-inset-bottom, 24px); }
         
