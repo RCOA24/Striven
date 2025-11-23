@@ -13,6 +13,7 @@ import WorkoutOrganizer from './pages/WorkoutOrganizer'; // ← Workout Organize
 import Notification from './components/Notifications';
 import Intro from './components/Intro';
 import { deleteActivity } from './utils/db';
+import FoodScanner from './pages/FoodScanner'; // NEW: FoodScanner page
 
 // CREATE CONTEXT
 export const AppContext = createContext();
@@ -153,6 +154,8 @@ function App() {
         return <ExerciseLibrary />;
       case 'organizer':
         return <WorkoutOrganizer />;
+      case 'food': // NEW
+        return <FoodScanner />;
       default:
         return (
           <Dashboard

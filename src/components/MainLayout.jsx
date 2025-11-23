@@ -1,11 +1,12 @@
 import React from 'react';
-import { Home, Activity, TrendingUp, User, Dumbbell, Settings } from 'lucide-react';
+import { Home, Activity, TrendingUp, User, Dumbbell, Settings, Scan } from 'lucide-react'; // +Scan
 
 const MainLayout = ({ children, currentPage, onNavigate }) => {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'activity', label: 'Activity', icon: Activity },
     { id: 'stats', label: 'Stats', icon: TrendingUp },
+    { id: 'food', label: 'Food', icon: Scan }, // NEW
     { id: 'exercises', label: 'Exercises', icon: Dumbbell },
     { id: 'profile', label: 'Profile', icon: User },
   ];
