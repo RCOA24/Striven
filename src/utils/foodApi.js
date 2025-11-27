@@ -1,13 +1,13 @@
 // utils/foodApi.js
 
 // ==========================================
-// 1. HELPER: OPEN FOOD FACTS (For Hugging Face Path)
+// 1. HELPER: OPEN FOOD FACTS (Fallback Database)
 // ==========================================
 async function fetchNutritionFromOFF(query) {
   try {
     const cleanQuery = query.replace(/_/g, ' ').trim().toLowerCase();
-    // Fetch specifically name and nutrients to save bandwidth
     const fields = "product_name,nutriments";
+    // sort_by=popularity helps find the "general" version of the food
     const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(cleanQuery)}&search_simple=1&action=process&json=1&page_size=3&fields=${fields}&sort_by=popularity`;
 
     const res = await fetch(url);
@@ -15,7 +15,6 @@ async function fetchNutritionFromOFF(query) {
 
     if (!data.products || data.products.length === 0) return null;
 
-    // Find first product with valid calories
     const product = data.products.find(p => 
       p.nutriments && (p.nutriments['energy-kcal_100g'] > 0 || p.nutriments.energy_value > 0)
     ) || data.products[0];
@@ -33,7 +32,7 @@ async function fetchNutritionFromOFF(query) {
 }
 
 // ==========================================
-// 2. PRIMARY: GOOGLE GEMINI (Fastest & Smartest)
+// 2. PRIMARY: GOOGLE GEMINI (The "Global Food Expert")
 // ==========================================
 async function analyzeWithGemini(imageBlob) {
   const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
@@ -46,13 +45,25 @@ async function analyzeWithGemini(imageBlob) {
     reader.readAsDataURL(imageBlob);
   });
 
+  // --- THE SECRET SAUCE: BETTER PROMPTING ---
+  // We explicitly tell it to look for international and specific regional dishes.
+  const promptText = `
+    Act as a world-renowned nutritionist and food critic with expertise in Asian, Filipino, Western, and International cuisines. 
+    Analyze the image and identify the food.
+    
+    Rules:
+    1. Look specifically for regional dishes (e.g., "Sinigang", "Adobo", "Sisig", "Ramen", "Paella") rather than generic terms like "Stew" or "Rice".
+    2. Estimate nutrition for a standard serving size (approx 1 serving).
+    3. Return STRICT JSON (no markdown) with these keys: 
+       name (string), calories (int), protein (int), carbs (int), fat (int), isUnknown (boolean).
+    4. If the image is unclear, make your best educated guess based on visible ingredients. Do not give up easily.
+    5. If it is absolutely not food (like a shoe or a car), set isUnknown: true.
+  `;
+
   const requestBody = {
     contents: [{
       parts: [
-        { text: `Identify this food. Estimate nutrition for 1 serving. 
-                 Return strictly valid JSON (no markdown) with these keys: 
-                 name (string), calories (int), protein (int), carbs (int), fat (int), isUnknown (boolean).
-                 If it's not food, set isUnknown: true.` },
+        { text: promptText },
         { inline_data: { mime_type: "image/jpeg", data: base64Data } }
       ]
     }]
@@ -72,20 +83,31 @@ async function analyzeWithGemini(imageBlob) {
   const data = await response.json();
   const text = data.candidates[0].content.parts[0].text;
   
-  // Clean Markdown (```json ... ```)
+  // Clean Markdown
   const jsonString = text.replace(/```json|```/g, '').trim();
-  const result = JSON.parse(jsonString);
-
-  return { ...result, confidence: 0.98 }; // Gemini is usually very confident
+  
+  try {
+    const result = JSON.parse(jsonString);
+    // If Gemini returns "Unknown" but gave a name, force it to be known
+    if (result.name && result.name !== "Unknown" && result.isUnknown) {
+        result.isUnknown = false;
+    }
+    return { ...result, confidence: 0.98 }; 
+  } catch (e) {
+    console.error("Failed to parse Gemini JSON", text);
+    throw new Error("AI parsing error");
+  }
 }
 
 // ==========================================
-// 3. FALLBACK: HUGGING FACE (Reliable Backup)
+// 3. FALLBACK: HUGGING FACE (Good for generic foods)
 // ==========================================
 async function analyzeWithHuggingFace(imageBlob) {
   const apiKey = import.meta.env.VITE_HUGGINGFACE_API_KEY;
   if (!apiKey) throw new Error("Missing HF API Key");
 
+  // NOTE: 'nateraw/food' is trained on Western Food-101. 
+  // It is BAD at Filipino/Asian food. We only use this if Google fails.
   const MODEL = "nateraw/food"; 
   const apiUrl = `https://router.huggingface.co/hf-inference/models/${MODEL}`;
 
@@ -98,18 +120,18 @@ async function analyzeWithHuggingFace(imageBlob) {
     body: imageBlob, 
   });
 
-  // Handle Cold Boot
   if (response.status === 503) {
     const errorData = await response.json();
     const waitTime = errorData.estimated_time || 2;
     await new Promise(r => setTimeout(r, waitTime * 1000));
-    return analyzeWithHuggingFace(imageBlob); // Retry recursively once
+    return analyzeWithHuggingFace(imageBlob); 
   }
 
   const result = await response.json();
   
   if (Array.isArray(result) && result.length > 0) {
     const top = result[0];
+    // Lower threshold heavily because nateraw is bad at international food
     if (top.score < 0.10) throw new Error("HF Confidence Low");
 
     const nutrition = await fetchNutritionFromOFF(top.label);
@@ -119,7 +141,6 @@ async function analyzeWithHuggingFace(imageBlob) {
       return { ...nutrition, confidence: top.score, isUnknown: false };
     }
     
-    // Identified but no nutrition data
     return { name: readableName, calories: 0, protein: 0, carbs: 0, fat: 0, confidence: top.score, isUnknown: true };
   }
   
@@ -127,17 +148,17 @@ async function analyzeWithHuggingFace(imageBlob) {
 }
 
 // ==========================================
-// 4. MAIN EXPORT (The Orchestrator)
+// 4. MAIN EXPORT
 // ==========================================
 export async function analyzeFood(imageBlob) {
-  // Strategy: Try Gemini First -> If it fails/errors, Switch to Hugging Face
   try {
-    console.log("Attempting Gemini Scan...");
+    // 1. Try Google Gemini (Smartest for International Food)
     return await analyzeWithGemini(imageBlob);
   } catch (geminiError) {
-    console.warn("Gemini failed/limited, switching to Hugging Face...", geminiError);
+    console.warn("Gemini failed, switching to Hugging Face...", geminiError);
     
     try {
+      // 2. Fallback to Hugging Face (Dumb but reliable backup)
       return await analyzeWithHuggingFace(imageBlob);
     } catch (hfError) {
       console.error("All AI models failed");
