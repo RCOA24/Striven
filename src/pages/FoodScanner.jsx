@@ -220,17 +220,20 @@ const FoodScanner = () => {
         </div>
       </div>
 
-      {/* Scanner Box Animation */}
+     {/* Scanner Box Animation */}
       {!result && streamActive && !error && (
         <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none">
-          <div className="w-[70vw] h-[70vw] max-w-sm max-h-sm border border-white/20 rounded-[2rem] relative overflow-hidden bg-white/5 backdrop-blur-[1px] shadow-2xl">
-            {/* Corners */}
+          
+          {/* UPDATED CLASS: Changed w-[70vw] to w-[70vmin] (relative to smallest side) */}
+          <div className="w-[70vmin] h-[70vmin] max-w-sm max-h-sm border border-white/20 rounded-[2rem] relative overflow-hidden bg-white/5 backdrop-blur-[1px] shadow-2xl">
+            
+            {/* Corners (Unchanged) */}
             <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-emerald-500 rounded-tl-2xl" />
             <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-emerald-500 rounded-tr-2xl" />
             <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-emerald-500 rounded-bl-2xl" />
             <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-emerald-500 rounded-br-2xl" />
             
-            {/* Scanning Line */}
+            {/* Scanning Line (Unchanged) */}
             {isScanning && (
               <div className="absolute inset-x-0 h-0.5 bg-emerald-400 shadow-[0_0_20px_2px_rgba(52,211,153,0.8)] animate-scan" />
             )}

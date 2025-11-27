@@ -62,7 +62,7 @@ export async function analyzeImageWithHuggingFace(imageBlob) {
           Authorization: `Bearer ${apiKey}`,
           // Don't set Content-Type manually when sending Blob/File usually, 
           // but for HF inference raw body, 'image/jpeg' or 'application/octet-stream' is okay.
-          "Content-Type": "image/jpeg" 
+          "Content-Type": "application/octet-stream" 
         },
         method: "POST",
         body: imageBlob,
