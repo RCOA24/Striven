@@ -32,9 +32,10 @@ export async function analyzeImageWithHuggingFace(base64Image) {
     const base64Response = await fetch(base64Image);
     const blob = await base64Response.blob();
 
-    // Use a specific food classification model (Vision Transformer fine-tuned on Food-101)
+    // Switch to BLIP (Image Captioning) for better accuracy on general foods
+    // The previous model (nateraw/food) was limited to specific dishes (Food-101 dataset)
     const response = await fetch(
-      "https://api-inference.huggingface.co/models/nateraw/food",
+      "https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-large",
       {
         headers: { Authorization: `Bearer ${apiKey}` },
         method: "POST",
@@ -44,22 +45,35 @@ export async function analyzeImageWithHuggingFace(base64Image) {
 
     const result = await response.json();
     
-    // Hugging Face returns an array of predictions: [{ label: "fried_chicken", score: 0.9 }, ...]
-    if (Array.isArray(result) && result.length > 0) {
-      const topPrediction = result[0];
-      // Clean label (e.g. "fried_chicken" -> "fried chicken")
-      const foodName = topPrediction.label.replace(/_/g, ' ');
+    // BLIP returns: [{ generated_text: "a close up of a fried egg" }]
+    if (Array.isArray(result) && result.length > 0 && result[0].generated_text) {
+      let description = result[0].generated_text.toLowerCase();
       
+      // Clean up common prefixes to get to the food name
+      const prefixes = ["a close up of ", "a plate of ", "a view of ", "an image of ", "a picture of "];
+      for (const prefix of prefixes) {
+        if (description.startsWith(prefix)) {
+          description = description.slice(prefix.length);
+        }
+      }
+      
+      // Further cleanup: remove "on a white plate", "with a fork", etc.
+      description = description.split(' on ')[0];
+      description = description.split(' with ')[0];
+      description = description.trim();
+
+      console.log("AI Identified:", description);
+
       // Get nutrition data for the identified food
-      const nutrition = await fetchNutrition(foodName);
+      const nutrition = await fetchNutrition(description);
       
       if (nutrition) {
         return nutrition;
       }
       
-      // Fallback if we identified the food but couldn't find nutrition
+      // Fallback
       return {
-        name: foodName,
+        name: description,
         calories: 0, protein: 0, carbs: 0, fat: 0,
         isUnknown: true
       };
