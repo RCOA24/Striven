@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Zap, Clock, Utensils, CheckCircle, RefreshCw, X, ScanLine, RotateCcw } from 'lucide-react';
 import { saveFoodLog, getFoodLogs } from '../utils/db';
-import { analyzeImageWithHuggingFace } from '../utils/foodApi';
+// UPDATED IMPORT: Using the new hybrid function
+import { analyzeFood } from '../utils/foodApi';
 
 const FoodScanner = () => {
   const videoRef = useRef(null);
@@ -131,7 +132,8 @@ const FoodScanner = () => {
         }
 
         try {
-            const aiResult = await analyzeImageWithHuggingFace(blob);
+            // UPDATED CALL: analyzeFood handles Gemini -> HF Fallback automatically
+            const aiResult = await analyzeFood(blob);
             
             if (aiResult) {
               setResult(aiResult);
@@ -306,8 +308,9 @@ const FoodScanner = () => {
             )}
             
             <div className="flex items-center justify-between text-xs text-zinc-500">
+                {/* Check source to display correct label */}
                 <span>Confidence: {Math.round(result.confidence * 100)}%</span>
-                <span>Source: OpenFoodFacts</span>
+                <span>Source: {result.confidence >= 0.95 ? 'Gemini AI' : 'OpenFoodFacts'}</span>
             </div>
           </div>
         )}
