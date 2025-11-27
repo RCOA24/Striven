@@ -55,7 +55,7 @@ const FoodScanner = () => {
     setHistory(logs);
   };
 
-  // --- 4. Scan Logic ---
+   // --- 4. Scan Logic ---
   const handleScan = useCallback(async () => {
     if (!videoRef.current || isScanning) return;
     
@@ -64,33 +64,42 @@ const FoodScanner = () => {
     setError(null);
 
     try {
-      // 1. Capture Image from Video Stream
       const video = videoRef.current;
       const canvas = document.createElement('canvas');
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const base64Image = canvas.toDataURL('image/jpeg', 0.8);
+      
+      // Get raw Base64 - we let the utility function compress it now
+      const base64Image = canvas.toDataURL('image/jpeg', 1.0);
 
-      // 2. Send to Hugging Face
+      // Send to optimized API
       const aiResult = await analyzeImageWithHuggingFace(base64Image);
       
-      if (aiResult && !aiResult.isUnknown) {
+      if (aiResult) {
         setResult(aiResult);
-        await saveFoodLog(aiResult);
-        loadHistory();
+        // Only save to DB if it's a valid scan (not unknown)
+        if (!aiResult.isUnknown) {
+          await saveFoodLog(aiResult);
+          loadHistory();
+        }
       } else {
-        setError("Could not identify food. Try getting closer.");
+        setError("AI couldn't recognize this food. Try a different angle.");
       }
-    } catch (error) {
-      console.error(error);
-      setError("Scan failed. Check API Key or connection.");
+    } catch (err) {
+      console.error(err);
+      // More friendly error messages
+      if (err.message.includes("Missing Hugging Face")) {
+        setError("API Key missing in configuration.");
+      } else {
+        setError("Connection error or subject unclear.");
+      }
     } finally {
       setIsScanning(false);
     }
   }, [isScanning]);
-
+  
   const resetScan = () => {
     setResult(null);
     setIsScanning(false);
