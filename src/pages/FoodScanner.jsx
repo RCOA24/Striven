@@ -1,23 +1,32 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Zap, Clock, Utensils, CheckCircle, RefreshCw, X, ScanLine, StopCircle } from 'lucide-react';
-import * as mobilenet from '@tensorflow-models/mobilenet';
+import { Zap, Clock, Utensils, CheckCircle, RefreshCw, X, ScanLine } from 'lucide-react';
 import { saveFoodLog, getFoodLogs } from '../utils/db';
+import { analyzeImageWithGPT } from '../utils/foodApi';
 
-// --- HOOKS ---
-
-// 1. Camera Management
-const useCamera = () => {
+const FoodScanner = () => {
   const videoRef = useRef(null);
+  const canvasRef = useRef(null);
   const [streamActive, setStreamActive] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [result, setResult] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [showHistory, setShowHistory] = useState(false);
   const [flash, setFlash] = useState(false);
   const [error, setError] = useState(null);
 
+  // --- 1. Initialize Camera ---
   useEffect(() => {
     let stream = null;
-    const startCamera = async () => {
+
+    const init = async () => {
+      // 2. Start Camera
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+        stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { 
+            facingMode: 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          } 
         });
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -26,340 +35,267 @@ const useCamera = () => {
           };
         }
       } catch (err) {
-        console.error("Camera Error:", err);
-        setError("Camera access denied.");
+        console.error("Camera init error:", err);
+        setError(prev => prev ? `${prev} Also camera denied.` : "Camera access denied.");
       }
     };
-    startCamera();
-    return () => stream?.getTracks().forEach(t => t.stop());
+
+    init();
+    loadHistory(); // Load from Dexie on mount
+
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
   }, []);
 
-  // Flash toggle
-  useEffect(() => {
-    if (!videoRef.current?.srcObject) return;
-    const track = videoRef.current.srcObject.getVideoTracks()[0];
-    const capabilities = track.getCapabilities();
-    if (capabilities.torch) {
-      track.applyConstraints({ advanced: [{ torch: flash }] }).catch(() => {});
-    }
-  }, [flash]);
-
-  return { videoRef, streamActive, flash, setFlash, error };
-};
-
-// 2. AI & Nutrition Logic
-const useFoodAI = () => {
-  const [model, setModel] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    mobilenet.load().then(m => {
-      setModel(m);
-      setLoading(false);
-    }).catch(e => {
-      console.error("Model Error:", e);
-      setLoading(false);
-    });
-  }, []);
-
-  const identify = async (videoElement) => {
-    if (!model || !videoElement) return null;
-    const predictions = await model.classify(videoElement);
-    return predictions?.[0]?.className.split(',')[0] || null;
+  const loadHistory = async () => {
+    const logs = await getFoodLogs();
+    setHistory(logs);
   };
 
-  const getNutrition = async (query) => {
-    try {
-      const res = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=1`);
-      const data = await res.json();
-      const p = data.products?.[0];
-      if (!p) return null;
-      return {
-        name: p.product_name || query,
-        calories: Math.round(p.nutriments?.energy_kcal || 0),
-        protein: Math.round(p.nutriments?.proteins || 0),
-        carbs: Math.round(p.nutriments?.carbohydrates || 0),
-        fat: Math.round(p.nutriments?.fat || 0),
-      };
-    } catch { return null; }
-  };
-
-  return { model, loading, identify, getNutrition };
-};
-
-// 3. History Management
-const useHistory = () => {
-  const [history, setHistory] = useState([]);
-  
-  const refresh = useCallback(async () => {
-    setHistory(await getFoodLogs());
-  }, []);
-
-  useEffect(() => { refresh(); }, [refresh]);
-
-  const add = async (item) => {
-    await saveFoodLog(item);
-    refresh();
-  };
-
-  return { history, add, refresh };
-};
-
-// --- COMPONENTS ---
-
-const CameraLayer = ({ videoRef, streamActive }) => (
-  <div className="absolute inset-0 z-0 bg-black">
-    <video
-      ref={videoRef}
-      autoPlay playsInline muted
-      className={`w-full h-full object-cover transition-opacity duration-700 ${streamActive ? 'opacity-100' : 'opacity-0'}`}
-    />
-    <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/90 pointer-events-none" />
-  </div>
-);
-
-const TopBar = ({ loading, flash, setFlash }) => (
-  <div className="relative z-20 flex justify-between items-start p-4 pt-safe-top">
-    <div className="flex flex-col">
-      <div className="flex items-center space-x-2 bg-black/30 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 w-fit">
-        <Utensils className="w-4 h-4 text-emerald-400" />
-        <span className="text-xs font-medium">AI Food Lens</span>
-      </div>
-      {loading && <span className="text-[10px] text-white/50 ml-2 mt-1">Loading AI...</span>}
-    </div>
-    <button
-      onClick={() => setFlash(!flash)}
-      className={`p-3 rounded-full backdrop-blur-md border transition-all ${flash ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-400' : 'bg-black/30 border-white/10 text-white'}`}
-    >
-      <Zap className={`w-5 h-5 ${flash ? 'fill-current' : ''}`} />
-    </button>
-  </div>
-);
-
-const ScannerOverlay = ({ isScanning, loading, streamActive }) => {
-  if (!streamActive) return null;
-  return (
-    <div className="relative z-10 flex-1 flex flex-col items-center justify-center pointer-events-none">
-      <div className={`w-[70vmin] h-[70vmin] max-w-[350px] max-h-[350px] aspect-square border border-white/20 rounded-[2rem] relative overflow-hidden bg-white/5 backdrop-blur-[1px] transition-all duration-300 ${isScanning ? 'scale-105 border-emerald-500/50' : ''}`}>
-        <div className="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-emerald-500 rounded-tl-2xl" />
-        <div className="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-emerald-500 rounded-tr-2xl" />
-        <div className="absolute bottom-0 left-0 w-10 h-10 border-b-4 border-l-4 border-emerald-500 rounded-bl-2xl" />
-        <div className="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 border-emerald-500 rounded-br-2xl" />
-        {isScanning && <div className="absolute inset-x-0 h-0.5 bg-emerald-400 shadow-[0_0_25px_rgba(52,211,153,1)] animate-scan top-0" />}
-      </div>
-      <p className="text-center mt-6 text-white/90 text-sm font-medium bg-black/40 px-4 py-2 rounded-full backdrop-blur-md mx-auto w-fit">
-        {loading ? 'Initializing AI Models...' : isScanning ? 'Identifying object...' : 'Center food & Scan'}
-      </p>
-    </div>
-  );
-};
-
-const ResultCard = ({ result, onReset }) => (
-  <div className="bg-zinc-900 border-t border-white/10 rounded-t-[2.5rem] p-6 pb-safe-bottom shadow-2xl animate-slide-up max-h-[80vh] overflow-y-auto w-full">
-    <div className="w-12 h-1 bg-zinc-700 rounded-full mx-auto mb-6 opacity-50" />
-    <div className="flex justify-between items-start mb-6">
-      <div>
-        <h2 className="text-3xl font-bold text-white capitalize leading-tight">{result.name}</h2>
-        <div className="flex items-center space-x-2 mt-2">
-          <CheckCircle className="w-4 h-4 text-emerald-500" />
-          <span className="text-emerald-500 text-sm font-medium">Logged to history</span>
-        </div>
-      </div>
-      <button onClick={onReset} className="p-3 bg-white/10 rounded-full hover:bg-white/20 transition-colors">
-        <RefreshCw className="w-5 h-5 text-white" />
-      </button>
-    </div>
-    <div className="grid grid-cols-2 gap-4 mb-6">
-      <div className="col-span-2 bg-zinc-800/50 rounded-3xl p-5 flex items-center justify-between border border-white/5">
-        <span className="text-zinc-400 font-medium">Energy</span>
-        <div className="text-right">
-          <span className="text-3xl font-bold text-white block">{result.calories}</span>
-          <span className="text-xs text-emerald-400 font-bold uppercase tracking-wider">Kcal</span>
-        </div>
-      </div>
-      <NutrientBox label="Protein" value={result.protein} unit="g" color="text-blue-400" bg="bg-blue-400/10" border="border-blue-400/20" />
-      <NutrientBox label="Carbs" value={result.carbs} unit="g" color="text-yellow-400" bg="bg-yellow-400/10" border="border-yellow-400/20" />
-      <NutrientBox label="Fats" value={result.fat} unit="g" color="text-rose-400" bg="bg-rose-400/10" border="border-rose-400/20" />
-      <NutrientBox label="Weight" value="100" unit="g" color="text-zinc-400" bg="bg-white/5" border="border-white/5" />
-    </div>
-    <button onClick={onReset} className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 rounded-2xl font-bold text-black transition-colors">
-      Scan Another Item
-    </button>
-  </div>
-);
-
-const HistorySheet = ({ history, onClose }) => (
-  <div className="absolute inset-0 z-50 bg-zinc-950 animate-fade-in flex flex-col">
-    <div className="flex items-center justify-between p-6 pt-safe-top border-b border-white/10 bg-zinc-900">
-      <h2 className="text-xl font-bold text-white">Scan History</h2>
-      <button onClick={onClose} className="p-2 bg-white/10 rounded-full hover:bg-white/20">
-        <X className="w-5 h-5 text-white" />
-      </button>
-    </div>
-    <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar pb-safe-bottom">
-      {history.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-full text-zinc-500 space-y-4">
-          <ScanLine className="w-16 h-16 opacity-20" />
-          <p>No food scanned yet</p>
-        </div>
-      ) : (
-        history.map((item, i) => (
-          <div key={i} className="flex items-center justify-between bg-zinc-900 border border-white/5 p-4 rounded-2xl">
-            <div className="flex-1 min-w-0 pr-4">
-              <div className="font-medium text-white text-lg truncate capitalize">{item.name}</div>
-              <div className="text-xs text-zinc-400 mt-1">
-                {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-emerald-400 font-bold">{item.calories} kcal</div>
-              <div className="flex space-x-2 text-[10px] text-zinc-500 mt-1">
-                <span>{item.protein}p</span>
-                <span>{item.carbs}c</span>
-                <span>{item.fat}f</span>
-              </div>
-            </div>
-          </div>
-        ))
-      )}
-    </div>
-  </div>
-);
-
-const NutrientBox = ({ label, value, unit, color, bg, border }) => (
-  <div className={`${bg} ${border} border rounded-2xl p-3 flex flex-col items-center justify-center text-center h-24`}>
-    <span className={`text-xl font-bold ${color}`}>{value}</span>
-    <span className="text-[10px] text-zinc-400 uppercase tracking-wider mt-1">{label}</span>
-    <span className="text-[10px] text-zinc-500">{unit}</span>
-  </div>
-);
-
-// --- MAIN COMPONENT ---
-
-const FoodScanner = () => {
-  const { videoRef, streamActive, flash, setFlash, error: cameraError } = useCamera();
-  const { loading: modelLoading, identify, getNutrition } = useFoodAI();
-  const { history, add: addToHistory } = useHistory();
-  
-  const [isScanning, setIsScanning] = useState(false);
-  const [result, setResult] = useState(null);
-  const [showHistory, setShowHistory] = useState(false);
-  const [scanError, setScanError] = useState(null);
-  const abortController = useRef(null);
-
-  const handleScan = async () => {
-    if (isScanning || modelLoading) return;
+  // --- 4. Scan Logic ---
+  const handleScan = useCallback(async () => {
+    if (!videoRef.current || isScanning) return;
+    
     setIsScanning(true);
     setResult(null);
-    setScanError(null);
-    abortController.current = new AbortController();
+    setError(null);
 
     try {
-      const foodName = await identify(videoRef.current);
-      if (abortController.current.signal.aborted) return;
+      // 1. Capture Image from Video Stream
+      const video = videoRef.current;
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const base64Image = canvas.toDataURL('image/jpeg', 0.8);
 
-      if (foodName) {
-        const nutrition = await getNutrition(foodName);
-        if (abortController.current.signal.aborted) return;
-
-        if (nutrition) {
-          setResult(nutrition);
-          addToHistory(nutrition);
-        } else {
-          setScanError(`Identified "${foodName}", but no nutrition info found.`);
-          setResult({ name: foodName, calories: '?', protein: '?', carbs: '?', fat: '?' });
-        }
+      // 2. Send to OpenAI
+      const aiResult = await analyzeImageWithGPT(base64Image);
+      
+      if (aiResult && !aiResult.isUnknown) {
+        setResult(aiResult);
+        await saveFoodLog(aiResult);
+        loadHistory();
       } else {
-        setScanError("Could not identify object.");
+        setError("Could not identify food. Try getting closer.");
       }
-    } catch (e) {
-      console.error(e);
-      setScanError("Scan failed.");
+    } catch (error) {
+      console.error(error);
+      setError("Scan failed. Check API Key or connection.");
     } finally {
-      if (!abortController.current.signal.aborted) {
-        setIsScanning(false);
-        abortController.current = null;
-      }
+      setIsScanning(false);
     }
-  };
+  }, [isScanning]);
 
-  const cancelScan = () => {
-    abortController.current?.abort();
-    setIsScanning(false);
+  const resetScan = () => {
     setResult(null);
-  };
-
-  const reset = () => {
-    setResult(null);
-    setScanError(null);
     setIsScanning(false);
+    setError(null);
   };
 
-  const error = cameraError || scanError;
-
+  // --- Render ---
   return (
-    <div className="absolute inset-0 w-full h-full bg-black text-white overflow-hidden flex flex-col">
-      <CameraLayer videoRef={videoRef} streamActive={streamActive} />
-      <TopBar loading={modelLoading} flash={flash} setFlash={setFlash} />
-
-      {/* Error Toast */}
-      {error && (
-        <div className="absolute top-20 left-0 right-0 flex justify-center z-50 pointer-events-none">
-          <div className="bg-red-500/90 text-white px-6 py-3 rounded-2xl backdrop-blur-xl shadow-xl animate-fade-in pointer-events-auto mx-4 text-center">
-            <p className="text-sm font-medium">{error}</p>
-            <button onClick={() => setScanError(null)} className="mt-2 text-xs bg-white/20 px-3 py-1 rounded-full hover:bg-white/30">Dismiss</button>
+    <div className="absolute inset-0 w-full h-full bg-black overflow-hidden flex flex-col">
+      
+      {/* Camera Viewfinder */}
+      <div className="absolute inset-0 z-0">
+        {error ? (
+          <div className="flex items-center justify-center h-full text-white/50 p-6 text-center bg-zinc-900">
+            <div className="space-y-2">
+              <X className="w-12 h-12 mx-auto text-red-400" />
+              <p>{error}</p>
+            </div>
           </div>
+        ) : (
+          <video 
+            ref={videoRef} 
+            autoPlay 
+            playsInline 
+            muted 
+            className={`w-full h-full object-cover transition-opacity duration-700 ${streamActive ? 'opacity-100' : 'opacity-0'}`}
+          />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/80 pointer-events-none" />
+      </div>
+
+      {/* Header Overlay */}
+      <div className="relative z-10 flex justify-between items-center p-4 pt-6">
+        <div className="flex items-center space-x-2 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
+          <Utensils className="w-4 h-4 text-emerald-400" />
+          <span className="text-xs font-medium text-white">AI Food Lens</span>
+        </div>
+        <button 
+          onClick={() => setFlash(!flash)}
+          className={`p-2 rounded-full backdrop-blur-md border transition-all ${flash ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-400' : 'bg-black/40 border-white/10 text-white'}`}
+        >
+          <Zap className={`w-5 h-5 ${flash ? 'fill-current' : ''}`} />
+        </button>
+      </div>
+
+      {/* Scanner Frame & Animation */}
+      {!result && streamActive && !error && (
+        <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none">
+          <div className="w-72 h-72 border border-white/20 rounded-3xl relative overflow-hidden bg-white/5 backdrop-blur-[2px]">
+            <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-emerald-500 rounded-tl-xl" />
+            <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-emerald-500 rounded-tr-xl" />
+            <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-emerald-500 rounded-bl-xl" />
+            <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-emerald-500 rounded-br-xl" />
+            
+            {isScanning && (
+              <div className="absolute inset-x-0 h-0.5 bg-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.8)] animate-scan top-0" />
+            )}
+          </div>
+          <p className="absolute mt-96 text-white/80 text-sm font-medium animate-pulse bg-black/40 px-4 py-1 rounded-full backdrop-blur-md">
+            {isScanning ? 'Analyzing with GPT-4o...' : 'Align food within frame'}
+          </p>
         </div>
       )}
 
-      {!result && <ScannerOverlay isScanning={isScanning} loading={modelLoading} streamActive={streamActive} />}
-
-      {/* Bottom Section */}
-      <div className="relative z-20 pb-safe-bottom bg-gradient-to-t from-black via-black/95 to-transparent pt-10 mt-auto">
+      {/* Main Controls / Results */}
+      <div className="absolute bottom-0 left-0 right-0 z-20 pb-24 md:pb-8 pt-20 bg-gradient-to-t from-black via-black/90 to-transparent">
         {!result ? (
-          <div className="flex flex-col items-center pb-8 px-6">
-            <div className="flex items-center justify-between w-full max-w-md px-4">
-              <button onClick={() => setShowHistory(true)} disabled={isScanning} className={`p-4 rounded-full bg-white/10 backdrop-blur-md text-white border border-white/5 transition-all ${isScanning ? 'opacity-30' : 'hover:bg-white/20'}`}>
+          <div className="flex flex-col items-center space-y-6">
+            <div className="flex items-center justify-center w-full px-8 space-x-12">
+              <button 
+                onClick={() => setShowHistory(true)}
+                className="p-4 rounded-full bg-white/10 backdrop-blur-md text-white hover:bg-white/20 transition-colors border border-white/5"
+              >
                 <Clock className="w-6 h-6" />
               </button>
 
-              <div className="relative">
-                {isScanning ? (
-                  <button onClick={cancelScan} className="w-20 h-20 rounded-full bg-red-500/20 border-4 border-red-500 flex items-center justify-center transition-all duration-200 hover:bg-red-500/30 hover:scale-105 animate-pulse">
-                    <div className="flex flex-col items-center justify-center">
-                      <StopCircle className="w-8 h-8 text-red-500 fill-current" />
-                      <span className="text-[10px] uppercase font-bold text-red-400 mt-1">Stop</span>
-                    </div>
-                  </button>
-                ) : (
-                  <button onClick={handleScan} disabled={!streamActive || modelLoading} className={`w-20 h-20 rounded-full border-4 border-white flex items-center justify-center transition-all duration-300 shadow-lg shadow-emerald-900/20 ${modelLoading ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 hover:border-emerald-400 active:scale-95'}`}>
-                    <div className="w-16 h-16 rounded-full bg-emerald-500 flex items-center justify-center">
-                      <ScanLine className="w-8 h-8 text-white" />
-                    </div>
-                  </button>
-                )}
-              </div>
-              <div className="w-14 h-14" />
+              <button 
+                onClick={handleScan}
+                disabled={!streamActive || isScanning || error}
+                className={`w-20 h-20 rounded-full border-4 border-white flex items-center justify-center transition-all duration-300 shadow-lg shadow-emerald-900/20 ${isScanning ? 'scale-90 opacity-80' : 'hover:scale-105 hover:border-emerald-400'} ${error ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <div className={`w-16 h-16 rounded-full transition-colors duration-300 ${isScanning ? 'bg-emerald-500' : 'bg-white'}`} />
+              </button>
+
+              <div className="w-14" />
             </div>
-            <p className="text-xs text-zinc-500 mt-6 font-medium">{modelLoading ? 'Please wait...' : 'Tap button to capture'}</p>
           </div>
         ) : (
-          <ResultCard result={result} onReset={reset} />
+          // Result Card
+          <div className="mx-4 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-3xl p-6 shadow-2xl animate-slide-up mb-4">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h2 className="text-2xl font-bold text-white capitalize">{result.name}</h2>
+                <div className="flex items-center space-x-2 mt-1">
+                  <CheckCircle className="w-4 h-4 text-emerald-500" />
+                  <span className="text-emerald-500 text-xs font-medium">Logged to history</span>
+                </div>
+              </div>
+              <button onClick={resetScan} className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors">
+                <RefreshCw className="w-5 h-5 text-white" />
+              </button>
+            </div>
+
+            {result.isUnknown ? (
+               <div className="text-zinc-400 text-sm mb-4">
+                 Identified as {result.name}, but no nutrition info found.
+               </div>
+            ) : (
+              <div className="grid grid-cols-4 gap-3 mb-4">
+                <NutrientBox label="Calories" value={result.calories} unit="kcal" color="text-white" />
+                <NutrientBox label="Protein" value={result.protein} unit="g" color="text-blue-400" />
+                <NutrientBox label="Carbs" value={result.carbs} unit="g" color="text-yellow-400" />
+                <NutrientBox label="Fat" value={result.fat} unit="g" color="text-rose-400" />
+              </div>
+            )}
+            
+            <div className="w-full bg-white/5 rounded-xl p-3 flex items-center justify-between">
+              <span className="text-xs text-zinc-400">AI Confidence</span>
+              <div className="flex items-center space-x-2">
+                <div className="w-24 h-1.5 bg-zinc-700 rounded-full overflow-hidden">
+                  <div className="h-full bg-emerald-500 w-[85%]" />
+                </div>
+                <span className="text-xs font-bold text-white">High</span>
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
-      {showHistory && <HistorySheet history={history} onClose={() => setShowHistory(false)} />}
+      {/* History Sheet */}
+      {showHistory && (
+        <div className="absolute inset-0 z-30 bg-black/95 backdrop-blur-xl animate-fade-in flex flex-col">
+          <div className="flex items-center justify-between p-6 border-b border-white/10 bg-zinc-900/50">
+            <h2 className="text-xl font-bold text-white">Scan History</h2>
+            <button onClick={() => setShowHistory(false)} className="p-2 bg-white/10 rounded-full hover:bg-white/20">
+              <X className="w-5 h-5 text-white" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+            {history.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-64 text-zinc-500 space-y-4">
+                <ScanLine className="w-12 h-12 opacity-20" />
+                <p>No scans yet</p>
+              </div>
+            ) : (
+              history.map((item, i) => (
+                <div key={i} className="flex items-center justify-between bg-zinc-900 border border-white/5 p-4 rounded-2xl hover:bg-zinc-800 transition-colors">
+                  <div>
+                    <div className="font-medium text-white capitalize">{item.name}</div>
+                    <div className="text-xs text-zinc-400 mt-1">
+                      {new Date(item.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} • {item.calories} kcal
+                    </div>
+                  </div>
+                  <div className="flex space-x-3 text-xs font-medium">
+                    <span className="text-blue-400">{item.protein}p</span>
+                    <span className="text-yellow-400">{item.carbs}c</span>
+                    <span className="text-rose-400">{item.fat}f</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
 
+      {/* Hidden Canvas for Capture */}
+      <canvas ref={canvasRef} className="hidden" />
+      
       <style jsx>{`
-        .pt-safe-top { padding-top: env(safe-area-inset-top, 24px); }
-        .pb-safe-bottom { padding-bottom: env(safe-area-inset-bottom, 24px); }
-        @keyframes scan { 0% { top: 0%; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
-        .animate-scan { animation: scan 2.5s linear infinite; }
-        .animate-slide-up { animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
-        @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes scan {
+          0% { top: 0%; opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { top: 100%; opacity: 0; }
+        }
+        .animate-scan {
+          animation: scan 2s linear infinite;
+        }
+        .animate-slide-up {
+          animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @keyframes slideUp {
+          from { transform: translateY(100%); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.05);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.2);
+          border-radius: 10px;
+        }
       `}</style>
     </div>
   );
 };
+
+const NutrientBox = ({ label, value, unit, color }) => (
+  <div className="bg-white/5 rounded-2xl p-3 flex flex-col items-center justify-center text-center border border-white/5">
+    <span className={`text-lg font-bold ${color}`}>{value}</span>
+    <span className="text-[10px] text-zinc-400 uppercase tracking-wider mt-1">{label}</span>
+  </div>
+);
 
 export default FoodScanner;
