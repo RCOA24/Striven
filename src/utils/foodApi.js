@@ -1,31 +1,30 @@
 // utils/foodApi.js
 
-// 1. Fetch Nutrition (Optimized Search)
+// --- 1. Fetch Nutrition from OpenFoodFacts ---
 export async function fetchNutrition(query) {
   try {
     // Clean up label (e.g., "hot_dog" -> "hot dog")
     const cleanQuery = query.replace(/_/g, ' ').trim();
     
-    // Search OpenFoodFacts
-    // sort_by=popularity helps get the generic version of the food
-    const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(cleanQuery)}&search_simple=1&action=process&json=1&page_size=5&sort_by=popularity`;
+    // API Call: Sort by popularity to avoid obscure variations
+    const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(cleanQuery)}&search_simple=1&action=process&json=1&page_size=6&sort_by=popularity`;
     
     const res = await fetch(url);
     const data = await res.json();
     
     if (!data.products || data.products.length === 0) return null;
 
-    // Filter: Find first product that actually has calorie data
+    // Filter: Find the first product that actually has calorie data
     const product = data.products.find(p => 
       p.nutriments && 
       (p.nutriments['energy-kcal_100g'] > 0 || p.nutriments.energy_value > 0)
     ) || data.products[0];
 
-    // normalize values
+    // Extract values
     const calories = product.nutriments?.['energy-kcal_100g'] || product.nutriments?.energy_value || 0;
     
-    // If calories are 0, it's likely a bad match or water, return null to force "Unknown" state or handle gracefully
-    if (calories === 0 && cleanQuery.toLowerCase() !== 'water') return null;
+    // Guard clause: If calories are 0 and it's not water, it's likely a bad match.
+    if (calories === 0 && !cleanQuery.toLowerCase().includes('water')) return null;
 
     return {
       name: cleanQuery,
@@ -35,18 +34,17 @@ export async function fetchNutrition(query) {
       fat: Math.round(product.nutriments?.fat_100g || 0),
     };
   } catch (e) {
-    console.error("Nutrition fetch error:", e);
+    console.error("Nutrition API Error:", e);
     return null;
   }
 }
 
-// 2. Analyze Image (Accepts Blob directly for speed)
+// --- 2. Analyze Image with Hugging Face (Direct Router) ---
 export async function analyzeImageWithHuggingFace(imageBlob) {
   const apiKey = import.meta.env.VITE_HUGGINGFACE_API_KEY;
   if (!apiKey) throw new Error("Missing API Key");
 
-  // Segformer is often faster/more accurate for food, but ViT is standard.
-  // We stick to the models you had, they are good.
+  // We use the specific router URL for better stability
   const MODELS = [
     "nateraw/food", 
     "Kaludi/food-category-classification-v2.0"
@@ -54,30 +52,33 @@ export async function analyzeImageWithHuggingFace(imageBlob) {
 
   for (const model of MODELS) {
     try {
-      // Ensure your Vite proxy is set up for /api/hf -> https://api-inference.huggingface.co
-      const proxyUrl = `/api/hf/models/${model}`;
+      console.log(`Analyzing with ${model}...`);
+      
+      // NEW ENDPOINT: router.huggingface.co
+      const apiUrl = `https://router.huggingface.co/hf-inference/models/${model}`;
 
-      const response = await fetch(proxyUrl, {
+      // We send the Blob directly. No JSON.stringify needed for raw image uploads.
+      const response = await fetch(apiUrl, {
         headers: { 
           Authorization: `Bearer ${apiKey}`,
-          // Don't set Content-Type manually when sending Blob/File usually, 
-          // but for HF inference raw body, 'image/jpeg' or 'application/octet-stream' is okay.
-          "Content-Type": "application/octet-stream" 
+          "Content-Type": "image/jpeg", // Explicitly set for binary upload
+          "x-use-cache": "false"        // Optional: force fresh inference
         },
         method: "POST",
-        body: imageBlob,
+        body: imageBlob, 
       });
 
-      // Handle Model Loading (Cold Boot)
+      // --- Handle Cold Boot (Model Loading 503) ---
       if (response.status === 503) {
         const errorData = await response.json();
         const waitTime = errorData.estimated_time || 5;
-        console.warn(`Model ${model} loading... waiting ${waitTime}s`);
+        console.log(`Model loading... waiting ${waitTime.toFixed(1)}s`);
         
+        // Wait
         await new Promise(r => setTimeout(r, waitTime * 1000));
         
-        // Retry once
-        const retryResponse = await fetch(proxyUrl, {
+        // Retry exact same request
+        const retryResponse = await fetch(apiUrl, {
           headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "image/jpeg" },
           method: "POST",
           body: imageBlob,
@@ -86,35 +87,39 @@ export async function analyzeImageWithHuggingFace(imageBlob) {
         if (retryResponse.ok) return processResult(await retryResponse.json());
       }
 
-      if (!response.ok) throw new Error(`HF Status ${response.status}`);
+      if (!response.ok) {
+        throw new Error(`HF API Error: ${response.status}`);
+      }
 
       const result = await response.json();
       return await processResult(result);
 
     } catch (err) {
-      console.warn(`Model ${model} failed, trying next...`, err.message);
+      console.warn(`Model ${model} failed:`, err.message);
+      // Loop continues to next model...
     }
   }
 
-  throw new Error("Could not recognize food. Please try again.");
+  throw new Error("Could not identify food. Try moving closer or checking lighting.");
 }
 
+// --- 3. Process Logic ---
 async function processResult(result) {
+  // HuggingFace returns an array: [{ label: "pizza", score: 0.99 }, ...]
   if (Array.isArray(result) && result.length > 0) {
     const topResult = result[0];
     
-    // Threshold: If AI is less than 20% sure, don't guess.
-    if (topResult.score < 0.20) throw new Error("Image unclear");
+    // Confidence Check (e.g. 20%)
+    if (topResult.score < 0.20) throw new Error("Confidence too low");
 
+    // Fetch Nutrition
     const nutrition = await fetchNutrition(topResult.label);
-    
-    // Clean Label
     const readableName = topResult.label.replace(/_/g, ' ');
 
     if (nutrition) {
       return { ...nutrition, confidence: topResult.score, isUnknown: false };
     } else {
-      // recognized the object, but no nutrition info found
+      // Recognized visual, but no nutrition found
       return { 
         name: readableName, 
         calories: 0, protein: 0, carbs: 0, fat: 0, 
@@ -123,5 +128,5 @@ async function processResult(result) {
       };
     }
   }
-  throw new Error("Invalid AI response");
+  throw new Error("Invalid response format from AI");
 }
