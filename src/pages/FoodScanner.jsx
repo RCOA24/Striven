@@ -1,11 +1,10 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Zap, Clock, Utensils, CheckCircle, RefreshCw, X, ScanLine, Camera, RotateCcw } from 'lucide-react';
+import { Zap, Clock, Utensils, CheckCircle, RefreshCw, X, ScanLine, RotateCcw } from 'lucide-react';
 import { saveFoodLog, getFoodLogs } from '../utils/db';
 import { analyzeImageWithHuggingFace } from '../utils/foodApi';
 
 const FoodScanner = () => {
   const videoRef = useRef(null);
-  const canvasRef = useRef(null); // Used for capturing
   
   // Camera State
   const [stream, setStream] = useState(null);
@@ -23,7 +22,6 @@ const FoodScanner = () => {
 
   // --- 1. Camera Initialization ---
   const startCamera = useCallback(async () => {
-    // Stop existing stream if any
     if (stream) {
       stream.getTracks().forEach(track => track.stop());
     }
@@ -32,7 +30,7 @@ const FoodScanner = () => {
       const newStream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
           facingMode: facingMode,
-          width: { ideal: 1280 }, // Higher res for preview
+          width: { ideal: 1280 }, 
           height: { ideal: 720 }
         } 
       });
@@ -41,15 +39,14 @@ const FoodScanner = () => {
 
       if (videoRef.current) {
         videoRef.current.srcObject = newStream;
-        // Wait for data to load
         videoRef.current.onloadedmetadata = async () => {
           try {
             await videoRef.current.play();
             setStreamActive(true);
             
-            // Check for torch capability
+            // Check for torch/flashlight capability
             const track = newStream.getVideoTracks()[0];
-            const capabilities = track.getCapabilities();
+            const capabilities = track.getCapabilities ? track.getCapabilities() : {};
             setHasTorch(!!capabilities.torch);
           } catch (e) {
             console.error("Play error", e);
@@ -62,16 +59,15 @@ const FoodScanner = () => {
     }
   }, [facingMode]);
 
-  // Initial Load
   useEffect(() => {
     startCamera();
     loadHistory();
     return () => {
       if (stream) stream.getTracks().forEach(track => track.stop());
     };
-  }, [startCamera]); // Re-run if facingMode changes
+  }, [startCamera]);
 
-  // Flashlight Toggle Logic
+  // --- 2. Camera Controls ---
   const toggleFlash = async () => {
     if (!stream || !hasTorch) return;
     const track = stream.getVideoTracks()[0];
@@ -87,7 +83,7 @@ const FoodScanner = () => {
 
   const toggleCamera = () => {
     setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
-    setFlashOn(false); // Flash usually resets on switch
+    setFlashOn(false);
   };
 
   const loadHistory = async () => {
@@ -99,7 +95,7 @@ const FoodScanner = () => {
     }
   };
 
-  // --- 2. Optimized Capture & Scan ---
+  // --- 3. Optimized Capture Logic (Center Crop) ---
   const handleScan = useCallback(async () => {
     if (!videoRef.current || isScanning) return;
     
@@ -110,9 +106,7 @@ const FoodScanner = () => {
     try {
       const video = videoRef.current;
       
-      // OPTIMIZATION: Create a small offscreen canvas/blob directly.
-      // Vision Transformers (ViT) usually expect 224x224 or 384x384. 
-      // Sending 4k images wastes bandwidth and processing time.
+      // Vision Transformers expect square images (384x384 is a good standard)
       const TARGET_SIZE = 384; 
       
       const canvas = document.createElement('canvas');
@@ -120,14 +114,15 @@ const FoodScanner = () => {
       canvas.height = TARGET_SIZE;
       const ctx = canvas.getContext('2d');
       
-      // Center crop logic
+      // LOGIC: Crop the center square of the video feed
+      // This matches the visual UI box so the AI sees exactly what the user sees
       const minDim = Math.min(video.videoWidth, video.videoHeight);
       const startX = (video.videoWidth - minDim) / 2;
       const startY = (video.videoHeight - minDim) / 2;
       
       ctx.drawImage(video, startX, startY, minDim, minDim, 0, 0, TARGET_SIZE, TARGET_SIZE);
 
-      // Convert to Blob directly (faster than Base64 string manipulation)
+      // Convert to Blob (Binary) for fast upload
       canvas.toBlob(async (blob) => {
         if (!blob) {
             setError("Capture failed");
@@ -141,20 +136,26 @@ const FoodScanner = () => {
             if (aiResult) {
               setResult(aiResult);
               if (!aiResult.isUnknown) {
-                // Ensure db.js handles errors gracefully
+                // Background save
                 saveFoodLog(aiResult).then(loadHistory).catch(e => console.log('Save failed', e));
               }
             }
         } catch (apiErr) {
+            console.error(apiErr);
+            // Specific Error Messaging
             if (apiErr.message.includes("API Key")) {
                 setError("Configuration Error: API Key missing.");
+            } else if (apiErr.message.includes("Confidence")) {
+                setError("Not sure what that is. Try getting closer.");
+            } else if (apiErr.message.includes("503")) {
+                setError("AI is warming up... please try again in a moment.");
             } else {
-                setError("Couldn't identify food. Try getting closer.");
+                setError("Could not identify food. Check connection.");
             }
         } finally {
             setIsScanning(false);
         }
-      }, 'image/jpeg', 0.8);
+      }, 'image/jpeg', 0.85);
 
     } catch (err) {
       console.error(err);
@@ -176,10 +177,12 @@ const FoodScanner = () => {
       {/* Viewfinder */}
       <div className="absolute inset-0 z-0 bg-black">
         {error ? (
-          <div className="flex flex-col items-center justify-center h-full text-white/60 p-6 text-center">
+          <div className="flex flex-col items-center justify-center h-full text-white/60 p-6 text-center z-50 relative">
             <X className="w-12 h-12 mb-4 text-rose-500" />
-            <p>{error}</p>
-            <button onClick={() => { setError(null); startCamera(); }} className="mt-4 px-4 py-2 bg-white/10 rounded-full text-sm">Retry Camera</button>
+            <p className="max-w-xs">{error}</p>
+            <button onClick={() => { setError(null); startCamera(); }} className="mt-6 px-6 py-2 bg-white/10 rounded-full text-sm hover:bg-white/20 transition-colors">
+              Retry Camera
+            </button>
           </div>
         ) : (
           <video 
@@ -190,7 +193,6 @@ const FoodScanner = () => {
             className={`w-full h-full object-cover transition-opacity duration-500 ${streamActive ? 'opacity-100' : 'opacity-0'}`}
           />
         )}
-        {/* Dark Gradient Overlay for readability */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/90 pointer-events-none" />
       </div>
 
@@ -224,16 +226,14 @@ const FoodScanner = () => {
       {!result && streamActive && !error && (
         <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none">
           
-          {/* UPDATED CLASS: Changed w-[70vw] to w-[70vmin] (relative to smallest side) */}
+          {/* FIX: Using vmin ensures the box is always a square relative to the smaller screen side */}
           <div className="w-[70vmin] h-[70vmin] max-w-sm max-h-sm border border-white/20 rounded-[2rem] relative overflow-hidden bg-white/5 backdrop-blur-[1px] shadow-2xl">
             
-            {/* Corners (Unchanged) */}
             <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-emerald-500 rounded-tl-2xl" />
             <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-emerald-500 rounded-tr-2xl" />
             <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-emerald-500 rounded-bl-2xl" />
             <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-emerald-500 rounded-br-2xl" />
             
-            {/* Scanning Line (Unchanged) */}
             {isScanning && (
               <div className="absolute inset-x-0 h-0.5 bg-emerald-400 shadow-[0_0_20px_2px_rgba(52,211,153,0.8)] animate-scan" />
             )}
@@ -268,7 +268,6 @@ const FoodScanner = () => {
                 <div className={`w-16 h-16 rounded-full transition-all duration-300 ${isScanning ? 'bg-emerald-500 scale-75' : 'bg-white'}`} />
             </button>
 
-            {/* Spacer for balance */}
             <div className="w-14" /> 
           </div>
         ) : (
@@ -356,7 +355,7 @@ const FoodScanner = () => {
         </div>
       )}
 
-      {/* CSS for Scan Animation */}
+      {/* Scan Line Animation */}
       <style>{`
         @keyframes scan {
           0% { top: 0%; opacity: 0; }
