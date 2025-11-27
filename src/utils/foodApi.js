@@ -20,49 +20,54 @@ export async function fetchNutrition(query) {
   }
 }
 
-export async function analyzeImageWithGPT(base64Image) {
-  const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+export async function analyzeImageWithHuggingFace(base64Image) {
+  const apiKey = import.meta.env.VITE_HUGGINGFACE_API_KEY;
   
   if (!apiKey) {
-    throw new Error("Missing OpenAI API Key");
+    throw new Error("Missing Hugging Face API Key");
   }
 
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: "gpt-4o", // Changed from gpt-4o-mini to gpt-4o for better accuracy
-        messages: [
-          {
-            role: "user",
-            content: [
-              { 
-                type: "text", 
-                text: "Identify the main food dish in this image. Return ONLY a JSON object with these keys: name (string), calories (number), protein (number), carbs (number), fat (number). Estimate for a standard serving size. If not food, return { isUnknown: true, name: 'Unknown' }." 
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: base64Image
-                }
-              }
-            ]
-          }
-        ],
-        max_tokens: 300,
-        response_format: { type: "json_object" }
-      })
-    });
+    // Convert Base64 to Blob for Hugging Face API
+    const base64Response = await fetch(base64Image);
+    const blob = await base64Response.blob();
 
-    const data = await response.json();
-    const content = data.choices[0].message.content;
-    return JSON.parse(content);
+    // Use a specific food classification model (Vision Transformer fine-tuned on Food-101)
+    const response = await fetch(
+      "https://api-inference.huggingface.co/models/nateraw/food",
+      {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        method: "POST",
+        body: blob,
+      }
+    );
+
+    const result = await response.json();
+    
+    // Hugging Face returns an array of predictions: [{ label: "fried_chicken", score: 0.9 }, ...]
+    if (Array.isArray(result) && result.length > 0) {
+      const topPrediction = result[0];
+      // Clean label (e.g. "fried_chicken" -> "fried chicken")
+      const foodName = topPrediction.label.replace(/_/g, ' ');
+      
+      // Get nutrition data for the identified food
+      const nutrition = await fetchNutrition(foodName);
+      
+      if (nutrition) {
+        return nutrition;
+      }
+      
+      // Fallback if we identified the food but couldn't find nutrition
+      return {
+        name: foodName,
+        calories: 0, protein: 0, carbs: 0, fat: 0,
+        isUnknown: true
+      };
+    }
+    
+    return null;
   } catch (error) {
-    console.error("OpenAI Error:", error);
+    console.error("Hugging Face Error:", error);
     return null;
   }
 }

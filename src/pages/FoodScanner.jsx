@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Zap, Clock, Utensils, CheckCircle, RefreshCw, X, ScanLine } from 'lucide-react';
 import { saveFoodLog, getFoodLogs } from '../utils/db';
-import { analyzeImageWithGPT } from '../utils/foodApi';
+import { analyzeImageWithHuggingFace } from '../utils/foodApi';
 
 const FoodScanner = () => {
   const videoRef = useRef(null);
@@ -73,8 +73,8 @@ const FoodScanner = () => {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const base64Image = canvas.toDataURL('image/jpeg', 0.8);
 
-      // 2. Send to OpenAI
-      const aiResult = await analyzeImageWithGPT(base64Image);
+      // 2. Send to Hugging Face
+      const aiResult = await analyzeImageWithHuggingFace(base64Image);
       
       if (aiResult && !aiResult.isUnknown) {
         setResult(aiResult);
@@ -150,7 +150,7 @@ const FoodScanner = () => {
             )}
           </div>
           <p className="absolute mt-96 text-white/80 text-sm font-medium animate-pulse bg-black/40 px-4 py-1 rounded-full backdrop-blur-md">
-            {isScanning ? 'Analyzing with GPT-4o...' : 'Align food within frame'}
+            {isScanning ? 'Analyzing with AI...' : 'Align food within frame'}
           </p>
         </div>
       )}
