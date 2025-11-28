@@ -3,8 +3,10 @@
 // ==========================================
 // 1. HELPER: OPEN FOOD FACTS (Fallback Database)
 // ==========================================
-async function fetchNutritionFromOFF(query) {
+async function fetchNutritionFromOFF(query, onStatus) {
   try {
+    if (onStatus) onStatus(`Searching database for "${query}"...`);
+    
     const cleanQuery = query.replace(/_/g, ' ').trim().toLowerCase();
     const fields = "product_name,nutriments";
     const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(cleanQuery)}&search_simple=1&action=process&json=1&page_size=3&fields=${fields}&sort_by=popularity`;
@@ -14,7 +16,6 @@ async function fetchNutritionFromOFF(query) {
 
     if (!data.products || data.products.length === 0) return null;
 
-    // Find first product with valid calories
     const product = data.products.find(p => 
       p.nutriments && (p.nutriments['energy-kcal_100g'] > 0 || p.nutriments.energy_value > 0)
     ) || data.products[0];
@@ -27,17 +28,18 @@ async function fetchNutritionFromOFF(query) {
       fat: Math.round(product.nutriments?.fat_100g || 0),
     };
   } catch (e) {
-    console.warn("OFF API Error", e);
     return null;
   }
 }
 
 // ==========================================
-// 2. PRIMARY: GOOGLE GEMINI (Robust Version)
+// 2. PRIMARY: GOOGLE GEMINI
 // ==========================================
-async function analyzeWithGemini(imageBlob) {
+async function analyzeWithGemini(imageBlob, onStatus) {
   const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
   if (!apiKey) throw new Error("Missing Google API Key");
+
+  if (onStatus) onStatus("Encoding image...");
 
   const base64Data = await new Promise((resolve) => {
     const reader = new FileReader();
@@ -45,24 +47,14 @@ async function analyzeWithGemini(imageBlob) {
     reader.readAsDataURL(imageBlob);
   });
 
+  if (onStatus) onStatus("Consulting Gemini AI...");
+
   const promptText = `
-    Identify this food. Return ONLY a JSON object. Do not include markdown formatting.
-    
-    If it is NOT food, return: {"isUnknown": true}
-    If it is food, return:
-    {
-      "name": "Food Name",
-      "calories": 0,
-      "protein": 0,
-      "carbs": 0,
-      "fat": 0,
-      "confidence": 0.95,
-      "isUnknown": false
-    }
-    
-    Rules:
-    1. Look specifically for Filipino/Asian dishes (e.g., "Sinigang", "Adobo", "Sisig") if applicable.
-    2. Estimate nutrition for 1 serving.
+    Identify this food. Return ONLY a JSON object.
+    If NOT food, return: {"isUnknown": true}
+    If food, return:
+    { "name": "Food Name", "calories": 0, "protein": 0, "carbs": 0, "fat": 0, "confidence": 0.95, "isUnknown": false }
+    Rules: Look for Filipino/Asian dishes. Estimate 1 serving.
   `;
 
   const response = await fetch(
@@ -83,10 +75,11 @@ async function analyzeWithGemini(imageBlob) {
 
   if (!response.ok) throw new Error("Gemini API Error");
 
+  if (onStatus) onStatus("Parsing AI results...");
+
   const data = await response.json();
   const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
   
-  // ROBUST PARSING: Extract strictly the JSON part to prevent crashes
   const jsonMatch = rawText.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error("Invalid JSON from Gemini");
   
@@ -100,9 +93,11 @@ async function analyzeWithGemini(imageBlob) {
 // ==========================================
 // 3. FALLBACK: HUGGING FACE
 // ==========================================
-async function analyzeWithHuggingFace(imageBlob) {
+async function analyzeWithHuggingFace(imageBlob, onStatus) {
   const apiKey = import.meta.env.VITE_HUGGINGFACE_API_KEY;
   if (!apiKey) throw new Error("Missing HF API Key");
+
+  if (onStatus) onStatus("Connecting to Vision Model...");
 
   const MODEL = "nateraw/food"; 
   const apiUrl = `https://router.huggingface.co/hf-inference/models/${MODEL}`;
@@ -114,10 +109,11 @@ async function analyzeWithHuggingFace(imageBlob) {
   });
 
   if (response.status === 503) {
+    if (onStatus) onStatus("Model warming up...");
     const errorData = await response.json();
     const waitTime = errorData.estimated_time || 2;
     await new Promise(r => setTimeout(r, waitTime * 1000));
-    return analyzeWithHuggingFace(imageBlob); 
+    return analyzeWithHuggingFace(imageBlob, onStatus); 
   }
 
   const result = await response.json();
@@ -126,14 +122,14 @@ async function analyzeWithHuggingFace(imageBlob) {
     const top = result[0];
     if (top.score < 0.15) throw new Error("HF Confidence Low");
 
-    const nutrition = await fetchNutritionFromOFF(top.label);
+    // Pass onStatus here too
+    const nutrition = await fetchNutritionFromOFF(top.label, onStatus);
     const readableName = top.label.replace(/_/g, ' ');
 
     if (nutrition && nutrition.calories > 0) {
       return { ...nutrition, confidence: top.score, isUnknown: false };
     }
     
-    // If OFF fails, return just the name and 0 cals
     return { name: readableName, calories: 0, protein: 0, carbs: 0, fat: 0, confidence: top.score, isUnknown: true };
   }
   
@@ -143,15 +139,18 @@ async function analyzeWithHuggingFace(imageBlob) {
 // ==========================================
 // 4. MAIN EXPORT
 // ==========================================
-export async function analyzeFood(imageBlob) {
+export async function analyzeFood(imageBlob, onStatus) {
   try {
     // Attempt 1: Gemini
-    return await analyzeWithGemini(imageBlob);
+    return await analyzeWithGemini(imageBlob, onStatus);
   } catch (geminiError) {
     console.warn("Gemini failed, switching to Hugging Face...", geminiError);
+    
+    if (onStatus) onStatus("Gemini unsure. Trying backup AI...");
+    
     try {
       // Attempt 2: Hugging Face + OpenFoodFacts
-      return await analyzeWithHuggingFace(imageBlob);
+      return await analyzeWithHuggingFace(imageBlob, onStatus);
     } catch (hfError) {
       console.error("All AI models failed");
       throw new Error("Could not identify food. Please try again.");

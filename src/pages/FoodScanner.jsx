@@ -14,13 +14,14 @@ const FoodScanner = () => {
   const [flashOn, setFlashOn] = useState(false);
 
   // App State
-  const [isProcessing, setIsProcessing] = useState(false); // New state for API loading
-  const [imageCaptured, setImageCaptured] = useState(false); // New state for frozen frame
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [statusText, setStatusText] = useState("Initializing..."); // NEW: Holds the real status
+  const [imageCaptured, setImageCaptured] = useState(false);
   const [result, setResult] = useState(null);
   const [history, setHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
   const [error, setError] = useState(null);
-  const [shutterEffect, setShutterEffect] = useState(false); // For visual flash
+  const [shutterEffect, setShutterEffect] = useState(false);
 
   // --- 1. Camera Initialization ---
   const startCamera = useCallback(async () => {
@@ -75,22 +76,20 @@ const FoodScanner = () => {
   const takePhoto = async () => {
     if (!videoRef.current || isProcessing) return;
 
-    // A. Visual Shutter Effect
     setShutterEffect(true);
     setTimeout(() => setShutterEffect(false), 150);
 
-    // B. Freeze Video (The "Take Picture" UX)
     videoRef.current.pause();
     setImageCaptured(true);
     setIsProcessing(true);
+    setStatusText("Capturing image..."); // Initial status
     setError(null);
 
     try {
       const video = videoRef.current;
       const canvas = document.createElement('canvas');
-      
-      // Center Crop logic
       const TARGET_SIZE = 512;
+      
       canvas.width = TARGET_SIZE;
       canvas.height = TARGET_SIZE;
       const ctx = canvas.getContext('2d');
@@ -104,14 +103,18 @@ const FoodScanner = () => {
         if (!blob) throw new Error("Capture failed");
 
         try {
-            const aiResult = await analyzeFood(blob);
+            // PASS THE SETTER FUNCTION TO THE API
+            const aiResult = await analyzeFood(blob, (status) => {
+                setStatusText(status); // Update UI with real API status
+            });
+
             setResult(aiResult);
             if (!aiResult.isUnknown) {
                 saveFoodLog(aiResult).then(loadHistory);
             }
         } catch (err) {
             console.error(err);
-            setError("Couldn't identify food. Try getting closer or better lighting.");
+            setError("Couldn't identify food. Try getting closer.");
         } finally {
             setIsProcessing(false);
         }
@@ -128,33 +131,27 @@ const FoodScanner = () => {
     setError(null);
     setIsProcessing(false);
     setImageCaptured(false);
-    if (videoRef.current) {
-        videoRef.current.play(); // Resume live feed
-    }
+    setStatusText("");
+    if (videoRef.current) videoRef.current.play();
   };
 
   // --- Render ---
   return (
-    <div className="absolute inset-0 w-full h-full bg-black overflow-hidden flex flex-col font-sans select-none">
+    <div className="absolute inset-0 w-full h-full bg-black overflow-hidden flex flex-col font-sans select-none text-white">
       
-      {/* 1. Viewfinder */}
+      {/* 1. Viewfinder Layer */}
       <div className="absolute inset-0 z-0 bg-black">
         <video 
           ref={videoRef} 
           playsInline 
           muted 
-          // If result exists or processing, we keep opacity 1 (showing frozen frame)
           className={`w-full h-full object-cover transition-opacity duration-500 ${streamActive ? 'opacity-100' : 'opacity-0'}`}
         />
-        
-        {/* Shutter Flash Animation */}
         <div className={`absolute inset-0 bg-white pointer-events-none transition-opacity duration-150 ${shutterEffect ? 'opacity-50' : 'opacity-0'}`} />
-        
-        {/* Dark overlay for text readability */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/90 pointer-events-none" />
       </div>
 
-      {/* 2. Error Message */}
+      {/* 2. Error Layer */}
       {error && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-6">
            <div className="bg-zinc-900 p-6 rounded-2xl border border-red-500/30 text-center max-w-xs shadow-2xl">
@@ -169,7 +166,7 @@ const FoodScanner = () => {
         </div>
       )}
 
-      {/* 3. Header */}
+      {/* 3. Header Controls */}
       {!result && (
       <div className="relative z-10 flex justify-between items-center p-4 safe-top pt-8">
         <div className="flex items-center space-x-2 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/5">
@@ -190,12 +187,12 @@ const FoodScanner = () => {
       </div>
       )}
 
-      {/* 4. Center Focus Box */}
+      {/* 4. Center Focus / Loading Box */}
       {!result && !error && (
         <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none">
           <div className={`w-[70vmin] h-[70vmin] max-w-sm max-h-sm border transition-all duration-300 rounded-[2rem] relative overflow-hidden shadow-2xl ${isProcessing ? 'border-emerald-500/50 bg-black/40 backdrop-blur-sm' : 'border-white/20 bg-white/5 backdrop-blur-[1px]'}`}>
             
-            {/* Corners */}
+            {/* Corners (Only show when not processing) */}
             {!isProcessing && (
                 <>
                 <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-emerald-500 rounded-tl-2xl" />
@@ -205,16 +202,19 @@ const FoodScanner = () => {
                 </>
             )}
 
-            {/* Loading Spinner */}
+            {/* REAL STATUS LOADING STATE */}
             {isProcessing && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-emerald-400">
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-emerald-400 p-4 text-center">
                     <Loader2 className="w-12 h-12 animate-spin mb-4" />
-                    <span className="text-sm font-medium text-white tracking-widest uppercase">Analyzing</span>
+                    {/* Display the dynamic status text */}
+                    <span className="text-sm font-medium text-white tracking-widest uppercase animate-pulse">
+                        {statusText}
+                    </span>
                 </div>
             )}
           </div>
           
-          {/* Helper Text */}
+          {/* Helper Text (Hide when processing) */}
           {!isProcessing && (
             <div className="absolute mt-80 flex flex-col items-center space-y-2">
                 <p className="text-white/80 text-sm font-medium px-4 py-1.5 bg-black/40 rounded-full backdrop-blur-md">
@@ -225,7 +225,7 @@ const FoodScanner = () => {
         </div>
       )}
 
-      {/* 5. Bottom Controls (Shutter) */}
+      {/* 5. Bottom Controls */}
       <div className="absolute bottom-0 left-0 right-0 z-20 pb-12 pt-12 bg-gradient-to-t from-black via-black/90 to-transparent">
         {!result && !isProcessing && !error ? (
           <div className="flex items-center justify-center w-full px-8 space-x-12">
@@ -233,7 +233,6 @@ const FoodScanner = () => {
               <Clock className="w-6 h-6" />
             </button>
 
-            {/* THE SHUTTER BUTTON (Click, don't hold) */}
             <button 
               onClick={takePhoto}
               disabled={!streamActive}
@@ -254,13 +253,13 @@ const FoodScanner = () => {
                 {!result.isUnknown && (
                     <div className="flex items-center space-x-2 mt-1">
                         <CheckCircle className="w-4 h-4 text-emerald-500" />
-                        <span className="text-emerald-500 text-xs font-medium">Saved to Log</span>
+                        <span className="text-emerald-500 text-xs font-medium">Logged</span>
                     </div>
                 )}
               </div>
               <button onClick={resetScanner} className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors active:scale-95 flex items-center gap-2 px-4">
                 <RefreshCw className="w-4 h-4 text-white" />
-                <span className="text-xs font-bold text-white">Scan Next</span>
+                <span className="text-xs font-bold text-white">Next</span>
               </button>
             </div>
 
@@ -287,12 +286,12 @@ const FoodScanner = () => {
         ) : null}
       </div>
 
-      {/* History Slide-over (Unchanged visually) */}
+      {/* History Slide-over */}
       {showHistory && (
         <div className="absolute inset-0 z-30 bg-black/60 backdrop-blur-sm animate-in fade-in">
           <div className="absolute inset-x-0 bottom-0 top-20 bg-zinc-900 rounded-t-3xl flex flex-col shadow-2xl animate-in slide-in-from-bottom">
             <div className="flex items-center justify-between p-6 border-b border-white/5">
-              <h2 className="text-xl font-bold text-white">Recent Scans</h2>
+              <h2 className="text-xl font-bold">Recent Scans</h2>
               <button onClick={() => setShowHistory(false)} className="p-2 bg-white/5 rounded-full hover:bg-white/10">
                 <X className="w-5 h-5 text-white" />
               </button>
