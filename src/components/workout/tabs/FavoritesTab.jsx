@@ -1,18 +1,23 @@
+// src/components/favorites/FavoritesTab.jsx
 import React, { useState, useMemo, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Plus, Sparkles, Search, X, TrendingUp, Zap, Loader2 } from 'lucide-react';
+import ExerciseModal from '../modals/ExerciseModal'; // Ensure path is correct
 
-// CORRECT: Default import (no curly braces)
-import ExerciseModal from '../modals/ExerciseModal';
-
-const NO_GIF = 'https://via.placeholder.com/400x300/111/fff?text=No+GIF';
+// ✅ FIX: Use local fallback GIF
+const FALLBACK_GIF = '/fallback-exercise.gif';
 
 /**
  * Memoized Favorite Card
- * Prevents unnecessary re-renders when search term changes or other items are removed.
  */
 const FavoriteCard = memo(({ item, onOpenModal, onQuickAdd, onUnfavorite }) => {
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [hasError, setHasError] = useState(false);
+
+  // Determine image source priority: Preview > GIF > Local Fallback
+  const displayImage = hasError 
+    ? FALLBACK_GIF 
+    : (item.previewImage || item.gifUrl || FALLBACK_GIF);
 
   return (
     <motion.div
@@ -26,23 +31,26 @@ const FavoriteCard = memo(({ item, onOpenModal, onQuickAdd, onUnfavorite }) => {
     >
       {/* Image Container */}
       <div className="relative aspect-[4/3] overflow-hidden bg-zinc-800">
+        
         {/* Skeleton Loader */}
         {!imageLoaded && (
-          <div className="absolute inset-0 flex items-center justify-center">
+          <div className="absolute inset-0 flex items-center justify-center bg-zinc-800 z-10">
             <Loader2 className="w-6 h-6 text-emerald-500 animate-spin opacity-50" />
           </div>
         )}
         
         <img
-          src={item.gifUrl || NO_GIF}
+          src={displayImage}
           alt={item.name}
-          loading="lazy" // Native lazy loading
+          loading="lazy"
           className={`w-full h-full object-cover transition-all duration-500 ${
             imageLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105'
           }`}
           onLoad={() => setImageLoaded(true)}
+          // ✅ CRITICAL FIX: Switch to local GIF on error
           onError={(e) => { 
-            e.target.src = NO_GIF;
+            e.target.onerror = null; 
+            if (!hasError) setHasError(true);
             setImageLoaded(true);
           }}
         />
@@ -50,7 +58,7 @@ const FavoriteCard = memo(({ item, onOpenModal, onQuickAdd, onUnfavorite }) => {
         {/* Gradient Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-300" />
         
-        {/* Unfavorite Button - Isolated z-index to prevent triggering card click */}
+        {/* Unfavorite Button */}
         <motion.button
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -189,7 +197,6 @@ export const FavoritesTab = ({ fullFavorites, quickAdd, toggleFavorite, showToas
   const [modalState, setModalState] = useState({ isOpen: false, exercise: null });
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Memoize callbacks to ensure child components don't re-render unnecessarily
   const openModal = useCallback((exercise) => {
     setModalState({ isOpen: true, exercise });
   }, []);
@@ -208,7 +215,6 @@ export const FavoritesTab = ({ fullFavorites, quickAdd, toggleFavorite, showToas
     }
   }, [toggleFavorite]);
 
-  // Optimize filtering
   const filteredFavorites = useMemo(() => {
     if (!searchTerm) return fullFavorites || [];
     const lowerTerm = searchTerm.toLowerCase();
@@ -261,7 +267,7 @@ export const FavoritesTab = ({ fullFavorites, quickAdd, toggleFavorite, showToas
         </motion.div>
       )}
 
-      {/* Quick Stats Footer - Only show if we have results */}
+      {/* Quick Stats Footer */}
       {filteredFavorites.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -283,7 +289,6 @@ export const FavoritesTab = ({ fullFavorites, quickAdd, toggleFavorite, showToas
         </motion.div>
       )}
 
-      {/* Modal */}
       <ExerciseModal
         isOpen={modalState.isOpen}
         exercise={modalState.exercise}

@@ -9,7 +9,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useSwipeable } from 'react-swipeable';
 import { toggleFavorite, isFavorite } from '../../../utils/db';
 
-const FALLBACK = 'https://via.placeholder.com/600x400/111/fff?text=No+Preview';
+// ✅ FIX 1: Use local fallback GIF
+const FALLBACK = '/fallback-exercise.gif';
 const WGER_API = 'https://wger.de/api/v2';
 
 // --- Helper Hook for Scroll Locking ---
@@ -27,7 +28,7 @@ const useScrollLock = (isOpen) => {
 export default function ExerciseModal({ isOpen, exercise: initialExercise, onClose, onQuickAdd, showToast }) {
   const [exercise, setExercise] = useState(initialExercise);
   const [imgIdx, setImgIdx] = useState(0);
-  const [instructionsOpen, setInstructionsOpen] = useState(true); // Default open for better discovery
+  const [instructionsOpen, setInstructionsOpen] = useState(true); 
   const [isFav, setIsFav] = useState(false);
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -41,7 +42,6 @@ export default function ExerciseModal({ isOpen, exercise: initialExercise, onClo
     if (isOpen) {
       setImgIdx(0);
       setImageLoaded(false);
-      // Auto-expand instructions on desktop, collapse on mobile initially if content is long
       setInstructionsOpen(window.innerWidth >= 768);
     }
   }, [isOpen, initialExercise?.id]);
@@ -80,7 +80,7 @@ export default function ExerciseModal({ isOpen, exercise: initialExercise, onClo
     fetchFullExercise();
   }, [isOpen, initialExercise]);
 
-  // Memoized Instruction Parsing (Expensive operation)
+  // Memoized Instruction Parsing
   const parsedContent = useMemo(() => {
     const html = exercise?.description || '';
     
@@ -104,14 +104,12 @@ export default function ExerciseModal({ isOpen, exercise: initialExercise, onClo
         .filter(li => li.tagName === 'LI')
         .forEach((li, i) => {
           const text = li.textContent.trim();
-          // Intelligent split for "Action: Details" format
           const splitIdx = text.indexOf(':');
           const action = splitIdx > -1 ? text.substring(0, splitIdx) : `Step ${i + 1}`;
           const detail = splitIdx > -1 ? text.substring(splitIdx + 1) : text;
           steps.push({ number: i + 1, action: action.trim(), text: detail.trim() });
         });
     } else {
-      // Fallback for paragraph-based instructions
       doc.querySelectorAll('p').forEach((p, i) => {
         const txt = p.textContent.trim();
         if (txt.length > 10 && !/tip|note|warning/i.test(txt)) {
@@ -180,18 +178,17 @@ export default function ExerciseModal({ isOpen, exercise: initialExercise, onClo
   };
 
   if (!isOpen) return null;
-  if (typeof document === 'undefined') return null; // SSR Safety
+  if (typeof document === 'undefined') return null; 
 
-  const currentImg = exercise?.images?.[imgIdx]?.image || exercise?.gifUrl || FALLBACK;
+  // ✅ FIX 2: Prioritize previewImage, then array image, then gifUrl, then FALLBACK
+  const currentImg = exercise?.images?.[imgIdx]?.image || exercise?.previewImage || exercise?.gifUrl || FALLBACK;
   const hasVideo = exercise?.videos?.length > 0;
   const hasMultipleImages = exercise?.images?.length > 1;
 
-  // Use Portal to break out of z-index stacking contexts
   return createPortal(
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center sm:p-6">
-          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -200,7 +197,6 @@ export default function ExerciseModal({ isOpen, exercise: initialExercise, onClo
             onClick={onClose}
           />
 
-          {/* Modal Container - Apple Style Sheet/Card */}
           <motion.div
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
@@ -265,7 +261,12 @@ export default function ExerciseModal({ isOpen, exercise: initialExercise, onClo
                       alt={exercise?.name} 
                       className={`h-full w-full object-cover transition-opacity duration-500 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
                       onLoad={() => setImageLoaded(true)}
-                      onError={(e) => { e.target.src = FALLBACK; setImageLoaded(true); }}
+                      // ✅ FIX 3: Safe fallback on error
+                      onError={(e) => { 
+                        e.target.onerror = null; 
+                        e.target.src = FALLBACK; 
+                        setImageLoaded(true); 
+                      }}
                     />
                     
                     {hasMultipleImages && (
@@ -360,7 +361,6 @@ export default function ExerciseModal({ isOpen, exercise: initialExercise, onClo
             {/* --- STICKY FOOTER --- */}
             <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6 bg-[#1c1c1e]/90 backdrop-blur-xl border-t border-white/10 z-30">
               <div className="flex gap-3">
-                {/* Add Button (Primary) */}
                 <motion.button
                   whileTap={{ scale: 0.97 }}
                   onClick={handleAdd}
@@ -377,7 +377,6 @@ export default function ExerciseModal({ isOpen, exercise: initialExercise, onClo
                   )}
                 </motion.button>
 
-                {/* Favorite Button (Secondary) */}
                 <motion.button
                   whileTap={{ scale: 0.95 }}
                   onClick={handleFav}
@@ -404,7 +403,6 @@ export default function ExerciseModal({ isOpen, exercise: initialExercise, onClo
   );
 }
 
-// Sub-component for uniform stat styling
 const StatBox = ({ icon: Icon, label, value, color }) => (
   <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-3 flex flex-col items-center text-center justify-center">
     <Icon className={`w-6 h-6 ${color} mb-2`} />

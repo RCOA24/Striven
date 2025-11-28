@@ -1,16 +1,16 @@
 // src/components/ExerciseModal.jsx
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { 
-  X, HeartPulse, Dumbbell, Clock, PlayCircle, Info, ChevronLeft, ChevronRight, 
-  ChevronDown, ChevronUp, AlertCircle, CheckCircle2, Plus, Heart, Loader2, Sparkles, Play
+  X, HeartPulse, Dumbbell, Clock, Info, ChevronLeft, ChevronRight, 
+  ChevronDown, ChevronUp, AlertCircle, CheckCircle2, Plus, Heart, Loader2, Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSwipeable } from 'react-swipeable';
 import toast, { Toaster } from 'react-hot-toast';
-import { addToTodayWorkout, addToFavorites, removeFromFavorites, isFavorite, toggleFavorite } from '../utils/db';
+import { addToTodayWorkout, isFavorite, toggleFavorite } from '../utils/db';
 
-const FALLBACK = 'https://via.placeholder.com/600x400/111/fff?text=No+Preview';
+const FALLBACK = '/fallback-exercise.gif';
 
 // --- Scroll Lock Hook ---
 const useScrollLock = (isOpen) => {
@@ -24,51 +24,74 @@ const useScrollLock = (isOpen) => {
   }, [isOpen]);
 };
 
-// --- Instruction Parser (Memoized inside component) ---
-const parseInstructions = (html) => {
-  if (!html) return { steps: [], tips: [] };
-
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, 'text/html');
-  const ol = doc.querySelector('ol');
-  const ul = doc.querySelector('ul');
-  const list = ol || ul;
+// --- ✅ FIXED: ROBUST INSTRUCTION PARSER ---
+const parseInstructions = (input) => {
+  if (!input) return { steps: [], tips: [] };
 
   let steps = [];
   let tips = [];
 
-  if (list) {
-    steps = Array.from(list.children)
-      .filter(el => el.tagName === 'LI')
-      .map((li, i) => {
-        const text = li.textContent.trim();
-        const strong = li.querySelector('strong');
-        const action = strong ? strong.textContent.trim() : text.split(' ').slice(0, 2).join(' ');
-        return { number: i + 1, action, text };
-      });
+  // 1. Check if it's HTML (contains tags)
+  const isHTML = /<[a-z][\s\S]*>/i.test(input);
+
+  if (isHTML) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(input, 'text/html');
+    
+    // Try to find list items first
+    const listItems = doc.querySelectorAll('li');
+    if (listItems.length > 0) {
+      steps = Array.from(listItems).map((li, i) => ({
+        number: i + 1,
+        action: `Step ${i + 1}`,
+        text: li.textContent.trim()
+      }));
+    } else {
+      // If HTML but no list, grab paragraphs
+      const paragraphs = doc.querySelectorAll('p');
+      steps = Array.from(paragraphs)
+        .map((p, i) => ({
+          number: i + 1,
+          action: `Step ${i + 1}`,
+          text: p.textContent.trim()
+        }))
+        .filter(s => s.text.length > 5); // Filter empty p tags
+    }
   } else {
-    const raw = doc.body.textContent;
-    // Improved sentence splitting logic
-    const sentences = raw.split(/(?<=[\.!?])\s+/).filter(s => s.length > 10);
-    steps = sentences.map((s, i) => ({
-      number: i + 1,
-      action: `Step ${i + 1}`,
-      text: s.trim()
-    }));
+    // 2. Handle Plain Text (ExerciseDB Standard)
+    // Split by periods, but respect common abbreviations if possible.
+    // We split by a period followed by a space to avoid splitting "approx." or "lbs." too aggressively
+    const rawSentences = input.split(/\. (?=[A-Z])/); 
+
+    steps = rawSentences.map((s, i) => {
+      const cleanText = s.trim().replace(/\.$/, ''); // Remove trailing dot
+      return {
+        number: i + 1,
+        // Smart Action: First 3 words or generic "Step X"
+        action: `Step ${i + 1}`, 
+        text: cleanText + '.' // Add dot back for grammar
+      };
+    }).filter(s => s.text.length > 3);
   }
 
-  const tipElements = doc.querySelectorAll('p');
-  tipElements.forEach(p => {
-    const text = p.textContent.toLowerCase();
-    if (text.match(/tip|note|common mistake|avoid|important/)) {
-      tips.push(p.textContent.replace(/tip:|note:/i, '').trim());
+  // 3. Extract "Pro Tips" keywords
+  // We look for steps that start with specific words and move them to tips
+  const cleanSteps = [];
+  steps.forEach(step => {
+    const lower = step.text.toLowerCase();
+    if (lower.startsWith('tip:') || lower.startsWith('note:') || lower.includes('avoid:')) {
+      tips.push(step.text.replace(/^(Tip:|Note:|Avoid:)\s*/i, ''));
+    } else {
+      cleanSteps.push({ ...step, number: cleanSteps.length + 1, action: `Step ${cleanSteps.length + 1}` });
     }
   });
 
-  return {
-    steps: steps.length > 0 ? steps : [{ number: 1, action: 'Info', text: 'See video for details.' }],
-    tips: tips.length > 0 ? tips : ['Keep core engaged', 'Control the movement', 'Breathe consistently']
-  };
+  // 4. Fallback if parsing failed completely
+  if (cleanSteps.length === 0 && input.length > 0) {
+    cleanSteps.push({ number: 1, action: 'Instruction', text: input });
+  }
+
+  return { steps: cleanSteps, tips };
 };
 
 // --- Main Component ---
@@ -83,7 +106,6 @@ const ExerciseModal = ({ exercise, isOpen, onClose }) => {
   
   useScrollLock(isOpen);
 
-  // Reset state on open
   useEffect(() => {
     if (isOpen) {
       setImgIdx(0);
@@ -97,15 +119,14 @@ const ExerciseModal = ({ exercise, isOpen, onClose }) => {
   const videos = exercise?.videos || [];
   const images = exercise?.images || [];
   
-  // Memoize expensive parsing
+  // Memoize parsing
   const { steps, tips } = useMemo(() => 
     parseInstructions(exercise?.description), 
   [exercise?.description]);
 
   const currentVideo = videos[vidIdx];
-  const currentImage = images[imgIdx]?.image || exercise?.gifUrl || FALLBACK;
+  const currentImage = images[imgIdx]?.image || exercise?.previewImage || exercise?.gifUrl || FALLBACK;
 
-  // Navigation
   const nextImg = () => { setImgLoaded(false); setImgIdx(i => (i + 1) % images.length); };
   const prevImg = () => { setImgLoaded(false); setImgIdx(i => (i - 1 + images.length) % images.length); };
 
@@ -116,13 +137,11 @@ const ExerciseModal = ({ exercise, isOpen, onClose }) => {
     trackMouse: true
   });
 
-  // Handlers
   const handleAddToWorkout = async () => {
     if (adding) return;
     setAdding(true);
     try {
       await addToTodayWorkout(exercise);
-      // Custom Apple-style Toast
       toast.custom((t) => (
         <motion.div 
           initial={{ opacity: 0, y: -20, scale: 0.9 }} 
@@ -183,7 +202,6 @@ const ExerciseModal = ({ exercise, isOpen, onClose }) => {
       <AnimatePresence>
         {isOpen && (
           <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center sm:p-6">
-            {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -192,7 +210,6 @@ const ExerciseModal = ({ exercise, isOpen, onClose }) => {
               className="absolute inset-0 bg-black/80 backdrop-blur-sm"
             />
 
-            {/* Modal Container */}
             <motion.div
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
@@ -201,7 +218,6 @@ const ExerciseModal = ({ exercise, isOpen, onClose }) => {
               className="relative w-full max-w-4xl bg-[#1c1c1e] sm:rounded-3xl rounded-t-3xl shadow-2xl flex flex-col max-h-[95vh] overflow-hidden isolate"
               onClick={e => e.stopPropagation()}
             >
-              {/* --- Sticky Header --- */}
               <div className="sticky top-0 z-20 flex items-center justify-between px-5 py-4 bg-[#1c1c1e]/90 backdrop-blur-xl border-b border-white/5">
                 <div className="min-w-0">
                   <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block mb-0.5">
@@ -219,12 +235,8 @@ const ExerciseModal = ({ exercise, isOpen, onClose }) => {
                 </button>
               </div>
 
-              {/* --- Scrollable Content --- */}
               <div className="overflow-y-auto overflow-x-hidden p-5 pb-32 space-y-6 scrollbar-hide">
-                
-                {/* Media Section */}
                 <div className="space-y-4">
-                  {/* Video Player */}
                   {videos.length > 0 && (
                     <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-zinc-900 shadow-lg ring-1 ring-white/5">
                       <video
@@ -257,8 +269,7 @@ const ExerciseModal = ({ exercise, isOpen, onClose }) => {
                     </div>
                   )}
 
-                  {/* Image Gallery (if no video or auxiliary) */}
-                  {(!videos.length && images.length > 0) && (
+                  {(!videos.length && (images.length > 0 || currentImage)) && (
                     <div {...swipeHandlers} className="relative aspect-video w-full rounded-2xl overflow-hidden bg-zinc-900 shadow-lg ring-1 ring-white/5 group">
                       {!imgLoaded && (
                         <div className="absolute inset-0 flex items-center justify-center bg-zinc-800">
@@ -270,7 +281,11 @@ const ExerciseModal = ({ exercise, isOpen, onClose }) => {
                         alt={exercise.name}
                         className={`h-full w-full object-contain transition-opacity duration-500 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
                         onLoad={() => setImgLoaded(true)}
-                        onError={(e) => { e.target.src = FALLBACK; setImgLoaded(true); }}
+                        onError={(e) => { 
+                          e.target.onerror = null; 
+                          e.target.src = FALLBACK; 
+                          setImgLoaded(true); 
+                        }}
                       />
                       
                       {images.length > 1 && (
@@ -290,7 +305,6 @@ const ExerciseModal = ({ exercise, isOpen, onClose }) => {
                   )}
                 </div>
 
-                {/* Stats Grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <StatBox icon={HeartPulse} label="Target" value={exercise.muscles} color="text-rose-400" />
                   <StatBox icon={Dumbbell} label="Equipment" value={exercise.equipment} color="text-blue-400" />
@@ -298,7 +312,7 @@ const ExerciseModal = ({ exercise, isOpen, onClose }) => {
                   <StatBox icon={Sparkles} label="Secondary" value={exercise.musclesSecondary} color="text-purple-400" />
                 </div>
 
-                {/* Instructions Accordion */}
+                {/* --- Instructions Accordion --- */}
                 <div className="bg-zinc-900/50 rounded-2xl border border-white/5 overflow-hidden">
                   <button
                     onClick={() => setInstructionsOpen(!instructionsOpen)}
@@ -322,6 +336,14 @@ const ExerciseModal = ({ exercise, isOpen, onClose }) => {
                         className="border-t border-white/5"
                       >
                         <div className="p-5 space-y-6">
+                          {/* Fallback if no steps */}
+                          {steps.length === 0 && (
+                            <div className="text-center py-4 text-zinc-500 italic text-sm">
+                              No written instructions available for this exercise.
+                              <br/>Please refer to the video/animation.
+                            </div>
+                          )}
+
                           {steps.map((step) => (
                             <div key={step.number} className="flex gap-4">
                               <div className="flex flex-col items-center gap-1">
@@ -359,10 +381,8 @@ const ExerciseModal = ({ exercise, isOpen, onClose }) => {
                 </div>
               </div>
 
-              {/* --- Sticky Footer --- */}
               <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6 bg-[#1c1c1e]/90 backdrop-blur-xl border-t border-white/10 z-30">
                 <div className="flex gap-3">
-                  {/* Add Button */}
                   <motion.button
                     whileTap={{ scale: 0.97 }}
                     onClick={handleAddToWorkout}
@@ -372,7 +392,6 @@ const ExerciseModal = ({ exercise, isOpen, onClose }) => {
                     {adding ? <Loader2 className="w-6 h-6 animate-spin" /> : <><Plus className="w-6 h-6 stroke-[3]" /> Add to Workout</>}
                   </motion.button>
 
-                  {/* Fav Button */}
                   <motion.button
                     whileTap={{ scale: 0.95 }}
                     onClick={handleToggleFav}
@@ -396,7 +415,6 @@ const ExerciseModal = ({ exercise, isOpen, onClose }) => {
   );
 };
 
-// Helper for stats
 const StatBox = ({ icon: Icon, label, value, color }) => (
   <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-3 flex flex-col items-center text-center justify-center">
     <Icon className={`w-6 h-6 ${color} mb-2`} />

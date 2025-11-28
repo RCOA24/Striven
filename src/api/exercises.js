@@ -1,4 +1,5 @@
 // src/api/exercises.js
+
 /**
  * ExerciseDB API Client with Enterprise-Grade Reliability
  * Features: Retry logic, circuit breaker, fallback proxies, caching, health checks
@@ -6,6 +7,9 @@
  */
 
 const API_BASE = 'https://exercisedb-api.vercel.app/api/v1';
+
+// ✅ DEFINE YOUR FALLBACK HERE (File must be in 'public' folder)
+const FALLBACK_GIF = '/fallback-exercise.gif';
 
 // Multiple CORS proxies for redundancy
 const CORS_PROXIES = [
@@ -15,7 +19,7 @@ const CORS_PROXIES = [
 ];
 
 // Persistent cache key (bump version on schema changes)
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const PERSISTED_KEY = `exercisedb_cache_${CACHE_VERSION}`;
 
 // Configuration
@@ -38,7 +42,7 @@ const CONFIG = {
   cache: {
     ttl: 5 * 60 * 1000, // 5 minutes
     maxSize: 100,
-    persist: true // ← NEW: enable localStorage
+    persist: true // enable localStorage
   }
 };
 
@@ -52,7 +56,7 @@ class ApiState {
     this.lastFailureTime = null;
     this.cache = new Map();
     this.cacheTimestamps = new Map();
-    this.inflightRequests = new Map(); // ← NEW: Request deduplication map
+    this.inflightRequests = new Map(); // Request deduplication map
 
     // Load persisted cache on startup
     if (CONFIG.cache.persist) this.loadPersistedCache();
@@ -111,7 +115,7 @@ class ApiState {
     console.log('Persisted cache cleared');
   }
 
-  // ── PROXY & CIRCUIT BREAKER (unchanged) ───────────────────────
+  // ── PROXY & CIRCUIT BREAKER ───────────────────────
   rotateProxy() {
     this.currentProxyIndex = (this.currentProxyIndex + 1) % CORS_PROXIES.length;
     console.log(`Rotated to proxy ${this.currentProxyIndex + 1}/${CORS_PROXIES.length}`);
@@ -157,7 +161,7 @@ class ApiState {
     return this.circuitState === 'OPEN';
   }
 
-  // ── CACHE (now persistent) ───────────────────────────────────
+  // ── CACHE ───────────────────────────────────
   setCache(key, value) {
     if (this.cache.size >= CONFIG.cache.maxSize) {
       const firstKey = this.cache.keys().next().value;
@@ -166,7 +170,7 @@ class ApiState {
     }
     this.cache.set(key, value);
     this.cacheTimestamps.set(key, Date.now());
-    this.persistCache(); // ← auto-save
+    this.persistCache(); 
   }
 
   getCache(key) {
@@ -216,10 +220,8 @@ export const checkApiHealth = async () => {
     });
 
     clearTimeout(timeoutId);
-    
     const isHealthy = res.ok;
     console.log(`Health check: ${isHealthy ? 'Healthy' : 'Unhealthy'}`);
-    
     return isHealthy;
   } catch (error) {
     console.log('Health check: Failed', error.message);
@@ -276,17 +278,13 @@ const fetchWithRetry = async (url, options = {}, attempt = 0) => {
     const isAborted = error.name === 'AbortError';
     const isNetworkError = error.message.includes('fetch') || error.message.includes('network');
 
-    console.warn(
-      `Request failed (${attempt + 1}/${CONFIG.retry.maxAttempts}):`,
-      error.message
-    );
+    console.warn(`Request failed (${attempt + 1}/${CONFIG.retry.maxAttempts}):`, error.message);
 
     if (import.meta.env.DEV && (isNetworkError || isAborted)) {
       apiState.rotateProxy();
       const endpoint = url.split(encodeURIComponent(API_BASE))[1];
       if (endpoint) {
-        const decodedEndpoint = decodeURIComponent(endpoint);
-        url = buildUrl(decodedEndpoint);
+        url = buildUrl(decodeURIComponent(endpoint));
       }
     }
 
@@ -312,17 +310,13 @@ const fetchWithRetry = async (url, options = {}, attempt = 0) => {
  */
 const parseApiResponse = async (res) => {
   const contentType = res.headers.get('content-type');
-  
   if (!contentType || !contentType.includes('application/json')) {
     throw new Error('Invalid response format - expected JSON');
   }
-
   const json = await res.json();
-  
   if (!json.success) {
     throw new Error(json.message || 'API returned unsuccessful response');
   }
-
   return json;
 };
 
@@ -392,8 +386,11 @@ export const fetchExercises = async (page = 0, options = {}) => {
         muscles: ex.targetMuscles?.join(', ') || 'Multiple',
         musclesSecondary: ex.secondaryMuscles?.join(', ') || null,
         equipment: ex.equipments?.join(', ') || 'Bodyweight',
-        previewImage: ex.gifUrl || ex.image || '/placeholder-exercise.jpg',
-        images: ex.images?.map(img => ({ image: img })) || [{ image: ex.gifUrl }],
+        
+        // ✅ UPDATED FALLBACK LOGIC
+        previewImage: ex.gifUrl || ex.image || FALLBACK_GIF,
+        
+        images: ex.images?.map(img => ({ image: img })) || [{ image: ex.gifUrl || FALLBACK_GIF }],
         videos: ex.videos?.map(vid => ({ video: vid })) || [],
         hasVideo: !!ex.videos?.length,
         aliases: ex.aliases || []
@@ -404,8 +401,6 @@ export const fetchExercises = async (page = 0, options = {}) => {
     };
 
     apiState.setCache(cacheKey, { ...result, cached: true });
-    console.log('Exercises loaded successfully');
-
     return result;
 
   } catch (error) {
@@ -445,42 +440,26 @@ export const fetchExercises = async (page = 0, options = {}) => {
 };
 
 /**
- * Get exercise categories with fallback
+ * Get exercise categories
  */
 export const getCategories = async (useCache = true) => {
   const cacheKey = 'categories';
-
   if (useCache) {
     const cached = apiState.getCache(cacheKey);
-    if (cached) {
-      console.log('Returning cached categories (persistent)');
-      return cached;
-    }
+    if (cached) return cached;
   }
 
   try {
     const url = buildUrl('/bodyparts');
-    console.log('Fetching categories');
-
     const res = await fetchWithRetry(url);
     const json = await parseApiResponse(res);
     
     const categories = ['All', ...(json.data?.map(c => c.name) || [])];
-    
     apiState.setCache(cacheKey, categories);
-    console.log('Categories loaded successfully');
-    
     return categories;
 
   } catch (err) {
-    console.error('Categories fetch failed:', err);
-    
-    const fallback = [
-      'All', 'back', 'cardio', 'chest', 'lower arms', 'lower legs',
-      'neck', 'shoulders', 'upper arms', 'upper legs', 'waist'
-    ];
-    
-    console.log('Using fallback categories');
+    const fallback = ['All', 'back', 'cardio', 'chest', 'lower arms', 'lower legs', 'neck', 'shoulders', 'upper arms', 'upper legs', 'waist'];
     return fallback;
   }
 };
@@ -493,13 +472,9 @@ export const fetchExerciseDetails = async (id, useCache = true) => {
 
   if (useCache) {
     const cached = apiState.getCache(cacheKey);
-    if (cached) {
-      console.log('Returning cached exercise details (persistent)');
-      return cached;
-    }
+    if (cached) return cached;
   }
 
-  // ← NEW: In-flight request deduplication
   if (apiState.inflightRequests.has(cacheKey)) {
     return apiState.inflightRequests.get(cacheKey);
   }
@@ -507,8 +482,6 @@ export const fetchExerciseDetails = async (id, useCache = true) => {
   const fetchPromise = (async () => {
     try {
       const url = buildUrl(`/exercises/${id}`);
-      console.log('Fetching exercise details:', id);
-
       const res = await fetchWithRetry(url);
       const json = await parseApiResponse(res);
       
@@ -521,16 +494,17 @@ export const fetchExerciseDetails = async (id, useCache = true) => {
         muscles: ex.targetMuscles?.join(', ') || 'Multiple',
         musclesSecondary: ex.secondaryMuscles?.join(', ') || null,
         equipment: ex.equipments?.join(', ') || 'Bodyweight',
-        images: ex.images?.map(img => ({ image: img })) || [{ image: ex.gifUrl }],
+        
+        // ✅ UPDATED FALLBACK LOGIC
+        previewImage: ex.gifUrl || ex.image || FALLBACK_GIF,
+        images: ex.images?.map(img => ({ image: img })) || [{ image: ex.gifUrl || FALLBACK_GIF }],
+        
         videos: ex.videos?.map(vid => ({ video: vid })) || [],
-        previewImage: ex.gifUrl || ex.image,
         aliases: ex.aliases || [],
         license: 'CC0'
       };
 
       apiState.setCache(cacheKey, details);
-      console.log('Exercise details loaded successfully');
-
       return details;
 
     } catch (err) {
@@ -540,25 +514,10 @@ export const fetchExerciseDetails = async (id, useCache = true) => {
   })();
 
   apiState.inflightRequests.set(cacheKey, fetchPromise);
-
-  try {
-    return await fetchPromise;
-  } finally {
-    apiState.inflightRequests.delete(cacheKey);
-  }
+  try { return await fetchPromise; } finally { apiState.inflightRequests.delete(cacheKey); }
 };
 
-/**
- * Utility: Clear all caches (in-memory + persisted)
- */
-export const clearCache = () => {
-  apiState.clearPersistedCache();
-  console.log('Cache cleared (including localStorage)');
-};
-
-/**
- * Utility: Get API status
- */
+export const clearCache = () => { apiState.clearPersistedCache(); console.log('Cache cleared'); };
 export const getApiStatus = () => {
   return {
     circuitState: apiState.circuitState,
@@ -570,14 +529,5 @@ export const getApiStatus = () => {
     storageKey: PERSISTED_KEY
   };
 };
-
-/**
- * Utility: Force circuit reset (use with caution)
- */
-export const resetCircuit = () => {
-  apiState.closeCircuit();
-  console.log('Circuit breaker manually reset');
-};
-
-// Export configuration for customization
+export const resetCircuit = () => { apiState.closeCircuit(); };
 export { CONFIG, apiState };
