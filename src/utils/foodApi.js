@@ -1,105 +1,94 @@
 // utils/foodApi.js
 
-// ==========================================
-// 1. PRIMARY: GOOGLE GEMINI (The "Global Food Expert")
-// ==========================================
-async function analyzeWithGemini(imageBlob, modelName = "gemini-1.5-flash") {
+export async function analyzeFood(imageBlob) {
   const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
-  if (!apiKey) throw new Error("Missing Google API Key");
+  if (!apiKey) throw new Error("API Key missing in environment variables");
 
-  // Convert Blob to Base64
-  const base64Data = await new Promise((resolve) => {
+  // 1. Convert Blob to Base64
+  const base64Data = await new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
     reader.readAsDataURL(imageBlob);
   });
 
+  // 2. The Prompt - Optimized for strict JSON
   const promptText = `
-    Act as a world-renowned nutritionist and food critic. Analyze the image and identify the food.
+    Identify this food. Return ONLY a JSON object. Do not include markdown formatting (like \`\`\`json).
+    
+    If it is NOT food, return: {"isFood": false}
+    If it is food, return:
+    {
+      "isFood": true,
+      "name": "Short food name",
+      "calories": 0,
+      "protein": 0,
+      "carbs": 0,
+      "fat": 0,
+      "confidence": 0.95
+    }
     
     Rules:
-    1. Look specifically for regional dishes (e.g., "Sinigang", "Adobo", "Sisig", "Ramen") rather than generic terms.
-    2. Estimate nutrition for a standard serving size (approx 1 serving).
-    3. Return STRICT JSON (no markdown) with these keys: 
-       name (string), calories (int), protein (int), carbs (int), fat (int), isUnknown (boolean).
-    4. If the image is unclear, make your best educated guess.
-    5. If it is absolutely not food, set isUnknown: true.
+    - Estimate calories for 1 standard serving.
+    - Round numbers to integers.
+    - If unsure of exact dish, guess the closest generic dish.
   `;
 
-  const requestBody = {
-    contents: [{
-      parts: [
-        { text: promptText },
-        { inline_data: { mime_type: "image/jpeg", data: base64Data } }
-      ]
-    }]
-  };
-
-  // Dynamic URL based on the model passed in
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(requestBody)
-    }
-  );
-
-  if (!response.ok) throw new Error(`Gemini ${modelName} Error`);
-
-  const data = await response.json();
-  const text = data.candidates[0].content.parts[0].text;
-  
-  // Clean up code blocks if Gemini returns markdown
-  const jsonString = text.replace(/```json|```/g, '').trim();
-  
+  // 3. Call Gemini 1.5 Flash (Fast & Cheap)
   try {
-    const result = JSON.parse(jsonString);
-    
-    // Safety check: if it found a name but flagged as unknown, correct it
-    if (result.name && result.name !== "Unknown" && result.isUnknown) {
-        result.isUnknown = false;
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: promptText },
+              { inline_data: { mime_type: "image/jpeg", data: base64Data } }
+            ]
+          }]
+        })
+      }
+    );
+
+    if (!response.ok) {
+        throw new Error(`API Error: ${response.status}`);
     }
+
+    const data = await response.json();
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!rawText) throw new Error("No data received from AI");
+
+    // 4. CLEANUP: Extract ONLY the JSON part (Fixes the crashing)
+    // This Regex finds the first '{' and the last '}'
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
     
-    return { ...result, confidence: 0.98 }; 
-  } catch (e) {
-    throw new Error("AI parsing error");
-  }
-}
-
-// ==========================================
-// 2. MAIN EXPORT (THE LOGIC CONTROLLER)
-// ==========================================
-export async function analyzeFood(imageBlob) {
-  // CONFIG: Define your models here
-  const MODEL_FAST = "gemini-1.5-flash"; // Fast, cheap, high rate limit
-  const MODEL_SMART = "gemini-1.5-pro";  // Slower, smarter, lower rate limit
-  
-  // STEP 1: Try the Fast Model (Flash)
-  try {
-    console.log(`Attempting analysis with ${MODEL_FAST}...`);
-    const result = await analyzeWithGemini(imageBlob, MODEL_FAST);
-
-    // If Flash is confident and knows the food, return immediately
-    if (!result.isUnknown) {
-      return result;
+    if (!jsonMatch) {
+        throw new Error("AI response was not valid JSON");
     }
-    
-    console.warn("Flash model returned 'Unknown'. Escalating to Pro model...");
-  } catch (flashError) {
-    console.warn("Flash model failed or errored. Escalating to Pro model...", flashError);
-  }
 
-  // STEP 2: Try the Smart Model (Pro)
-  // We only reach here if Flash said "Unknown" OR crashed
-  try {
-    console.log(`Attempting analysis with ${MODEL_SMART}...`);
-    const result = await analyzeWithGemini(imageBlob, MODEL_SMART);
-    
-    return result; 
+    const result = JSON.parse(jsonMatch[0]);
 
-  } catch (proError) {
-    console.error("All AI models failed", proError);
-    throw new Error("Could not identify food. Please try again or enter manually.");
+    // 5. Validation
+    if (!result.isFood) {
+        throw new Error("Not recognized as food");
+    }
+
+    return {
+        name: result.name || "Unknown Food",
+        calories: result.calories || 0,
+        protein: result.protein || 0,
+        carbs: result.carbs || 0,
+        fat: result.fat || 0,
+        confidence: result.confidence || 0.8,
+        isUnknown: false
+    };
+
+  } catch (error) {
+    console.error("Gemini Analysis Failed:", error);
+    // Return a safe fallback object to prevent UI crashing
+    throw error; // Re-throw to let UI handle the error message
   }
 }
