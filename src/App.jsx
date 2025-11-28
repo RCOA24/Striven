@@ -14,6 +14,7 @@ import Notification from './components/Notifications';
 import Intro from './components/Intro';
 import { deleteActivity } from './utils/db';
 import FoodScanner from './pages/FoodScanner'; // NEW: FoodScanner page
+import CalorieCalculator from './pages/CalorieCalculator'; // NEW: Import Calculator
 
 // CREATE CONTEXT
 export const AppContext = createContext();
@@ -156,6 +157,8 @@ function App() {
         return <WorkoutOrganizer />;
       case 'food': // NEW
         return <FoodScanner />;
+      case 'calculator': // NEW ROUTE
+        return <CalorieCalculator />;
       default:
         return (
           <Dashboard
@@ -178,7 +181,7 @@ function App() {
   };
 
   return (
-    <AppContext.Provider value={{ currentPage, setCurrentPage }}>
+    <AppContext.Provider value={{ currentPage, setCurrentPage, showNotification }}>
       {/* Notification */}
       <Notification
         type={notification.type}

@@ -4,9 +4,9 @@
  * Licensed under the MIT License
  */
 
-import React, { useState, useMemo } from 'react';
-import { User, Award, TrendingUp, Zap, Download, Upload, Trash2, AlertTriangle, CheckCircle, XCircle, ChevronRight, Footprints, Flame } from 'lucide-react';
-import { exportData, importData, clearAllData } from '../utils/db';
+import React, { useState, useMemo, useEffect } from 'react';
+import { User, Award, TrendingUp, Zap, Download, Upload, Trash2, AlertTriangle, CheckCircle, XCircle, ChevronRight, Footprints, Flame, Apple } from 'lucide-react';
+import { exportData, importData, clearAllData, getNutritionProfile, getFoodLogs } from '../utils/db';
 import LicenseModal from '../components/LicenseModal';
 
 // Redesigned Stat Card based on attachment
@@ -54,6 +54,7 @@ const ProfilePage = ({ activities = [], weeklyStats = {} }) => {
   const [isImporting, setIsImporting] = useState(false);
   const [notification, setNotification] = useState(null); 
   const [showLicense, setShowLicense] = useState(false);
+  const [nutritionStats, setNutritionStats] = useState({ target: 0, totalLogged: 0 });
 
   // Show notification
   const showNotification = (type, message) => {
@@ -71,6 +72,19 @@ const ProfilePage = ({ activities = [], weeklyStats = {} }) => {
       ? Math.round(activities.reduce((sum, a) => sum + (a.steps || 0), 0) / activities.length)
       : 0,
   }), [activities]);
+
+  // Load nutrition stats
+  useEffect(() => {
+    const loadNutrition = async () => {
+        const profile = await getNutritionProfile();
+        const logs = await getFoodLogs();
+        setNutritionStats({
+            target: profile ? profile.targetCalories : 0,
+            totalLogged: logs ? logs.length : 0
+        });
+    };
+    loadNutrition();
+  }, []);
 
   // Handle data export
   const handleExport = async () => {
@@ -224,6 +238,25 @@ const ProfilePage = ({ activities = [], weeklyStats = {} }) => {
             value={Math.round(lifetimeStats.totalCalories).toLocaleString()}
             color="bg-orange-500"
           />
+          {/* NEW: Nutrition Card */}
+          {nutritionStats.target > 0 && (
+             <div className="col-span-2 bg-[#1C1C1E] rounded-3xl p-5 relative overflow-hidden flex items-center justify-between group">
+                <div className="absolute top-0 right-0 w-[35%] h-full bg-black/20" />
+                <div className="flex items-center gap-4 z-10">
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center bg-green-500 text-white shadow-lg">
+                        <Apple className="w-6 h-6" />
+                    </div>
+                    <div>
+                        <div className="text-2xl font-bold text-white font-apple tracking-tight">{nutritionStats.target} kcal</div>
+                        <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest font-apple">Daily Goal</div>
+                    </div>
+                </div>
+                <div className="z-10 text-right">
+                    <div className="text-xl font-bold text-white">{nutritionStats.totalLogged}</div>
+                    <div className="text-[10px] text-zinc-500 uppercase">Meals Logged</div>
+                </div>
+             </div>
+          )}
         </div>
       </div>
 

@@ -48,10 +48,52 @@ db.version(4).stores({
   todayWorkout: '++id, exerciseId, name, sets, reps, weight, rest, notes, order, addedAt',
   workoutPlans: '++id, name, days, createdAt, isActive',
   exerciseLogs: '++id, exerciseId, date, set, weight, reps, oneRm',
-  foodLogs: '++id, name, calories, protein, carbs, fat, timestamp' // NEW TABLE
+  foodLogs: '++id, name, calories, protein, carbs, fat, timestamp'
 }).upgrade(() => {
   console.log('Upgraded to v4: Added foodLogs');
 });
+
+// Version 5: NUTRITION PROFILE
+db.version(5).stores({
+  activities: '++id, date, steps, distance, calories, duration, timestamp',
+  weeklyStats: '++id, weekStart, totalSteps, totalDistance, totalCalories, totalDuration',
+  settings: '++id, key, value',
+  goals: '++id, type, target, current, date, completed',
+  favorites: '++id, exerciseId, name, muscles, equipment, category, gifUrl, addedAt',
+  todayWorkout: '++id, exerciseId, name, sets, reps, weight, rest, notes, order, addedAt',
+  workoutPlans: '++id, name, days, createdAt, isActive',
+  exerciseLogs: '++id, exerciseId, date, set, weight, reps, oneRm',
+  foodLogs: '++id, name, calories, protein, carbs, fat, timestamp',
+  nutritionProfile: '++id, targetCalories, protein, fats, carbs, updatedAt' // NEW TABLE
+}).upgrade(() => {
+  console.log('Upgraded to v5: Added nutritionProfile');
+});
+
+/* ==================================================================
+   NUTRITION PROFILE
+================================================================== */
+export const saveNutritionProfile = async (profile) => {
+  try {
+    // We only keep one active profile, so clear old ones
+    await db.nutritionProfile.clear(); 
+    return await db.nutritionProfile.add({
+      ...profile,
+      updatedAt: Date.now()
+    });
+  } catch (error) {
+    console.error('Failed to save nutrition profile:', error);
+    throw error;
+  }
+};
+
+export const getNutritionProfile = async () => {
+  try {
+    return await db.nutritionProfile.orderBy('updatedAt').reverse().first();
+  } catch (error) {
+    console.error('Failed to get nutrition profile:', error);
+    return null;
+  }
+};
 
 /* ==================================================================
    FOOD LOGS
@@ -543,8 +585,11 @@ export const exportData = async () => {
       todayWorkout: await db.todayWorkout.toArray(),
       workoutPlans: await db.workoutPlans.toArray(), // Includes rest day info in days array
       exerciseLogs: await db.exerciseLogs.toArray(),
+      // NEW: Include Food & Nutrition Data
+      foodLogs: await db.foodLogs.toArray(),
+      nutritionProfile: await db.nutritionProfile.toArray(),
       exportDate: new Date().toISOString(),
-      appVersion: '3.0'
+      appVersion: '3.1' // Bumped version
     };
     return data;
   } catch (error) {
@@ -574,7 +619,9 @@ export const importData = async (data) => {
       db.favorites, 
       db.todayWorkout, 
       db.workoutPlans, 
-      db.exerciseLogs, 
+      db.exerciseLogs,
+      db.foodLogs,
+      db.nutritionProfile,
       async () => {
         if (data.activities?.length) {
           // Remove id field to let auto-increment handle it
@@ -608,6 +655,15 @@ export const importData = async (data) => {
         if (data.exerciseLogs?.length) {
           const logs = data.exerciseLogs.map(({ id, ...rest }) => rest);
           await db.exerciseLogs.bulkAdd(logs);
+        }
+        // NEW: Import Food & Nutrition
+        if (data.foodLogs?.length) {
+          const logs = data.foodLogs.map(({ id, ...rest }) => rest);
+          await db.foodLogs.bulkAdd(logs);
+        }
+        if (data.nutritionProfile?.length) {
+          const profiles = data.nutritionProfile.map(({ id, ...rest }) => rest);
+          await db.nutritionProfile.bulkAdd(profiles);
         }
       }
     );
