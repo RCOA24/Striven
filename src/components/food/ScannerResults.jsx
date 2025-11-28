@@ -8,6 +8,13 @@ const NutrientBox = ({ label, value, color, bg }) => (
   </div>
 );
 
+const MicroNutrientRow = ({ label, value, unit }) => (
+  <div className="flex justify-between items-center text-xs text-zinc-400 py-1 border-b border-white/5 last:border-0">
+    <span>{label}</span>
+    <span className="text-white font-medium">{value}{unit}</span>
+  </div>
+);
+
 const ScannerResults = ({ result, onReset }) => {
   if (!result) return null;
 
@@ -37,12 +44,23 @@ const ScannerResults = ({ result, onReset }) => {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-4 gap-3 mb-4">
-            <NutrientBox label="Kcal" value={result.calories} color="text-white" bg="bg-white/10" />
-            <NutrientBox label="Prot" value={result.protein + 'g'} color="text-blue-400" bg="bg-blue-500/10" />
-            <NutrientBox label="Carb" value={result.carbs + 'g'} color="text-yellow-400" bg="bg-yellow-500/10" />
-            <NutrientBox label="Fat" value={result.fat + 'g'} color="text-rose-400" bg="bg-rose-500/10" />
-          </div>
+          <>
+            <div className="grid grid-cols-4 gap-3 mb-4">
+              <NutrientBox label="Kcal" value={result.calories} color="text-white" bg="bg-white/10" />
+              <NutrientBox label="Prot" value={result.protein + 'g'} color="text-blue-400" bg="bg-blue-500/10" />
+              <NutrientBox label="Carb" value={result.carbs + 'g'} color="text-yellow-400" bg="bg-yellow-500/10" />
+              <NutrientBox label="Fat" value={result.fat + 'g'} color="text-rose-400" bg="bg-rose-500/10" />
+            </div>
+            
+            {/* Micronutrients Section */}
+            {(result.sugar > 0 || result.fiber > 0 || result.sodium > 0) && (
+              <div className="bg-black/20 rounded-xl p-3 mb-4">
+                {result.sugar > 0 && <MicroNutrientRow label="Sugar" value={result.sugar} unit="g" />}
+                {result.fiber > 0 && <MicroNutrientRow label="Fiber" value={result.fiber} unit="g" />}
+                {result.sodium > 0 && <MicroNutrientRow label="Sodium" value={result.sodium} unit="mg" />}
+              </div>
+            )}
+          </>
         )}
         
         <div className="flex items-center justify-between text-[10px] text-zinc-500 border-t border-white/5 pt-3 uppercase tracking-wider">

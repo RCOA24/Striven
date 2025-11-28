@@ -64,10 +64,51 @@ db.version(5).stores({
   workoutPlans: '++id, name, days, createdAt, isActive',
   exerciseLogs: '++id, exerciseId, date, set, weight, reps, oneRm',
   foodLogs: '++id, name, calories, protein, carbs, fat, timestamp',
-  nutritionProfile: '++id, targetCalories, protein, fats, carbs, updatedAt' // NEW TABLE
+  nutritionProfile: '++id, targetCalories, protein, fats, carbs, updatedAt'
 }).upgrade(() => {
   console.log('Upgraded to v5: Added nutritionProfile');
 });
+
+// Version 6: WATER LOGS & MICRONUTRIENTS
+db.version(6).stores({
+  activities: '++id, date, steps, distance, calories, duration, timestamp',
+  weeklyStats: '++id, weekStart, totalSteps, totalDistance, totalCalories, totalDuration',
+  settings: '++id, key, value',
+  goals: '++id, type, target, current, date, completed',
+  favorites: '++id, exerciseId, name, muscles, equipment, category, gifUrl, addedAt',
+  todayWorkout: '++id, exerciseId, name, sets, reps, weight, rest, notes, order, addedAt',
+  workoutPlans: '++id, name, days, createdAt, isActive',
+  exerciseLogs: '++id, exerciseId, date, set, weight, reps, oneRm',
+  foodLogs: '++id, name, calories, protein, carbs, fat, sugar, fiber, sodium, timestamp', // Added micronutrients
+  nutritionProfile: '++id, targetCalories, protein, fats, carbs, updatedAt',
+  waterLogs: '++id, amount, timestamp' // NEW TABLE
+}).upgrade(() => {
+  console.log('Upgraded to v6: Added waterLogs & micronutrients');
+});
+
+/* ==================================================================
+   WATER LOGS
+================================================================== */
+export const saveWaterLog = async (amount) => {
+  try {
+    return await db.waterLogs.add({
+      amount, // in ml
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    console.error('Failed to save water log:', error);
+    throw error;
+  }
+};
+
+export const getWaterLogs = async () => {
+  try {
+    return await db.waterLogs.orderBy('timestamp').reverse().toArray();
+  } catch (error) {
+    console.error('Failed to get water logs:', error);
+    return [];
+  }
+};
 
 /* ==================================================================
    NUTRITION PROFILE
@@ -588,8 +629,9 @@ export const exportData = async () => {
       // NEW: Include Food & Nutrition Data
       foodLogs: await db.foodLogs.toArray(),
       nutritionProfile: await db.nutritionProfile.toArray(),
+      waterLogs: await db.waterLogs.toArray(), // NEW
       exportDate: new Date().toISOString(),
-      appVersion: '3.1' // Bumped version
+      appVersion: '3.2' // Bumped version
     };
     return data;
   } catch (error) {
@@ -622,6 +664,7 @@ export const importData = async (data) => {
       db.exerciseLogs,
       db.foodLogs,
       db.nutritionProfile,
+      db.waterLogs, // NEW
       async () => {
         if (data.activities?.length) {
           // Remove id field to let auto-increment handle it
@@ -664,6 +707,10 @@ export const importData = async (data) => {
         if (data.nutritionProfile?.length) {
           const profiles = data.nutritionProfile.map(({ id, ...rest }) => rest);
           await db.nutritionProfile.bulkAdd(profiles);
+        }
+        if (data.waterLogs?.length) {
+          const logs = data.waterLogs.map(({ id, ...rest }) => rest);
+          await db.waterLogs.bulkAdd(logs);
         }
       }
     );

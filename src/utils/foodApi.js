@@ -137,6 +137,9 @@ async function analyzeWithGemini(imageBlob, onStatus) {
       "protein": 0, 
       "carbs": 0, 
       "fat": 0, 
+      "sugar": 0,
+      "fiber": 0,
+      "sodium": 0,
       "confidence": 0.95, 
       "isUnknown": false 
     }
