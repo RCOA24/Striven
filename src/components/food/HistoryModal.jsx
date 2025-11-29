@@ -1,5 +1,5 @@
-import React from 'react';
-import { X, ScanLine, Utensils, Clock, Trash2, Calendar, Target, Ruler, Weight, Droplets, Plus, Minus, Info } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, ScanLine, Utensils, Clock, Trash2, Calendar, Target, Ruler, Weight, Droplets, Plus, Minus, Info, ChevronDown, ChevronUp } from 'lucide-react';
 
 const HistoryModal = ({ 
   isOpen, 
@@ -14,6 +14,15 @@ const HistoryModal = ({
   onDelete, 
   onSetGoal 
 }) => {
+  const [expandedDates, setExpandedDates] = useState({});
+
+  const toggleDate = (date) => {
+    setExpandedDates(prev => ({
+      ...prev,
+      [date]: !prev[date]
+    }));
+  };
+
   if (!isOpen) return null;
 
   const glassSize = 250;
@@ -170,7 +179,7 @@ const HistoryModal = ({
                 )}
             </div>
             
-            <div className="p-4 space-y-6">
+            <div className="p-4 space-y-4">
             {history.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-40 text-zinc-500 space-y-4">
                 <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">
@@ -179,51 +188,62 @@ const HistoryModal = ({
                 <p className="text-sm">No food logged yet</p>
                 </div>
             ) : (
-                Object.entries(groupedHistory).map(([date, group]) => (
-                <div key={date} className="animate-in slide-in-from-bottom-2 duration-500">
-                    <div className="flex items-center justify-between px-2 mb-3">
-                    <div className="flex items-center gap-2 text-emerald-500">
-                        <Calendar className="w-4 h-4" />
-                        <span className="text-xs font-bold uppercase tracking-wider">{date}</span>
-                    </div>
-                    <span className="text-xs text-zinc-500 font-medium">{group.totalCals} kcal total</span>
-                    </div>
-                    
-                    <div className="space-y-2">
-                    {group.items.map((item, i) => (
-                        <div key={item.id || i} className="flex items-center justify-between bg-black/20 border border-white/5 p-3 rounded-2xl hover:bg-white/5 transition-colors group">
-                        <div className="flex items-center space-x-3 min-w-0 flex-1">
-                            <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center border border-white/5 flex-shrink-0">
-                            <Utensils className="w-4 h-4 text-zinc-400" />
-                            </div>
-                            <div className="min-w-0 flex-1 pr-2">
-                            <div className="font-medium text-white capitalize text-sm truncate">{item.name}</div>
-                            <div className="text-[10px] text-zinc-500 flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                {new Date(item.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                            </div>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-3 flex-shrink-0">
-                            <div className="text-right">
-                            <div className="text-white font-bold text-sm">{item.calories}</div>
-                            <div className="text-[9px] text-zinc-500 uppercase tracking-wide">kcal</div>
-                            </div>
+                Object.entries(groupedHistory).map(([date, group]) => {
+                    const isExpanded = expandedDates[date];
+                    return (
+                        <div key={date} className="animate-in slide-in-from-bottom-2 duration-500 bg-white/5 rounded-2xl overflow-hidden border border-white/5">
                             <button 
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onDelete(item.id);
-                            }}
-                            className="p-2 text-zinc-600 hover:text-red-500 hover:bg-red-500/10 rounded-full transition-colors"
+                                onClick={() => toggleDate(date)}
+                                className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors"
                             >
-                            <Trash2 className="w-4 h-4" />
+                                <div className="flex items-center gap-2 text-emerald-500">
+                                    <Calendar className="w-4 h-4" />
+                                    <span className="text-xs font-bold uppercase tracking-wider">{date}</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <span className="text-xs text-zinc-500 font-medium">{group.totalCals} kcal</span>
+                                    {isExpanded ? <ChevronUp className="w-4 h-4 text-zinc-500" /> : <ChevronDown className="w-4 h-4 text-zinc-500" />}
+                                </div>
                             </button>
+                            
+                            {isExpanded && (
+                                <div className="px-3 pb-3 space-y-2 border-t border-white/5 pt-3">
+                                    {group.items.map((item, i) => (
+                                        <div key={item.id || i} className="flex items-center justify-between bg-black/20 border border-white/5 p-3 rounded-xl hover:bg-white/5 transition-colors group">
+                                        <div className="flex items-center space-x-3 min-w-0 flex-1">
+                                            <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center border border-white/5 flex-shrink-0">
+                                            <Utensils className="w-4 h-4 text-zinc-400" />
+                                            </div>
+                                            <div className="min-w-0 flex-1 pr-2">
+                                            <div className="font-medium text-white capitalize text-sm truncate">{item.name}</div>
+                                            <div className="text-[10px] text-zinc-500 flex items-center gap-1">
+                                                <Clock className="w-3 h-3" />
+                                                {new Date(item.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                            </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3 flex-shrink-0">
+                                            <div className="text-right">
+                                            <div className="text-white font-bold text-sm">{item.calories}</div>
+                                            <div className="text-[9px] text-zinc-500 uppercase tracking-wide">kcal</div>
+                                            </div>
+                                            <button 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onDelete(item.id);
+                                            }}
+                                            className="p-2 text-zinc-600 hover:text-red-500 hover:bg-red-500/10 rounded-full transition-colors"
+                                            >
+                                            <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                        </div>
-                    ))}
-                    </div>
-                </div>
-                ))
+                    );
+                })
             )}
             </div>
         </div>
