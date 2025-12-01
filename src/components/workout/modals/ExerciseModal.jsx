@@ -11,6 +11,7 @@ import { toggleFavorite, isFavorite } from '../../../utils/db';
 
 // ✅ FIX 1: Use local fallback GIF
 const FALLBACK = '/fallback-exercise.gif';
+const SAFETY_PLACEHOLDER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Crect width='300' height='300' fill='%2327272a'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='14' fill='%2371717a'%3ENo Preview%3C/text%3E%3C/svg%3E";
 const WGER_API = 'https://wger.de/api/v2';
 
 // --- Helper Hook for Scroll Locking ---
@@ -180,8 +181,24 @@ export default function ExerciseModal({ isOpen, exercise: initialExercise, onClo
   if (!isOpen) return null;
   if (typeof document === 'undefined') return null; 
 
-  // ✅ FIX 2: Prioritize previewImage, then array image, then gifUrl, then FALLBACK
-  const currentImg = exercise?.images?.[imgIdx]?.image || exercise?.previewImage || exercise?.gifUrl || FALLBACK;
+  // Image State Handling
+  const getPrimaryImage = () => exercise?.images?.[imgIdx]?.image || exercise?.previewImage || exercise?.gifUrl || FALLBACK;
+  const [displayImage, setDisplayImage] = useState(getPrimaryImage());
+
+  useEffect(() => {
+    setDisplayImage(getPrimaryImage());
+    setImageLoaded(false);
+  }, [imgIdx, exercise]);
+
+  const handleImageError = (e) => {
+    e.target.onerror = null;
+    if (displayImage === FALLBACK) {
+      setDisplayImage(SAFETY_PLACEHOLDER);
+    } else if (displayImage !== SAFETY_PLACEHOLDER) {
+      setDisplayImage(FALLBACK);
+    }
+    setImageLoaded(true);
+  };
   const hasVideo = exercise?.videos?.length > 0;
   const hasMultipleImages = exercise?.images?.length > 1;
 
@@ -242,7 +259,7 @@ export default function ExerciseModal({ isOpen, exercise: initialExercise, onClo
                       muted 
                       loop 
                       playsInline 
-                      poster={currentImg} 
+                      poster={displayImage} 
                       className="h-full w-full object-cover"
                     >
                       <source src={exercise.videos[0].video} type="video/mp4" />
@@ -257,16 +274,11 @@ export default function ExerciseModal({ isOpen, exercise: initialExercise, onClo
                       <div className="absolute inset-0 bg-zinc-800 animate-pulse" />
                     )}
                     <img 
-                      src={currentImg} 
+                      src={displayImage} 
                       alt={exercise?.name} 
                       className={`h-full w-full object-cover transition-opacity duration-500 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
                       onLoad={() => setImageLoaded(true)}
-                      // ✅ FIX 3: Safe fallback on error
-                      onError={(e) => { 
-                        e.target.onerror = null; 
-                        e.target.src = FALLBACK; 
-                        setImageLoaded(true); 
-                      }}
+                      onError={handleImageError}
                     />
                     
                     {hasMultipleImages && (

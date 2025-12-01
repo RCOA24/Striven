@@ -11,6 +11,8 @@ import toast, { Toaster } from 'react-hot-toast';
 import { addToTodayWorkout, isFavorite, toggleFavorite } from '../utils/db';
 
 const FALLBACK = '/fallback-exercise.gif';
+const SAFETY_PLACEHOLDER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Crect width='300' height='300' fill='%2327272a'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='14' fill='%2371717a'%3ENo Preview%3C/text%3E%3C/svg%3E";
+
 
 // --- Scroll Lock Hook ---
 const useScrollLock = (isOpen) => {
@@ -125,7 +127,25 @@ const ExerciseModal = ({ exercise, isOpen, onClose }) => {
   [exercise?.description]);
 
   const currentVideo = videos[vidIdx];
-  const currentImage = images[imgIdx]?.image || exercise?.previewImage || exercise?.gifUrl || FALLBACK;
+  
+  // Image State Handling
+  const getPrimaryImage = () => images[imgIdx]?.image || exercise?.previewImage || exercise?.gifUrl || FALLBACK;
+  const [displayImage, setDisplayImage] = useState(getPrimaryImage());
+
+  useEffect(() => {
+    setDisplayImage(getPrimaryImage());
+    setImgLoaded(false);
+  }, [imgIdx, exercise]);
+
+  const handleImageError = (e) => {
+    e.target.onerror = null;
+    if (displayImage === FALLBACK) {
+      setDisplayImage(SAFETY_PLACEHOLDER);
+    } else if (displayImage !== SAFETY_PLACEHOLDER) {
+      setDisplayImage(FALLBACK);
+    }
+    setImgLoaded(true);
+  };
 
   const nextImg = () => { setImgLoaded(false); setImgIdx(i => (i + 1) % images.length); };
   const prevImg = () => { setImgLoaded(false); setImgIdx(i => (i - 1 + images.length) % images.length); };
@@ -246,7 +266,7 @@ const ExerciseModal = ({ exercise, isOpen, onClose }) => {
                         muted
                         loop
                         playsInline
-                        poster={currentImage}
+                        poster={displayImage}
                         className="h-full w-full object-cover"
                       >
                         <source src={currentVideo?.video} type="video/mp4" />
@@ -269,7 +289,7 @@ const ExerciseModal = ({ exercise, isOpen, onClose }) => {
                     </div>
                   )}
 
-                  {(!videos.length && (images.length > 0 || currentImage)) && (
+                  {(!videos.length && (images.length > 0 || displayImage)) && (
                     <div {...swipeHandlers} className="relative aspect-video w-full rounded-2xl overflow-hidden bg-zinc-900 shadow-lg ring-1 ring-white/5 group">
                       {!imgLoaded && (
                         <div className="absolute inset-0 flex items-center justify-center bg-zinc-800">
@@ -277,15 +297,11 @@ const ExerciseModal = ({ exercise, isOpen, onClose }) => {
                         </div>
                       )}
                       <img
-                        src={currentImage}
+                        src={displayImage}
                         alt={exercise.name}
                         className={`h-full w-full object-contain transition-opacity duration-500 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
                         onLoad={() => setImgLoaded(true)}
-                        onError={(e) => { 
-                          e.target.onerror = null; 
-                          e.target.src = FALLBACK; 
-                          setImgLoaded(true); 
-                        }}
+                        onError={handleImageError}
                       />
                       
                       {images.length > 1 && (

@@ -1,12 +1,28 @@
 import { motion } from 'framer-motion';
-import { Heart } from 'lucide-react';
+import { Heart, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
-// ✅ FIX 1: Use the local GIF from your /public folder
 const FALLBACK_GIF = '/fallback-exercise.gif';
+const SAFETY_PLACEHOLDER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Crect width='300' height='300' fill='%2327272a'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='14' fill='%2371717a'%3ENo Preview%3C/text%3E%3C/svg%3E";
 
 export const ExerciseCard = ({ exercise, onClick, onQuickAdd }) => {
-  // ✅ FIX 2: Prioritize the 'previewImage' we added to the API logic, then the gifUrl
-  const displayImage = exercise.previewImage || exercise.gifUrl || FALLBACK_GIF;
+  const [imgSrc, setImgSrc] = useState(exercise.previewImage || exercise.gifUrl || FALLBACK_GIF);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    setImgSrc(exercise.previewImage || exercise.gifUrl || FALLBACK_GIF);
+    setIsLoading(true);
+  }, [exercise.previewImage, exercise.gifUrl]);
+
+  const handleError = (e) => {
+    e.target.onerror = null;
+    if (imgSrc === FALLBACK_GIF) {
+      setImgSrc(SAFETY_PLACEHOLDER);
+    } else if (imgSrc !== SAFETY_PLACEHOLDER) {
+      setImgSrc(FALLBACK_GIF);
+    }
+    setIsLoading(false);
+  };
 
   return (
     <motion.div
@@ -16,17 +32,19 @@ export const ExerciseCard = ({ exercise, onClick, onQuickAdd }) => {
       onClick={onClick}
     >
       <div className="relative h-40 bg-black/50">
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-zinc-800 z-10">
+            <Loader2 className="w-6 h-6 text-emerald-500 animate-spin" />
+          </div>
+        )}
         <img
-          src={displayImage}
+          src={imgSrc}
           alt={exercise.name}
-          className="w-full h-full object-cover"
-          // ✅ FIX 3: If the API link is 404, force the local GIF
-          onError={(e) => {
-            e.target.onerror = null; // Prevent infinite loop
-            e.target.src = FALLBACK_GIF;
-          }}
+          className={`w-full h-full object-cover transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+          onLoad={() => setIsLoading(false)}
+          onError={handleError}
         />
-        <Heart className="absolute top-3 right-3 w-7 h-7 text-rose-500 fill-current" />
+        <Heart className="absolute top-3 right-3 w-7 h-7 text-rose-500 fill-current z-20" />
       </div>
       <div className="p-4">
         <h3 className="font-bold text-sm line-clamp-2">{exercise.name}</h3>

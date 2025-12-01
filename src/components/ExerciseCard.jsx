@@ -2,31 +2,56 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Dumbbell, Heart, Sparkles, ImageOff } from 'lucide-react';
 
+// NOTE: Ensure 'fallback-exercise.gif' is inside the 'public' folder
+const FALLBACK_GIF = '/fallback-exercise.gif';
+const SAFETY_PLACEHOLDER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Crect width='300' height='300' fill='%2327272a'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='14' fill='%2371717a'%3ENo Preview%3C/text%3E%3C/svg%3E";
+
 export default function ExerciseCard({ exercise, onClick }) {
   const [imgState, setImgState] = useState({
-    src: exercise.previewImage || exercise.gifUrl || '/fallback-exercise.gif',
+    src: exercise.previewImage || exercise.gifUrl || FALLBACK_GIF,
     hasError: false,
-    loaded: false
+    loaded: false,
+    usingFallback: false
   });
 
   // Reset state if the exercise prop changes (important for search/filtering)
   useEffect(() => {
     setImgState({
-      src: exercise.previewImage || exercise.gifUrl || '/fallback-exercise.gif',
+      src: exercise.previewImage || exercise.gifUrl || FALLBACK_GIF,
       hasError: false,
-      loaded: false
+      loaded: false,
+      usingFallback: false
     });
   }, [exercise.id, exercise.previewImage, exercise.gifUrl]);
 
-  const handleError = () => {
-    if (!imgState.hasError) {
-      setImgState(prev => ({
+  const handleError = (e) => {
+    // 1. Stop browser from retrying immediately
+    e.target.onerror = null;
+
+    // 2. Check what URL failed
+    const failedSrc = e.target.src || '';
+
+    setImgState(prev => {
+      // If we failed on the fallback GIF (or if we already flagged usingFallback), switch to SVG
+      if (prev.usingFallback || failedSrc.includes('fallback-exercise.gif')) {
+        return {
+          ...prev,
+          src: SAFETY_PLACEHOLDER,
+          hasError: true,
+          loaded: true,
+          usingFallback: true // Stay in fallback mode
+        };
+      }
+
+      // First failure: Try the local fallback GIF
+      return {
         ...prev,
-        src: '/fallback-exercise.gif', // Switch to local fallback
-        hasError: true, // Mark as error so we can hide badges
-        loaded: true // Stop loading spinner
-      }));
-    }
+        src: FALLBACK_GIF,
+        usingFallback: true,
+        hasError: true,
+        loaded: true
+      };
+    });
   };
 
   const handleLoad = () => {
