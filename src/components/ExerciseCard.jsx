@@ -1,6 +1,6 @@
 // src/components/ExerciseCard.jsx
 import React, { useState, useEffect } from 'react';
-import { Play, Dumbbell, Heart, Sparkles, ImageOff } from 'lucide-react';
+import { Play, Dumbbell, Heart, Sparkles, ImageOff, Info } from 'lucide-react';
 
 // NOTE: Ensure 'fallback-exercise.gif' is inside the 'public' folder
 const FALLBACK_GIF = '/fallback-exercise.gif';
@@ -32,23 +32,25 @@ export default function ExerciseCard({ exercise, onClick }) {
     const failedSrc = e.target.src || '';
 
     setImgState(prev => {
-      // If we failed on the fallback GIF (or if we already flagged usingFallback), switch to SVG
+      // CRITICAL FAILURE: If we failed on the fallback GIF (or if we already flagged usingFallback)
+      // switch to the SVG Placeholder.
       if (prev.usingFallback || failedSrc.includes('fallback-exercise.gif')) {
         return {
           ...prev,
           src: SAFETY_PLACEHOLDER,
-          hasError: true,
+          hasError: true, // Now we truly have an error (SVG shown)
           loaded: true,
-          usingFallback: true // Stay in fallback mode
+          usingFallback: true
         };
       }
 
-      // First failure: Try the local fallback GIF
+      // SOFT FAILURE: First failure (API Image). Switch to local fallback GIF.
+      // We do NOT set hasError to true here, because the fallback GIF is still a valid visual.
       return {
         ...prev,
         src: FALLBACK_GIF,
         usingFallback: true,
-        hasError: true,
+        hasError: false, 
         loaded: true
       };
     });
@@ -75,6 +77,8 @@ export default function ExerciseCard({ exercise, onClick }) {
         <img
           src={imgState.src}
           alt={exercise.name}
+          // IMPORTANT: referrerPolicy="no-referrer" allows loading images from APIs that block hotlinking
+          referrerPolicy="no-referrer"
           className={`w-full h-full object-cover transition-all duration-700 ease-out
             ${imgState.hasError ? 'opacity-40 grayscale-[0.5]' : 'group-hover:scale-110'}
             ${imgState.loaded ? 'opacity-100' : 'opacity-0'}
@@ -84,15 +88,23 @@ export default function ExerciseCard({ exercise, onClick }) {
           onError={handleError}
         />
 
-        {/* 3. "GIF" Badge -> ONLY show if real image loaded successfully */}
-        {!imgState.hasError && imgState.loaded && (
+        {/* 3. "GIF" Badge -> ONLY show if Real API Image loaded successfully */}
+        {!imgState.hasError && imgState.loaded && !imgState.usingFallback && (
           <div className="absolute top-3 right-3 bg-emerald-500 text-black text-xs px-3 py-1.5 rounded-full font-bold flex items-center gap-1 shadow-lg animate-pulse z-20">
             <Sparkles className="w-3 h-3" />
             GIF
           </div>
         )}
 
-        {/* 4. Error State Indicator (Optional: Adds an icon if fallback is used) */}
+        {/* 4. "Generic" Badge -> Show if we switched to the Fallback GIF successfully */}
+        {!imgState.hasError && imgState.loaded && imgState.usingFallback && (
+          <div className="absolute top-3 right-3 bg-zinc-700/80 backdrop-blur-md text-white text-xs px-3 py-1.5 rounded-full font-medium flex items-center gap-1 border border-white/5 z-20">
+            <Info className="w-3 h-3" />
+            Generic
+          </div>
+        )}
+
+        {/* 5. Error State Indicator -> Show if Fallback also failed (SVG Mode) */}
         {imgState.hasError && imgState.loaded && (
           <div className="absolute top-3 right-3 bg-zinc-800/80 backdrop-blur-md text-zinc-400 text-xs px-3 py-1.5 rounded-full font-bold flex items-center gap-1 border border-white/5 z-20">
             <ImageOff className="w-3 h-3" />
