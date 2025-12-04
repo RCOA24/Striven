@@ -20,29 +20,28 @@ const Intro = ({ onComplete }) => {
       try {
         await audio.play();
       } catch (err) {
-        // Autoplay restrictions are common, we just ignore errors
+        // Ignore autoplay blocks
       }
     };
     playAudio();
 
     // --- 2. Animation Timeline ---
     const sequence = async () => {
-      // Step 1: Hold initial blank state briefly
-      await new Promise(r => setTimeout(r, 500));
+      // Small buffer to let the browser paint the initial black screen
+      await new Promise(r => requestAnimationFrame(() => setTimeout(r, 500)));
       setStage('loading');
       
-      // Step 2: Let the Logo/Text animations play (2.5 seconds)
+      // Allow animations to play
       await new Promise(r => setTimeout(r, 2500));
-      setStage('expanding'); // Triggers Green Circle Expansion
+      setStage('expanding'); 
 
-      // Step 3: Wait for Green Circle to fill screen (0.8s animation + buffer)
+      // Wait for Green Circle Expansion
       await new Promise(r => setTimeout(r, 1000));
-      setStage('fading'); // Triggers the Container Fade Out
+      setStage('fading'); 
 
-      // Step 4: Wait for the Fade Out to finish (1.0s)
-      await new Promise(r => setTimeout(r, 1000));
+      // Wait for Fade Out
+      await new Promise(r => setTimeout(r, 1200));
       
-      // Step 5: FINALLY unmount. The screen is already transparent now.
       if (onComplete) onComplete();
     };
 
@@ -52,36 +51,45 @@ const Intro = ({ onComplete }) => {
   return (
     <motion.div
       key="intro-container"
-      // We animate the opacity of the WHOLE container based on the 'fading' stage
+      // Optimization: Animate opacity on a GPU-promoted layer
       animate={{ opacity: stage === 'fading' ? 0 : 1 }}
       transition={{ duration: 1, ease: "easeOut" }}
-      className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black overflow-hidden font-sans ${
+      className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black overflow-hidden font-sans touch-none ${
         stage === 'fading' ? 'pointer-events-none' : ''
       }`}
+      // Force GPU layer for the whole container
+      style={{ willChange: "opacity" }} 
     >
       
       {/* --- 1. Dynamic Background --- */}
-      <div className="absolute inset-0 z-0 opacity-30">
+      {/* Optimization: Used transform-gpu and will-change to prevent jank on the blur */}
+      <div className="absolute inset-0 z-0 opacity-30 pointer-events-none">
         <motion.div 
           animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
           transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-[#22c55e] rounded-full blur-[120px]"
+          className="absolute top-1/2 left-1/2 w-[500px] h-[500px] bg-[#22c55e] rounded-full blur-[80px] transform-gpu"
+          style={{ 
+            x: "-50%", 
+            y: "-50%",
+            willChange: "transform, opacity",
+            backfaceVisibility: "hidden" // Fixes iOS flicker
+          }}
         />
       </div>
 
-      {/* Wrapper for content: It needs to disappear when Green Circle expands */}
+      {/* Content Wrapper */}
       <motion.div 
-        className="relative z-10 flex flex-col items-center justify-center gap-8"
+        className="relative z-10 flex flex-col items-center justify-center gap-8 transform-gpu"
         animate={{ 
           opacity: stage === 'expanding' || stage === 'fading' ? 0 : 1, 
           scale: stage === 'expanding' ? 0.9 : 1
         }} 
-        transition={{ duration: 0.4, ease: "easeInOut" }}
+        transition={{ duration: 0.4 }}
+        style={{ willChange: "opacity, transform" }}
       >
         
         {/* --- 2. The Logo Wrapper --- */}
         <div className="relative w-32 h-32 flex items-center justify-center">
-          {/* Spinning Rings */}
           <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 100 100">
             <circle cx="50" cy="50" r="46" stroke="#333" strokeWidth="4" fill="none" />
             <motion.circle 
@@ -101,19 +109,21 @@ const Intro = ({ onComplete }) => {
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: "spring", stiffness: 200, damping: 20, delay: 0.1 }}
-            className="relative w-20 h-20 bg-white rounded-full flex items-center justify-center overflow-hidden shadow-2xl shadow-green-500/20"
+            className="relative w-20 h-20 bg-white rounded-full flex items-center justify-center overflow-hidden shadow-2xl shadow-green-500/20 transform-gpu"
           >
             <img 
               src={LOGO_URL} 
               alt="Striven Logo" 
               className="w-14 h-14 object-contain"
             />
-            {/* AI Scan Effect */}
+            {/* AI Scan Effect - OPTIMIZED */}
+            {/* Changed from 'top' to 'translateY' for 60fps mobile rendering */}
             <motion.div 
-              initial={{ top: "-100%" }}
-              animate={{ top: "200%" }}
+              initial={{ translateY: "-100%" }}
+              animate={{ translateY: "200%" }}
               transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 0.5, ease: "linear" }}
-              className="absolute left-0 right-0 h-1/2 bg-gradient-to-b from-transparent via-green-400/30 to-transparent w-full"
+              className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-transparent via-green-400/30 to-transparent w-full"
+              style={{ willChange: "transform" }}
             />
           </motion.div>
         </div>
@@ -147,13 +157,17 @@ const Intro = ({ onComplete }) => {
       </motion.div>
 
       {/* --- 4. The Exit Animation (Green Expansion) --- */}
-      {/* We conditionally render this only when needed, but keep it mounted during the fade */}
       {(stage === 'expanding' || stage === 'fading') && (
         <motion.div
           initial={{ scale: 0, borderRadius: "100%" }}
           animate={{ scale: 30 }}
           transition={{ duration: 0.8, ease: "circIn" }}
-          className="absolute bg-emerald-500 w-24 h-24 rounded-full z-20 pointer-events-none"
+          className="absolute bg-green-500 w-24 h-24 rounded-full z-20 pointer-events-none transform-gpu"
+          style={{ 
+            willChange: "transform",
+            backfaceVisibility: "hidden", // Crucial for iOS smoothness
+            perspective: 1000
+          }}
         />
       )}
 
