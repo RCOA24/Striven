@@ -17,6 +17,12 @@ const useStriven = () => {
   const [calories, setCalories] = useState(0);
   const [duration, setDuration] = useState(0);
   const [sensorSupported, setSensorSupported] = useState(true);
+  
+  // NEW: Location State
+  const [currentLocation, setCurrentLocation] = useState(null);
+  const [route, setRoute] = useState([]);
+  const watchIdRef = useRef(null);
+
   const [weeklyStats, setWeeklyStats] = useState({
     totalSteps: 0,
     totalDistance: 0,
@@ -184,6 +190,21 @@ const useStriven = () => {
       }
 
       await stepDetectorRef.current.start();
+      
+      // NEW: Start Geolocation Tracking
+      if ('geolocation' in navigator) {
+        watchIdRef.current = navigator.geolocation.watchPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            const point = [latitude, longitude];
+            setCurrentLocation(point);
+            setRoute(prev => [...prev, point]);
+          },
+          (error) => console.warn('Location tracking error:', error),
+          { enableHighAccuracy: true, distanceFilter: 5 }
+        );
+      }
+
       startTimeRef.current = Date.now();
       pausedTimeRef.current = 0;
       setIsTracking(true);
@@ -200,7 +221,12 @@ const useStriven = () => {
       stepDetectorRef.current.stop();
     }
     
-    // Track paused time
+    // NEW: Stop Geolocation Watch
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    
     pausedTimeRef.current += Date.now() - startTimeRef.current - duration * 1000;
     
     setIsPaused(true);
@@ -212,8 +238,21 @@ const useStriven = () => {
       if (stepDetectorRef.current) {
         await stepDetectorRef.current.start();
       }
+
+      // NEW: Resume Geolocation Watch
+      if ('geolocation' in navigator) {
+        watchIdRef.current = navigator.geolocation.watchPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            const point = [latitude, longitude];
+            setCurrentLocation(point);
+            setRoute(prev => [...prev, point]);
+          },
+          (error) => console.warn('Location tracking error:', error),
+          { enableHighAccuracy: true, distanceFilter: 5 }
+        );
+      }
       
-      // Resume timer from where it was paused
       startTimeRef.current = Date.now();
       
       setIsPaused(false);
@@ -228,6 +267,15 @@ const useStriven = () => {
       stepDetectorRef.current.stop();
       stepDetectorRef.current.reset();
     }
+    
+    // NEW: Clear Location Data
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    setRoute([]);
+    setCurrentLocation(null);
+
     setSteps(0);
     setDistance(0);
     setCalories(0);
@@ -244,21 +292,27 @@ const useStriven = () => {
       if (stepDetectorRef.current) {
         stepDetectorRef.current.stop();
       }
+      
+      // NEW: Stop Geolocation
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
 
-      // Only save if there are steps
       if (steps === 0) {
         console.log('No steps to save');
         reset();
         return null;
       }
 
-      // Save activity to Dexie.js
       const activity = {
         steps,
         distance: parseFloat(distance.toFixed(2)),
         calories: Math.round(calories),
         duration,
-        date: new Date().toISOString()
+        date: new Date().toISOString(),
+        // Optional: Save route if you want to show it in history later
+        // route: route 
       };
 
       const activityId = await addActivity(activity);
@@ -291,13 +345,15 @@ const useStriven = () => {
       setIsPaused(false);
       startTimeRef.current = null;
       pausedTimeRef.current = 0;
+      setRoute([]); // NEW
+      setCurrentLocation(null); // NEW
 
       return activity;
     } catch (error) {
       console.error('Failed to save activity:', error);
       throw error;
     }
-  }, [steps, distance, calories, duration, reset]);
+  }, [steps, distance, calories, duration, reset, route]); // Added route dependency
 
   return {
     steps,
@@ -310,6 +366,8 @@ const useStriven = () => {
     sensorSupported,
     activities,
     weeklyStats,
+    currentLocation, // NEW
+    route, // NEW
     startTracking,
     pauseTracking,
     resumeTracking,

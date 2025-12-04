@@ -10,9 +10,11 @@ import {
   Pause, 
   RotateCcw, 
   ChevronRight, 
-  TrendingUp 
+  TrendingUp,
+  Map as MapIcon // NEW
 } from 'lucide-react';
 import LicenseModal from '../components/LicenseModal';
+import LiveMap from '../components/LiveMap'; // NEW
 
 // --- Components ---
 
@@ -159,10 +161,13 @@ const Dashboard = ({
   reset = () => {}, 
   stopAndSave = () => {},
   weeklyStats = { totalSteps: 0, activeDays: 0 },
-  onNavigateToStats = () => {}
+  onNavigateToStats = () => {},
+  currentLocation = null, // NEW
+  route = [] // NEW
 }) => {
   const dailyStepsGoal = 10000;
   const [showLicense, setShowLicense] = useState(false);
+  const [viewMode, setViewMode] = useState('steps'); // NEW: 'steps' or 'map'
 
   // Request notification permission when starting workout
   const handleStartWorkout = async () => {
@@ -175,6 +180,7 @@ const Dashboard = ({
       }
     }
     startTracking();
+    setViewMode('map'); // Auto-switch to map when starting
   };
 
   const weeklyAverage = useMemo(() => 
@@ -206,9 +212,38 @@ const Dashboard = ({
         {/* Main Content - Responsive Grid */}
         <main className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 items-start">
           
-          {/* Left Column: Step Counter (Centered on Desktop) */}
-          <div className="flex flex-col items-center justify-center lg:h-full lg:sticky lg:top-8">
-            <StepCounter steps={steps} goal={dailyStepsGoal} />
+          {/* Left Column: Step Counter OR Map (Centered on Desktop) */}
+          <div className="flex flex-col items-center justify-center lg:h-full lg:sticky lg:top-8 relative">
+            
+            {/* View Toggle Button (Only visible when tracking) */}
+            {isTracking && (
+              <button 
+                onClick={() => setViewMode(v => v === 'steps' ? 'map' : 'steps')}
+                className="absolute top-0 right-4 z-10 bg-zinc-800/80 backdrop-blur-md p-2 px-4 rounded-full text-white text-xs font-bold flex items-center gap-2 border border-white/10 hover:bg-zinc-700 transition-colors"
+              >
+                {viewMode === 'steps' ? <MapIcon size={14} /> : <Footprints size={14} />}
+                {viewMode === 'steps' ? 'Show Map' : 'Show Steps'}
+              </button>
+            )}
+
+            {isTracking && viewMode === 'map' ? (
+               <div className="w-full aspect-square max-w-[280px] lg:max-w-[400px] mx-auto mb-8 lg:mb-0 rounded-[2rem] overflow-hidden shadow-2xl border border-zinc-800 relative">
+                  <LiveMap route={route} currentLocation={currentLocation} />
+                  {/* Overlay Stats on Map */}
+                  <div className="absolute bottom-4 left-4 right-4 bg-black/60 backdrop-blur-md rounded-xl p-3 flex justify-between items-center border border-white/10 z-[400]">
+                      <div>
+                        <div className="text-xs text-zinc-400 font-bold uppercase">Steps</div>
+                        <div className="text-lg font-bold text-white">{steps.toLocaleString()}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs text-zinc-400 font-bold uppercase">Dist</div>
+                        <div className="text-lg font-bold text-emerald-400">{distance.toFixed(2)}km</div>
+                      </div>
+                  </div>
+               </div>
+            ) : (
+               <StepCounter steps={steps} goal={dailyStepsGoal} />
+            )}
           </div>
 
           {/* Right Column: Metrics & Controls */}

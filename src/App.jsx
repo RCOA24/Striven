@@ -44,6 +44,8 @@ function App() {
     sensorSupported,
     activities,
     weeklyStats,
+    currentLocation, // NEW
+    route, // NEW
     startTracking,
     pauseTracking,
     resumeTracking,
@@ -154,6 +156,8 @@ function App() {
             stopAndSave={handleFinish}
             weeklyStats={weeklyStats}
             onNavigateToStats={handleNavigateToStats}
+            currentLocation={currentLocation} // NEW
+            route={route} // NEW
           />
         );
       case 'activity':
