@@ -86,6 +86,43 @@ db.version(6).stores({
   console.log('Upgraded to v6: Added waterLogs & micronutrients');
 });
 
+// Version 7: GPS ROUTES
+db.version(7).stores({
+  activities: '++id, date, steps, distance, calories, duration, timestamp, hasGPS', // Added hasGPS index
+  weeklyStats: '++id, weekStart, totalSteps, totalDistance, totalCalories, totalDuration',
+  settings: '++id, key, value',
+  goals: '++id, type, target, current, date, completed',
+  favorites: '++id, exerciseId, name, muscles, equipment, category, gifUrl, addedAt',
+  todayWorkout: '++id, exerciseId, name, sets, reps, weight, rest, notes, order, addedAt',
+  workoutPlans: '++id, name, days, createdAt, isActive',
+  exerciseLogs: '++id, exerciseId, date, set, weight, reps, oneRm',
+  foodLogs: '++id, name, calories, protein, carbs, fat, sugar, fiber, sodium, timestamp',
+  nutritionProfile: '++id, targetCalories, protein, fats, carbs, updatedAt',
+  waterLogs: '++id, amount, timestamp'
+}).upgrade(tx => {
+  // Optional: Migrate existing activities to have hasGPS = false if needed
+  return tx.table('activities').toCollection().modify(activity => {
+    if (!activity.hasGPS) activity.hasGPS = !!(activity.route && activity.route.length > 0);
+  });
+});
+
+// Version 8: LOCATION NAMES
+db.version(8).stores({
+  activities: '++id, date, steps, distance, calories, duration, timestamp, hasGPS, startLocation, endLocation',
+  weeklyStats: '++id, weekStart, totalSteps, totalDistance, totalCalories, totalDuration',
+  settings: '++id, key, value',
+  goals: '++id, type, target, current, date, completed',
+  favorites: '++id, exerciseId, name, muscles, equipment, category, gifUrl, addedAt',
+  todayWorkout: '++id, exerciseId, name, sets, reps, weight, rest, notes, order, addedAt',
+  workoutPlans: '++id, name, days, createdAt, isActive',
+  exerciseLogs: '++id, exerciseId, date, set, weight, reps, oneRm',
+  foodLogs: '++id, name, calories, protein, carbs, fat, sugar, fiber, sodium, timestamp',
+  nutritionProfile: '++id, targetCalories, protein, fats, carbs, updatedAt',
+  waterLogs: '++id, amount, timestamp'
+}).upgrade(tx => {
+  console.log('Upgraded to v8: Added location names');
+});
+
 /* ==================================================================
    WATER LOGS
 ================================================================== */

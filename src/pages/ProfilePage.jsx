@@ -5,12 +5,14 @@
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { User, Award, TrendingUp, Zap, Download, Upload, Trash2, AlertTriangle, CheckCircle, XCircle, ChevronRight, Footprints, Flame, Apple } from 'lucide-react';
+import { User, Award, TrendingUp, Zap, Download, Upload, Trash2, AlertTriangle, CheckCircle, XCircle, ChevronRight, Footprints, Flame, Apple, MapPin, X } from 'lucide-react'; // Added MapPin, X
 import { exportData, importData, clearAllData, getNutritionProfile, getFoodLogs } from '../utils/db';
 import LicenseModal from '../components/LicenseModal';
+import LiveMap from '../components/LiveMap'; // Import LiveMap
+import { motion, AnimatePresence } from 'framer-motion'; // Import animation
 
 // Redesigned Stat Card based on attachment
-const StatCard = ({ icon: Icon, label, value, color }) => (
+const StatCard = ({ icon: Icon, label, value, color, subValue }) => ( // Added subValue prop
   <div className="bg-[#1C1C1E] rounded-3xl p-5 relative overflow-hidden h-40 flex flex-col justify-between group">
     {/* Right side dark accent */}
     <div className="absolute top-0 right-0 w-[35%] h-full bg-black/20" />
@@ -24,6 +26,8 @@ const StatCard = ({ icon: Icon, label, value, color }) => (
     <div className="z-10">
       <div className="text-3xl font-bold text-white font-apple tracking-tight mb-1">{value}</div>
       <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest font-apple">{label}</div>
+      {/* NEW: Sub Value for Location */}
+      {subValue && <div className="text-[10px] text-emerald-500 font-medium mt-1 truncate">{subValue}</div>}
     </div>
   </div>
 );
@@ -55,6 +59,7 @@ const ProfilePage = ({ activities = [], weeklyStats = {} }) => {
   const [notification, setNotification] = useState(null); 
   const [showLicense, setShowLicense] = useState(false);
   const [nutritionStats, setNutritionStats] = useState({ target: 0, totalLogged: 0 });
+  const [viewBestMap, setViewBestMap] = useState(null); // State for map
 
   // Show notification
   const showNotification = (type, message) => {
@@ -63,15 +68,23 @@ const ProfilePage = ({ activities = [], weeklyStats = {} }) => {
   };
 
   // Calculate lifetime stats - Memoized for performance
-  const lifetimeStats = useMemo(() => ({
-    totalActivities: activities.length,
-    totalSteps: activities.reduce((sum, a) => sum + (a.steps || 0), 0),
-    totalDistance: activities.reduce((sum, a) => sum + (a.distance || 0), 0),
-    totalCalories: activities.reduce((sum, a) => sum + (a.calories || 0), 0),
-    averageSteps: activities.length > 0 
-      ? Math.round(activities.reduce((sum, a) => sum + (a.steps || 0), 0) / activities.length)
-      : 0,
-  }), [activities]);
+  const lifetimeStats = useMemo(() => {
+    // Find best distance activity
+    const bestDistActivity = activities.length > 0 
+        ? activities.reduce((a, b) => (a.distance || 0) > (b.distance || 0) ? a : b)
+        : null;
+
+    return {
+        totalActivities: activities.length,
+        totalSteps: activities.reduce((sum, a) => sum + (a.steps || 0), 0),
+        totalDistance: activities.reduce((sum, a) => sum + (a.distance || 0), 0),
+        totalCalories: activities.reduce((sum, a) => sum + (a.calories || 0), 0),
+        averageSteps: activities.length > 0 
+        ? Math.round(activities.reduce((sum, a) => sum + (a.steps || 0), 0) / activities.length)
+        : 0,
+        bestDistance: bestDistActivity
+    };
+  }, [activities]);
 
   // Load nutrition stats
   useEffect(() => {
@@ -226,12 +239,19 @@ const ProfilePage = ({ activities = [], weeklyStats = {} }) => {
             value={lifetimeStats.totalSteps.toLocaleString()}
             color="bg-blue-500"
           />
-          <StatCard
-            icon={TrendingUp}
-            label="Distance"
-            value={`${lifetimeStats.totalDistance.toFixed(1)} km`}
-            color="bg-purple-500"
-          />
+          
+          {/* Clickable Distance Card if GPS data exists */}
+          <div onClick={() => lifetimeStats.bestDistance?.hasGPS && setViewBestMap(lifetimeStats.bestDistance)}>
+            <StatCard
+                icon={lifetimeStats.bestDistance?.hasGPS ? MapPin : TrendingUp}
+                label={lifetimeStats.bestDistance?.hasGPS ? "Best Run (Map)" : "Distance"}
+                value={`${lifetimeStats.totalDistance.toFixed(1)} km`}
+                color="bg-purple-500"
+                // Pass location string
+                subValue={lifetimeStats.bestDistance?.startLocation ? `${lifetimeStats.bestDistance.startLocation} ➝ ${lifetimeStats.bestDistance.endLocation}` : null}
+            />
+          </div>
+
           <StatCard
             icon={Flame}
             label="Calories"
@@ -259,6 +279,46 @@ const ProfilePage = ({ activities = [], weeklyStats = {} }) => {
           )}
         </div>
       </div>
+
+      {/* Map Modal for Profile */}
+      <AnimatePresence>
+          {viewBestMap && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-4"
+              onClick={() => setViewBestMap(null)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+                className="bg-zinc-900 w-full max-w-lg h-[60vh] rounded-3xl overflow-hidden relative border border-white/10 shadow-2xl"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="absolute top-4 right-4 z-[401]">
+                  <button 
+                    onClick={() => setViewBestMap(null)}
+                    className="bg-black/50 backdrop-blur-md p-2 rounded-full text-white hover:bg-black/70"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+                
+                <div className="absolute top-4 left-4 z-[401] bg-purple-500/90 backdrop-blur-md px-3 py-1 rounded-full border border-purple-400/20 shadow-lg">
+                   <div className="flex items-center gap-1.5">
+                      <Award size={12} className="text-white fill-current" />
+                      <span className="text-xs font-bold text-white uppercase">Longest Distance</span>
+                   </div>
+                </div>
+
+                <LiveMap 
+                  route={viewBestMap.route} 
+                  readOnly={true}
+                  startName={viewBestMap.startLocation}
+                  endName={viewBestMap.endLocation}
+                />
+              </motion.div>
+            </motion.div>
+          )}
+      </AnimatePresence>
 
       {/* Data Management - iOS List Style */}
       <div className="px-4 mb-8">

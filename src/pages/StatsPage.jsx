@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { db } from '../utils/db';
 import LicenseModal from '../components/LicenseModal';
+import LiveMap from '../components/LiveMap'; // Import LiveMap
 
 /* -------------------------------------------------------------------------- */
 /*                             APPLE STYLE CONSTANTS                          */
@@ -100,6 +101,7 @@ const StatsPage = () => {
   const goalsFromDb = useLiveQuery(() => db.goals.toArray(), []) || [];
   const [editingGoal, setEditingGoal] = useState(null);
   const [showLicense, setShowLicense] = useState(false);
+  const [viewRecordMap, setViewRecordMap] = useState(null); // State for map modal
 
   // Date Helpers
   const today = new Date();
@@ -155,7 +157,8 @@ const StatsPage = () => {
       steps: bestSteps.steps || 0,
       stepsDate: new Date(bestSteps.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
       distance: (bestDist.distance || 0).toFixed(2),
-      distanceDate: new Date(bestDist.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      distanceDate: new Date(bestDist.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      distanceActivity: bestDist // Store full activity object
     };
   }, [activities]);
 
@@ -285,12 +288,30 @@ const StatsPage = () => {
                 <div className="text-[10px] uppercase font-bold text-[#8e8e93] tracking-wide mt-1">Most Steps</div>
                 <div className="text-[10px] text-[#636366] mt-0.5">{personalBests.stepsDate}</div>
               </div>
-              <div className="flex flex-col items-center text-center pl-4">
-                <div className="w-12 h-12 mb-3 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-500 ring-1 ring-yellow-500/30">
+              
+              {/* Clickable Distance Record */}
+              <div 
+                className={`flex flex-col items-center text-center pl-4 ${personalBests.distanceActivity.hasGPS ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                onClick={() => personalBests.distanceActivity.hasGPS && setViewRecordMap(personalBests.distanceActivity)}
+              >
+                <div className="w-12 h-12 mb-3 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-500 ring-1 ring-yellow-500/30 relative">
                   <MapPin size={20} />
+                  {personalBests.distanceActivity.hasGPS && (
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-[#1c1c1e]" />
+                  )}
                 </div>
                 <div className="text-xl font-bold text-white">{personalBests.distance} <span className="text-sm">km</span></div>
-                <div className="text-[10px] uppercase font-bold text-[#8e8e93] tracking-wide mt-1">Farthest Run</div>
+                <div className="text-[10px] uppercase font-bold text-[#8e8e93] tracking-wide mt-1">
+                  Farthest Run {personalBests.distanceActivity.hasGPS && '(View Map)'}
+                </div>
+                
+                {/* NEW: Show Location Names */}
+                {personalBests.distanceActivity.startLocation && (
+                  <div className="text-[10px] text-emerald-500 font-medium mt-0.5 truncate max-w-[120px]">
+                    {personalBests.distanceActivity.startLocation} ➝ {personalBests.distanceActivity.endLocation}
+                  </div>
+                )}
+                
                 <div className="text-[10px] text-[#636366] mt-0.5">{personalBests.distanceDate}</div>
               </div>
             </div>
@@ -300,6 +321,46 @@ const StatsPage = () => {
         </BentoCard>
 
       </div>
+
+      {/* Map Modal for PR */}
+      <AnimatePresence>
+          {viewRecordMap && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-4"
+              onClick={() => setViewRecordMap(null)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+                className="bg-zinc-900 w-full max-w-lg h-[60vh] rounded-3xl overflow-hidden relative border border-white/10 shadow-2xl"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="absolute top-4 right-4 z-[401]">
+                  <button 
+                    onClick={() => setViewRecordMap(null)}
+                    className="bg-black/50 backdrop-blur-md p-2 rounded-full text-white hover:bg-black/70"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+                
+                <div className="absolute top-4 left-4 z-[401] bg-yellow-500/90 backdrop-blur-md px-3 py-1 rounded-full border border-yellow-400/20 shadow-lg">
+                   <div className="flex items-center gap-1.5">
+                      <Trophy size={12} className="text-black fill-current" />
+                      <span className="text-xs font-bold text-black uppercase">Personal Record</span>
+                   </div>
+                </div>
+
+                <LiveMap 
+                  route={viewRecordMap.route} 
+                  readOnly={true}
+                  startName={viewRecordMap.startLocation}
+                  endName={viewRecordMap.endLocation}
+                />
+              </motion.div>
+            </motion.div>
+          )}
+      </AnimatePresence>
 
       {/* EDIT GOAL FLOATING CARD (UPDATED POSITION) */}
       <AnimatePresence>

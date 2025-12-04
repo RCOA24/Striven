@@ -305,14 +305,42 @@ const useStriven = () => {
         return null;
       }
 
+      // NEW: Fetch Location Names before saving
+      let startLoc = null;
+      let endLoc = null;
+
+      if (route && route.length > 0) {
+        try {
+           const getAddress = async (lat, lng) => {
+              const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=12`);
+              const data = await res.json();
+              const addr = data.address;
+              return addr.city || addr.town || addr.village || addr.municipality || addr.suburb || addr.county || "";
+           };
+           
+           // Fetch start and end in parallel
+           const [s, e] = await Promise.all([
+             getAddress(route[0][0], route[0][1]),
+             getAddress(route[route.length-1][0], route[route.length-1][1])
+           ]);
+           
+           startLoc = s;
+           endLoc = e;
+        } catch (error) {
+          console.warn("Failed to fetch location names:", error);
+        }
+      }
+
       const activity = {
         steps,
         distance: parseFloat(distance.toFixed(2)),
         calories: Math.round(calories),
         duration,
         date: new Date().toISOString(),
-        // Optional: Save route if you want to show it in history later
-        // route: route 
+        route: route, 
+        hasGPS: route && route.length > 0,
+        startLocation: startLoc, // Save to DB
+        endLocation: endLoc      // Save to DB
       };
 
       const activityId = await addActivity(activity);

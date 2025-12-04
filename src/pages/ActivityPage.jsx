@@ -8,9 +8,10 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar, Footprints, TrendingUp, Flame, Trash2,
-  ChevronLeft, ChevronRight, MapPin
+  ChevronLeft, ChevronRight, MapPin, X // Added X
 } from 'lucide-react';
 import LicenseModal from '../components/LicenseModal';
+import LiveMap from '../components/LiveMap'; // Import LiveMap
 
 const GOAL_STEPS = 10000;
 
@@ -29,7 +30,7 @@ const COLORS = {
 /* -------------------------------------------------------------------------- */
 /*                             ACTIVITY CARD                                  */
 /* -------------------------------------------------------------------------- */
-const ActivityCard = ({ activity, onDelete }) => {
+const ActivityCard = ({ activity, onDelete, onViewMap }) => { // Added onViewMap prop
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const formatDate = (dateString) => {
@@ -46,17 +47,30 @@ const ActivityCard = ({ activity, onDelete }) => {
       <motion.div 
         initial={{ opacity: 0, y: 20 }} 
         animate={{ opacity: 1, y: 0 }}
-        className={`relative ${COLORS.card} rounded-2xl p-5 h-full active:scale-[0.99] transition-transform touch-manipulation`}
+        onClick={() => activity.hasGPS && onViewMap(activity)} // Click handler
+        className={`relative ${COLORS.card} rounded-2xl p-5 h-full active:scale-[0.99] transition-transform touch-manipulation ${activity.hasGPS ? 'cursor-pointer hover:bg-zinc-800' : ''}`}
       >
         {/* Top Row: Icon & Date */}
         <div className="flex justify-between items-start mb-4">
           <div className="flex gap-3">
-            <div className="w-10 h-10 rounded-full bg-[#a4ff00]/10 flex items-center justify-center text-[#a4ff00]">
-              <Footprints size={20} fill="currentColor" />
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${activity.hasGPS ? 'bg-emerald-500/20 text-emerald-500' : 'bg-[#a4ff00]/10 text-[#a4ff00]'}`}>
+              {activity.hasGPS ? <MapPin size={20} fill="currentColor" /> : <Footprints size={20} fill="currentColor" />}
             </div>
             <div>
-              <div className="text-white font-bold text-lg leading-tight">Walking</div>
+              <div className="text-white font-bold text-lg leading-tight">
+                {activity.hasGPS ? 'Outdoor Run' : 'Walking'}
+              </div>
               <div className={`${COLORS.textSub} text-xs font-medium`}>{formatDate(activity.date)}</div>
+              
+              {/* NEW: Display Location Names */}
+              {activity.hasGPS && activity.startLocation && (
+                <div className="flex items-center gap-1 mt-1 text-[10px] text-emerald-400 font-medium">
+                  <MapPin size={10} />
+                  <span className="truncate max-w-[150px]">
+                    {activity.startLocation} {activity.endLocation && `➝ ${activity.endLocation}`}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
           
@@ -252,6 +266,7 @@ const CalendarView = ({ activities, selectedDate, onDateSelect }) => {
 const ActivityPage = ({ activities = [], onDeleteActivity, onRefresh }) => {
   const [selectedDate, setSelectedDate] = useState(null);
   const [showLicense, setShowLicense] = useState(false);
+  const [selectedMapActivity, setSelectedMapActivity] = useState(null); // State for map modal
 
   const filteredActivities = useMemo(() => {
     if (!selectedDate) return activities;
@@ -359,13 +374,70 @@ const ActivityPage = ({ activities = [], onDeleteActivity, onRefresh }) => {
                     ) : (
                         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                             {filteredActivities.map((act) => (
-                                <ActivityCard key={act.id} activity={act} onDelete={handleDelete} />
+                                <ActivityCard 
+                                  key={act.id} 
+                                  activity={act} 
+                                  onDelete={handleDelete}
+                                  onViewMap={setSelectedMapActivity} // Pass handler
+                                />
                             ))}
                         </div>
                     )}
                 </div>
             </div>
         </div>
+
+        {/* Map Modal */}
+        <AnimatePresence>
+          {selectedMapActivity && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-4"
+              onClick={() => setSelectedMapActivity(null)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+                className="bg-zinc-900 w-full max-w-lg h-[60vh] rounded-3xl overflow-hidden relative border border-white/10 shadow-2xl"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="absolute top-4 right-4 z-[401]">
+                  <button 
+                    onClick={() => setSelectedMapActivity(null)}
+                    className="bg-black/50 backdrop-blur-md p-2 rounded-full text-white hover:bg-black/70"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+                
+                <div className="absolute bottom-4 left-4 right-4 z-[401] bg-black/60 backdrop-blur-md p-4 rounded-2xl border border-white/10">
+                   <div className="flex justify-between items-center">
+                      <div>
+                        <div className="text-xs text-zinc-400 uppercase font-bold">Distance</div>
+                        <div className="text-xl font-bold text-white">{selectedMapActivity.distance} km</div>
+                        {/* Show location in modal footer too */}
+                        {selectedMapActivity.startLocation && (
+                           <div className="text-[10px] text-zinc-500 mt-1">
+                             {selectedMapActivity.startLocation} ➝ {selectedMapActivity.endLocation}
+                           </div>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs text-zinc-400 uppercase font-bold">Steps</div>
+                        <div className="text-xl font-bold text-emerald-400">{selectedMapActivity.steps}</div>
+                      </div>
+                   </div>
+                </div>
+
+                <LiveMap 
+                  route={selectedMapActivity.route} 
+                  readOnly={true} 
+                  startName={selectedMapActivity.startLocation} // Pass to map
+                  endName={selectedMapActivity.endLocation}     // Pass to map
+                />
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* App Info */}
         <div className="px-4 text-center mt-8 border-t border-white/5 pt-8">
