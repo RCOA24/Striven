@@ -182,13 +182,11 @@ const Dashboard = ({
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 flex flex-col">
         
         {/* Header */}
-        <header className="flex justify-between items-center mb-8 py-2">
+        <header className="flex md:hidden justify-center items-center gap-3 mb-8 py-2">
           
           <h1 className="text-3xl font-bold tracking-tight">Striven</h1>
           
-          <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center">
-            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-          </div>
+          <img src="/StrivenLogo.png" alt="Striven Logo" className="w-10 h-10 rounded-xl shadow-lg" />
         </header>
         
 

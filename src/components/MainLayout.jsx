@@ -20,9 +20,7 @@ const MainLayout = ({ children, currentPage, onNavigate }) => {
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <div className="flex items-center space-x-3">
-              <div className="bg-gradient-to-br from-green-400 to-emerald-500 p-2 rounded-xl shadow-lg">
-                <Activity className="w-6 h-6 text-white" />
-              </div>
+              <img src="/StrivenLogo.png" alt="Striven Logo" className="w-10 h-10 rounded-xl shadow-lg" />
               <span className="text-2xl font-bold text-white">Striven</span>
             </div>
 
