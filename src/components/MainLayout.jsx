@@ -17,15 +17,15 @@ const MainLayout = ({ children, currentPage, onNavigate }) => {
       {/* Top Navigation Bar - Desktop */}
       <nav className="hidden md:block bg-zinc-900/50 backdrop-blur-xl border-b border-white/10 z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center h-16">
             {/* Logo */}
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-3 shrink-0">
               <img src="/StrivenLogo.png" alt="Striven Logo" className="w-10 h-10 rounded-xl shadow-lg" />
               <span className="text-2xl font-bold text-white">Striven</span>
             </div>
 
             {/* Navigation Links */}
-            <div className="flex space-x-1">
+            <div className="flex-1 flex justify-center space-x-1">
               {navItems.map((item) => (
                 <button
                   key={item.id}
@@ -42,10 +42,8 @@ const MainLayout = ({ children, currentPage, onNavigate }) => {
               ))}
             </div>
 
-            {/* Settings Icon */}
-            <button className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 transition-all">
-              <Settings className="w-5 h-5" />
-            </button>
+            {/* Spacer to balance logo width for perfect centering */}
+            <div className="w-[140px] shrink-0 hidden lg:block"></div>
           </div>
         </div>
       </nav>
