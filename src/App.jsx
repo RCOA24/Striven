@@ -1,5 +1,5 @@
 // src/App.jsx
-import React, { useState, createContext, useContext } from 'react';
+import React, { useState, createContext, useContext, useEffect } from 'react';
 import { Activity } from 'lucide-react';
 import useStriven from './hooks/useStriven'; // DO NOT CHANGE this import!
 import useNotifications from './hooks/useNotifications';
@@ -22,6 +22,17 @@ export const AppContext = createContext();
 function App() {
   const [currentPage, setCurrentPage] = useState('dashboard'); // ← 'organizer' for power mode
   const [showIntro, setShowIntro] = useState(true);
+
+  // Handle PWA Shortcuts & Deep Linking
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const pageParam = params.get('page');
+    if (pageParam) {
+      setCurrentPage(pageParam);
+      // Clean URL without reloading
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   const {
     steps,

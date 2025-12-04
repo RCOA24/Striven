@@ -1,4 +1,4 @@
-const CACHE_NAME = 'striven-dynamic-v1';
+const CACHE_NAME = 'striven-v2';
 
 // Install event: Skip waiting to activate immediately
 self.addEventListener('install', (event) => {
@@ -24,7 +24,7 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch event: Network First, falling back to Cache
+// Fetch event: Network First for HTML, Cache First for assets
 self.addEventListener('fetch', (event) => {
   // Skip cross-origin requests (like Google APIs) to avoid opaque response issues
   if (!event.request.url.startsWith(self.location.origin)) return;
@@ -46,7 +46,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // For assets (JS, CSS, Images), try cache first, then network (Stale-While-Revalidate logic could go here, but Cache First is safer for assets)
+  // For assets (JS, CSS, Images), try cache first, then network
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {

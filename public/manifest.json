@@ -1,24 +1,77 @@
 {
   "name": "Striven - Privacy-First Fitness",
   "short_name": "Striven",
-  "description": "Track your fitness journey with privacy-first analytics and AI tools.",
+  "description": "Track your fitness journey with privacy-first analytics, workout planning, and AI food tracking.",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "minimal-ui"],
   "background_color": "#000000",
   "theme_color": "#000000",
   "orientation": "portrait",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["fitness", "health", "lifestyle"],
   "icons": [
     {
       "src": "/StrivenLogo.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/StrivenLogo.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/StrivenLogo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/StrivenLogo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
-  ]
+  ],
+  "screenshots": [
+    {
+      "src": "/StrivenLogo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Striven Dashboard"
+    },
+    {
+      "src": "/StrivenLogo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Mobile View"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Start Workout",
+      "short_name": "Workout",
+      "description": "Go to workout organizer",
+      "url": "/?page=organizer",
+      "icons": [{ "src": "/StrivenLogo.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Scan Food",
+      "short_name": "Food",
+      "description": "Open AI Food Scanner",
+      "url": "/?page=food",
+      "icons": [{ "src": "/StrivenLogo.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ],
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  }
 }
