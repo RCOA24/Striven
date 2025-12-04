@@ -1,4 +1,4 @@
-const CACHE_NAME = 'striven-v2';
+const CACHE_NAME = 'striven-v3';
 
 // Install event: Skip waiting to activate immediately
 self.addEventListener('install', (event) => {
@@ -26,7 +26,7 @@ self.addEventListener('activate', (event) => {
 
 // Fetch event: Network First for HTML, Cache First for assets
 self.addEventListener('fetch', (event) => {
-  // Skip cross-origin requests (like Google APIs) to avoid opaque response issues
+  // Skip cross-origin requests
   if (!event.request.url.startsWith(self.location.origin)) return;
 
   // For navigation requests (HTML), try network first, then cache
@@ -67,4 +67,31 @@ self.addEventListener('fetch', (event) => {
       });
     })
   );
+});
+
+// --- Advanced PWA Capabilities ---
+
+// Background Sync
+self.addEventListener('sync', (event) => {
+  console.log('[SW] Background sync triggered', event.tag);
+  // Logic to sync data when online would go here
+});
+
+// Periodic Background Sync
+self.addEventListener('periodicsync', (event) => {
+  console.log('[SW] Periodic sync triggered', event.tag);
+  // Logic to update content in background
+});
+
+// Push Notifications
+self.addEventListener('push', (event) => {
+  console.log('[SW] Push notification received', event);
+  const data = event.data ? event.data.json() : {};
+  const title = data.title || 'Striven Update';
+  const options = {
+    body: data.body || 'New activity available.',
+    icon: '/icon-192.png',
+    badge: '/icon-96.png'
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
 });

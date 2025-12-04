@@ -1,20 +1,86 @@
 {
-  "name": "Striven App",
+  "name": "Striven - Privacy-First Fitness",
   "short_name": "Striven",
-  "start_url": "./index.html",
+  "description": "Track your fitness journey with privacy-first analytics, workout planning, and AI food tracking.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
+  "display_override": ["window-controls-overlay", "minimal-ui", "tabbed"],
+  "background_color": "#000000",
   "theme_color": "#000000",
+  "orientation": "portrait",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["fitness", "health", "lifestyle"],
+  "prefer_related_applications": false,
   "icons": [
+    { "src": "/icon-48.png", "sizes": "48x48", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-72.png", "sizes": "72x72", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-96.png", "sizes": "96x96", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-144.png", "sizes": "144x144", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "screenshots": [
     {
-      "src": "StrivenLogo.png",
-      "sizes": "192x192",
-      "type": "image/png"
+      "src": "/StrivenLogo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Striven Dashboard"
     },
     {
-      "src": "StrivenLogo.png",
+      "src": "/StrivenLogo.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Mobile View"
     }
-  ]
+  ],
+  "shortcuts": [
+    {
+      "name": "Start Workout",
+      "short_name": "Workout",
+      "description": "Go to workout organizer",
+      "url": "/?page=organizer",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Scan Food",
+      "short_name": "Food",
+      "description": "Open AI Food Scanner",
+      "url": "/?page=food",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ],
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  },
+  "file_handlers": [
+    {
+      "action": "/",
+      "accept": {
+        "application/json": [".json", ".striven"]
+      }
+    }
+  ],
+  "share_target": {
+    "action": "/",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "protocol_handlers": [
+    {
+      "protocol": "web+striven",
+      "url": "/?link=%s"
+    }
+  ],
+  "note_taking": {
+    "new_note_url": "/?page=organizer&action=new"
+  }
 }
