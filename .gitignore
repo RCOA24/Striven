@@ -25,3 +25,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Ensure PWA files are tracked (not ignored)
+!public/sw.js
+!public/manifest.json
