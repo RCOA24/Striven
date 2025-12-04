@@ -164,6 +164,19 @@ const Dashboard = ({
   const dailyStepsGoal = 10000;
   const [showLicense, setShowLicense] = useState(false);
 
+  // Request notification permission when starting workout
+  const handleStartWorkout = async () => {
+    // PWAs can use local notifications! Request permission here.
+    if ('Notification' in window && Notification.permission === 'default') {
+      try {
+        await Notification.requestPermission();
+      } catch (e) {
+        console.error('Error requesting notification permission:', e);
+      }
+    }
+    startTracking();
+  };
+
   const weeklyAverage = useMemo(() => 
     weeklyStats.activeDays > 0 
       ? Math.round(weeklyStats.totalSteps / weeklyStats.activeDays)
@@ -228,7 +241,7 @@ const Dashboard = ({
 
             <div className="space-y-3 mt-2">
               {!isTracking ? (
-                <ControlButton onClick={startTracking} isMain icon={Play} variant="primary">
+                <ControlButton onClick={handleStartWorkout} isMain icon={Play} variant="primary">
                   Start Workout
                 </ControlButton>
               ) : (
