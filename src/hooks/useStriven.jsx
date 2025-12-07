@@ -9,6 +9,19 @@ import {
   db
 } from '../utils/db';
 
+// Helper: Calculate distance between two coordinates in km (Haversine formula)
+const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  const R = 6371; // Radius of the earth in km
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
 const useStriven = () => {
   const [steps, setSteps] = useState(0);
   const [isTracking, setIsTracking] = useState(false);
@@ -22,6 +35,7 @@ const useStriven = () => {
   const [currentLocation, setCurrentLocation] = useState(null);
   const [route, setRoute] = useState([]);
   const watchIdRef = useRef(null);
+  const lastGpsPositionRef = useRef(null); // Track last recorded GPS point for distance calc
 
   const [weeklyStats, setWeeklyStats] = useState({
     totalSteps: 0,
@@ -176,9 +190,13 @@ const useStriven = () => {
 
   // Update metrics when steps change
   useEffect(() => {
-    setDistance(steps * STEP_LENGTH_KM);
+    // Only use step-based distance if we don't have GPS data yet
+    // This prevents overwriting accurate GPS distance with step estimates
+    if (route.length === 0) {
+      setDistance(steps * STEP_LENGTH_KM);
+    }
     setCalories(steps * CALORIES_PER_STEP);
-  }, [steps]);
+  }, [steps, route.length]);
 
   const startTracking = useCallback(async () => {
     try {
@@ -197,8 +215,27 @@ const useStriven = () => {
           (position) => {
             const { latitude, longitude } = position.coords;
             const point = [latitude, longitude];
+            
+            // Calculate GPS Distance
+            if (lastGpsPositionRef.current) {
+              const dist = calculateDistance(
+                lastGpsPositionRef.current[0], lastGpsPositionRef.current[1],
+                latitude, longitude
+              );
+              
+              // Only count if moved > 10 meters (0.01 km) to reduce GPS drift noise
+              if (dist > 0.01) {
+                setDistance(prev => prev + dist);
+                lastGpsPositionRef.current = point;
+                setRoute(prev => [...prev, point]);
+              }
+            } else {
+              // First point
+              lastGpsPositionRef.current = point;
+              setRoute(prev => [...prev, point]);
+            }
+
             setCurrentLocation(point);
-            setRoute(prev => [...prev, point]);
           },
           (error) => console.warn('Location tracking error:', error),
           { enableHighAccuracy: true, distanceFilter: 5 }
@@ -245,8 +282,25 @@ const useStriven = () => {
           (position) => {
             const { latitude, longitude } = position.coords;
             const point = [latitude, longitude];
+            
+            // Calculate GPS Distance
+            if (lastGpsPositionRef.current) {
+              const dist = calculateDistance(
+                lastGpsPositionRef.current[0], lastGpsPositionRef.current[1],
+                latitude, longitude
+              );
+              
+              if (dist > 0.01) {
+                setDistance(prev => prev + dist);
+                lastGpsPositionRef.current = point;
+                setRoute(prev => [...prev, point]);
+              }
+            } else {
+              lastGpsPositionRef.current = point;
+              setRoute(prev => [...prev, point]);
+            }
+
             setCurrentLocation(point);
-            setRoute(prev => [...prev, point]);
           },
           (error) => console.warn('Location tracking error:', error),
           { enableHighAccuracy: true, distanceFilter: 5 }
@@ -275,6 +329,7 @@ const useStriven = () => {
     }
     setRoute([]);
     setCurrentLocation(null);
+    lastGpsPositionRef.current = null; // Reset GPS ref
 
     setSteps(0);
     setDistance(0);
@@ -346,8 +401,6 @@ const useStriven = () => {
       const activityId = await addActivity(activity);
       console.log('Activity saved with ID:', activityId);
       
-      // useLiveQuery will automatically update the activities list!
-
       // Update weekly stats
       const now = new Date();
       const startOfWeek = new Date(now);
@@ -373,15 +426,16 @@ const useStriven = () => {
       setIsPaused(false);
       startTimeRef.current = null;
       pausedTimeRef.current = 0;
-      setRoute([]); // NEW
-      setCurrentLocation(null); // NEW
+      setRoute([]); 
+      setCurrentLocation(null); 
+      lastGpsPositionRef.current = null; // Reset GPS ref
 
       return activity;
     } catch (error) {
       console.error('Failed to save activity:', error);
       throw error;
     }
-  }, [steps, distance, calories, duration, reset, route]); // Added route dependency
+  }, [steps, distance, calories, duration, reset, route]);
 
   return {
     steps,
@@ -394,8 +448,8 @@ const useStriven = () => {
     sensorSupported,
     activities,
     weeklyStats,
-    currentLocation, // NEW
-    route, // NEW
+    currentLocation,
+    route,
     startTracking,
     pauseTracking,
     resumeTracking,
