@@ -217,7 +217,7 @@ const useStrivenTracker = () => {
         console.warn('Browser geolocation watch error:', err);
         setLocationError(err.message || 'Location error');
       },
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 }
     );
   }, [handlePosition]);
 
@@ -245,7 +245,7 @@ const useStrivenTracker = () => {
     await clearGeoWatch();
     usingBrowserWatchRef.current = false;
     watchIdRef.current = await Geolocation.watchPosition(
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+      { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 },
       (position, err) => {
         if (err) {
           console.warn('Capacitor location error:', err);
