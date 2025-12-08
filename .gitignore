@@ -29,3 +29,26 @@ dist-ssr
 # Ensure PWA files are tracked (not ignored)
 !public/sw.js
 !public/manifest.json
+
+
+# ----------------------------------
+# Capacitor / Android Native Project
+# ----------------------------------
+
+# Android generated build files (DO NOT COMMIT THESE)
+android/build/
+android/app/build/
+android/.gradle/
+
+# Local configuration file (contains your local SDK path)
+local.properties
+
+# Android Studio settings
+android/.idea/
+android/app/*.iml
+android/*.iml
+
+# Capacitor specific (usually inside android/app/src/main/assets)
+# Depending on your setup, you might want to ignore the web assets copied over
+# But usually, Capacitor manages this. 
+# Ideally, don't ignore 'public' inside android, let Capacitor handle sync.
