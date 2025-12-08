@@ -229,7 +229,7 @@ const Dashboard = ({
 
             {isTracking && viewMode === 'map' ? (
                <div className="w-full aspect-square max-w-[280px] lg:max-w-[400px] mx-auto mb-8 lg:mb-0 rounded-[2rem] overflow-hidden shadow-2xl border border-zinc-800 relative">
-                  <LiveMap route={route} currentLocation={currentLocation} />
+                  <LiveMap route={route} currentLocation={currentLocation} locationError={locationError} />
                   {/* Overlay Stats on Map */}
                   <div className="absolute bottom-4 left-4 right-4 bg-black/60 backdrop-blur-md rounded-xl p-3 flex justify-between items-center border border-white/10 z-[400]">
                       <div>

@@ -244,6 +244,22 @@ const useStriven = () => {
     );
   }, [handlePosition]);
 
+  const clearGeoWatch = useCallback(async () => {
+    try {
+      if (watchIdRef.current !== null) {
+        if (usingBrowserWatchRef.current) {
+          navigator.geolocation?.clearWatch(watchIdRef.current);
+        } else if (isNativeCapacitor()) {
+          await Geolocation.clearWatch({ id: watchIdRef.current });
+        }
+      }
+    } catch (e) {
+      console.warn('Clear watch failed:', e);
+    }
+    watchIdRef.current = null;
+    usingBrowserWatchRef.current = false;
+  }, [isNativeCapacitor]);
+
   const startNativeWatch = useCallback(async () => {
     if (!isNativeCapacitor()) throw new Error('Native geolocation not available');
     const permissionStatus = await Geolocation.checkPermissions();
@@ -263,22 +279,6 @@ const useStriven = () => {
       }
     );
   }, [clearGeoWatch, handlePosition, isNativeCapacitor]);
-
-  const clearGeoWatch = useCallback(async () => {
-    try {
-      if (watchIdRef.current !== null) {
-        if (usingBrowserWatchRef.current) {
-          navigator.geolocation?.clearWatch(watchIdRef.current);
-        } else if (isNativeCapacitor()) {
-          await Geolocation.clearWatch({ id: watchIdRef.current });
-        }
-      }
-    } catch (e) {
-      console.warn('Clear watch failed:', e);
-    }
-    watchIdRef.current = null;
-    usingBrowserWatchRef.current = false;
-  }, [isNativeCapacitor]);
 
   const startTracking = useCallback(async () => {
     try {

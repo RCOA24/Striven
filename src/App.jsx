@@ -1,7 +1,7 @@
 // src/App.jsx
 import React, { useState, createContext, useContext, useEffect } from 'react';
 import { Activity } from 'lucide-react';
-import useStriven from './hooks/useStriven'; // DO NOT CHANGE this import!
+import useStriven from './hooks/UseStriven'; // FIXED: Capitalized filename match
 import useNotifications from './hooks/useNotifications';
 import MainLayout from './components/MainLayout';
 import Dashboard from './pages/Dashboard';
