@@ -10,6 +10,9 @@ import { exportData, importData, clearAllData, getNutritionProfile, getFoodLogs 
 import LicenseModal from '../components/LicenseModal';
 import LiveMap from '../components/LiveMap'; // Import LiveMap
 import { motion, AnimatePresence } from 'framer-motion'; // Import animation
+import { Capacitor } from '@capacitor/core'; // NEW
+import { Share } from '@capacitor/share'; // NEW
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'; // NEW
 
 // Redesigned Stat Card based on attachment
 const StatCard = ({ icon: Icon, label, value, color, subValue }) => ( // Added subValue prop
@@ -104,25 +107,55 @@ const ProfilePage = ({ activities = [], weeklyStats = {} }) => {
     try {
       setIsExporting(true);
       const data = await exportData();
-      
-      // Create JSON file
       const dataStr = JSON.stringify(data, null, 2);
-      const dataBlob = new Blob([dataStr], { type: 'application/json' });
-      
-      // Create download link
-      const url = URL.createObjectURL(dataBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `striven-backup-${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      
-      showNotification('success', 'Data exported successfully!');
+      const fileName = `striven-backup-${new Date().toISOString().split('T')[0]}.json`;
+
+      if (Capacitor.isNativePlatform()) {
+        // --- MOBILE EXPORT (Filesystem + Share) ---
+        try {
+          // 1. Write file to Cache directory
+          await Filesystem.writeFile({
+            path: fileName,
+            data: dataStr,
+            directory: Directory.Cache,
+            encoding: Encoding.UTF8
+          });
+
+          // 2. Get the URI
+          const uriResult = await Filesystem.getUri({
+            directory: Directory.Cache,
+            path: fileName
+          });
+
+          // 3. Open Share Sheet
+          await Share.share({
+            title: 'Striven Backup',
+            text: 'Here is my Striven backup file.',
+            url: uriResult.uri,
+            dialogTitle: 'Save Backup'
+          });
+          
+          showNotification('success', 'Backup ready to save!');
+        } catch (mobileErr) {
+          console.error('Mobile export error:', mobileErr);
+          throw new Error('Mobile export failed. Ensure Filesystem permission.');
+        }
+      } else {
+        // --- WEB EXPORT (Blob Download) ---
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(dataBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        showNotification('success', 'Data exported successfully!');
+      }
     } catch (error) {
       console.error('Export failed:', error);
-      showNotification('error', 'Failed to export data. Please try again.');
+      showNotification('error', 'Failed to export data. ' + error.message);
     } finally {
       setIsExporting(false);
     }

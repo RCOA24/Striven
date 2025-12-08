@@ -47,12 +47,14 @@ const useStrivenTracker = () => {
   }, []);
 
   const handlePosition = useCallback(({ latitude, longitude, accuracy }) => {
-    // Reject low-accuracy fixes (>30m) or missing coords
-    if (!latitude || !longitude || (accuracy && accuracy > 30)) return;
+    // Reject low-accuracy fixes (>100m) or missing coords
+    // FIXED: Increased tolerance to 100m for Web/WiFi geolocation (was 30m)
+    if (!latitude || !longitude || (accuracy && accuracy > 100)) return;
 
     const now = Date.now();
-    // Throttle to one update every 2s to reduce jitter
-    if (now - lastUpdateTsRef.current < 2000) return;
+    // Throttle to one update every 1s to reduce jitter
+    // FIXED: Reduced throttle time for better responsiveness
+    if (now - lastUpdateTsRef.current < 1000) return;
     lastUpdateTsRef.current = now;
 
     const lat = parseFloat(latitude);
@@ -233,7 +235,8 @@ const useStrivenTracker = () => {
         console.warn('Browser geolocation watch error:', err);
         setLocationError(err.message || 'Location error');
       },
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 }
+      // FIXED: Added maximumAge: 10000 to allow cached positions (faster lock)
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 30000 }
     );
   }, [handlePosition]);
 
