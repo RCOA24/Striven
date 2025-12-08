@@ -52,7 +52,8 @@ const useStrivenTracker = () => {
         lastGpsPositionRef.current[0], lastGpsPositionRef.current[1],
         latitude, longitude
       );
-      if (dist > 0.01) {
+      // Lowered threshold to 5 meters for better responsiveness during testing
+      if (dist > 0.005) { 
         setDistance(prev => prev + dist);
         lastGpsPositionRef.current = point;
         setRoute(prev => [...prev, point]);

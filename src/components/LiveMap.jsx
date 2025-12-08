@@ -35,7 +35,7 @@ const MapController = ({ location, route }) => {
   useEffect(() => {
     // Mode 1: Live Tracking (Follow User)
     if (location) {
-      map.setView(location, map.getZoom() || 16);
+      map.setView(location, map.getZoom() || 16, { animate: true });
     }
     // Mode 2: View History (Fit Route)
     else if (route && route.length > 0) {
@@ -87,17 +87,18 @@ const LiveMap = ({ route, currentLocation, readOnly = false, startName, endName,
 
       fetchLocations();
     }
-  }, [readOnly, route, startLocation]); // Added startLocation dependency to skip if already exists
+  }, [readOnly, route, startLocation]);
 
   // --- MOVED HOOKS UP TO PREVENT REACT ERROR #310 ---
   // Determine center (fallback to route start or 0,0)
   const initialCenter = currentLocation || (route && route.length > 0 ? route[0] : [0,0]);
 
   // Force re-render on Android when map is ready to prevent grey tiles
+  // FIXED: Stable key for live mode to prevent remounting on every location update
   const mapKey = useMemo(() => {
      if (readOnly) return `map-readonly-${route?.[0]?.[0] || 0}`;
-     return `map-live-${initialCenter[0]}-${initialCenter[1]}`;
-  }, [readOnly, route, initialCenter]);
+     return `map-live-session`; 
+  }, [readOnly, route]);
 
   // --- CONDITIONAL RENDERS AFTER HOOKS ---
 
@@ -149,6 +150,11 @@ const LiveMap = ({ route, currentLocation, readOnly = false, startName, endName,
       
       {/* Current Position Marker (Only in Live Mode) */}
       {currentLocation && !readOnly && <Marker position={currentLocation} />}
+
+      {/* Start Marker (Visible in Live Mode if we have a route) */}
+      {!readOnly && route && route.length > 0 && (
+        <Marker position={route[0]} icon={startIcon} opacity={0.7} />
+      )}
 
       {/* Start/End Markers (Only in ReadOnly Mode) */}
       {readOnly && route && route.length > 0 && (
