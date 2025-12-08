@@ -111,10 +111,9 @@ const ProfilePage = ({ activities = [], weeklyStats = {} }) => {
       const fileName = `striven-backup-${new Date().toISOString().split('T')[0]}.json`;
 
       if (Capacitor.isNativePlatform()) {
-        // --- MOBILE EXPORT (Filesystem + Share) ---
+        // --- MOBILE EXPORT (Save to Downloads) ---
         try {
-          // 1. Write file to Documents directory (Persistent & Accessible)
-          // Changed from Cache to Documents so it persists and is accessible
+          // 1. Write file to Documents directory (user-accessible on Android/iOS)
           await Filesystem.writeFile({
             path: fileName,
             data: dataStr,
@@ -122,25 +121,19 @@ const ProfilePage = ({ activities = [], weeklyStats = {} }) => {
             encoding: Encoding.UTF8
           });
 
-          // 2. Get the URI
+          // 2. Get the saved URI for confirmation
           const uriResult = await Filesystem.getUri({
             directory: Directory.Documents,
             path: fileName
           });
 
-          // 3. Open Share Sheet
-          // This allows the user to "Save to Files" (iOS) or save to Downloads/Drive (Android)
-          await Share.share({
-            title: 'Striven Backup',
-            text: 'Here is my Striven backup file.',
-            url: uriResult.uri,
-            dialogTitle: 'Save to Files'
-          });
+          // 3. Show success message with file location
+          showNotification('success', `Backup saved to Documents/${fileName}`);
           
-          showNotification('success', 'Select "Save to Files" to finish download');
+          console.log('File saved to:', uriResult.uri);
         } catch (mobileErr) {
           console.error('Mobile export error:', mobileErr);
-          throw new Error('Mobile export failed. Ensure Filesystem permission.');
+          throw new Error('Mobile export failed: ' + mobileErr.message);
         }
       } else {
         // --- WEB EXPORT (Blob Download) ---
