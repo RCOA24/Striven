@@ -1,7 +1,7 @@
 // src/App.jsx
 import React, { useState, createContext, useContext, useEffect } from 'react';
 import { Activity } from 'lucide-react';
-import useStriven from './hooks/UseStriven'; // FIXED: Capitalized filename match
+import useStrivenTracker from './hooks/useStrivenTracker'; // FIXED: New filename
 import useNotifications from './hooks/useNotifications';
 import MainLayout from './components/MainLayout';
 import Dashboard from './pages/Dashboard';
@@ -53,7 +53,7 @@ function App() {
     stopAndSave,
     refreshActivities,
     locationError, // NEW
-  } = useStriven();
+  } = useStrivenTracker();
 
   const { notification, showNotification, hideNotification } = useNotifications();
 
