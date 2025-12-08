@@ -1,8 +1,9 @@
 # 🏃‍♂️ Striven Web App
 
 <p align="center">
-  <img src="https://via.placeholder.com/120x120.png?text=Striven+Logo" alt="Striven Logo" width="120"/>
+  <img width="500" height="500" alt="StrivenLogo" src="https://github.com/user-attachments/assets/5ff214b3-8612-4308-82f1-cb810bbe0d8d" />
 </p>
+
 
 <p align="center">
   <strong>A comprehensive, privacy-first fitness companion & PWA</strong><br>
@@ -46,6 +47,7 @@ It prioritizes **data sovereignty**: all user data (workouts, history, logs) is 
 - **Real-Time Pedometer**: Uses `DeviceMotionEvent` and Generic Sensor APIs for accurate step counting.
 - **Live Metrics**: Tracks distance, calories burned, and active duration.
 - **Apple-Style Rings**: Visual daily progress for Move, Exercise, and Stand goals.
+- **Live Location Tracking**: Syncs the user’s real-time location during workouts using Leaflet and Nominatim so routes are mapped as they move.
 
 ### 🏋️‍♂️ Workout Organizer
 - **Custom Plans**: Create and manage weekly workout routines.
