@@ -31,12 +31,38 @@ const useStriven = () => {
   const [calories, setCalories] = useState(0);
   const [duration, setDuration] = useState(0);
   const [sensorSupported, setSensorSupported] = useState(true);
+  const [locationError, setLocationError] = useState(null); // NEW
   
   // NEW: Location State
   const [currentLocation, setCurrentLocation] = useState(null);
   const [route, setRoute] = useState([]);
   const watchIdRef = useRef(null);
   const lastGpsPositionRef = useRef(null); // Track last recorded GPS point for distance calc
+  const usingBrowserWatchRef = useRef(false); // NEW
+  const isNativeCapacitor = useCallback(() => {
+    return typeof window !== 'undefined' &&
+      window.Capacitor?.getPlatform &&
+      window.Capacitor.getPlatform() !== 'web';
+  }, []);
+
+  const handlePosition = useCallback(({ latitude, longitude }) => {
+    const point = [latitude, longitude];
+    if (lastGpsPositionRef.current) {
+      const dist = calculateDistance(
+        lastGpsPositionRef.current[0], lastGpsPositionRef.current[1],
+        latitude, longitude
+      );
+      if (dist > 0.01) {
+        setDistance(prev => prev + dist);
+        lastGpsPositionRef.current = point;
+        setRoute(prev => [...prev, point]);
+      }
+    } else {
+      lastGpsPositionRef.current = point;
+      setRoute(prev => [...prev, point]);
+    }
+    setCurrentLocation(point);
+  }, []);
 
   const [weeklyStats, setWeeklyStats] = useState({
     totalSteps: 0,
@@ -199,69 +225,84 @@ const useStriven = () => {
     setCalories(steps * CALORIES_PER_STEP);
   }, [steps, route.length]);
 
+  const startBrowserWatch = useCallback(async () => {
+    if (!navigator.geolocation) throw new Error('Geolocation API not supported');
+    if (!window.isSecureContext) throw new Error('Geolocation requires HTTPS/localhost');
+
+    await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(() => resolve(), (err) => reject(err), { enableHighAccuracy: true, timeout: 8000 });
+    });
+
+    usingBrowserWatchRef.current = true;
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (position) => handlePosition(position.coords),
+      (err) => {
+        console.warn('Browser geolocation watch error:', err);
+        setLocationError(err.message || 'Location error');
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+    );
+  }, [handlePosition]);
+
+  const startNativeWatch = useCallback(async () => {
+    if (!isNativeCapacitor()) throw new Error('Native geolocation not available');
+    const permissionStatus = await Geolocation.checkPermissions();
+    if (permissionStatus.location !== 'granted') await Geolocation.requestPermissions();
+
+    await clearGeoWatch();
+    usingBrowserWatchRef.current = false;
+    watchIdRef.current = await Geolocation.watchPosition(
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+      (position, err) => {
+        if (err) {
+          console.warn('Capacitor location error:', err);
+          setLocationError(err.message || 'Location error');
+          return;
+        }
+        if (position?.coords) handlePosition(position.coords);
+      }
+    );
+  }, [clearGeoWatch, handlePosition, isNativeCapacitor]);
+
+  const clearGeoWatch = useCallback(async () => {
+    try {
+      if (watchIdRef.current !== null) {
+        if (usingBrowserWatchRef.current) {
+          navigator.geolocation?.clearWatch(watchIdRef.current);
+        } else if (isNativeCapacitor()) {
+          await Geolocation.clearWatch({ id: watchIdRef.current });
+        }
+      }
+    } catch (e) {
+      console.warn('Clear watch failed:', e);
+    }
+    watchIdRef.current = null;
+    usingBrowserWatchRef.current = false;
+  }, [isNativeCapacitor]);
+
   const startTracking = useCallback(async () => {
     try {
+      setLocationError(null);
       if (!stepDetectorRef.current) {
-        // Create step detector with callback that increments steps
         stepDetectorRef.current = new StepDetector((stepCount = 1) => {
           setSteps(prev => prev + stepCount);
         });
       }
-
       await stepDetectorRef.current.start();
-      
-      // NEW: Start Geolocation Tracking (Capacitor)
-      try {
-        const permissionStatus = await Geolocation.checkPermissions();
-        if (permissionStatus.location !== 'granted') {
-             await Geolocation.requestPermissions();
-        }
 
-        // Clear existing watch if any
-        if (watchIdRef.current !== null) {
-            await Geolocation.clearWatch({ id: watchIdRef.current });
-        }
-
-        watchIdRef.current = await Geolocation.watchPosition(
-          { 
-            enableHighAccuracy: true, 
-            timeout: 10000, 
-            maximumAge: 0 
-          },
-          (position, err) => {
-            if (err) {
-                console.warn('Location tracking error:', err);
-                return;
-            }
-            if (position) {
-                const { latitude, longitude } = position.coords;
-                const point = [latitude, longitude];
-                
-                // Calculate GPS Distance
-                if (lastGpsPositionRef.current) {
-                  const dist = calculateDistance(
-                    lastGpsPositionRef.current[0], lastGpsPositionRef.current[1],
-                    latitude, longitude
-                  );
-                  
-                  // Only count if moved > 10 meters (0.01 km) to reduce GPS drift noise
-                  if (dist > 0.01) {
-                    setDistance(prev => prev + dist);
-                    lastGpsPositionRef.current = point;
-                    setRoute(prev => [...prev, point]);
-                  }
-                } else {
-                  // First point
-                  lastGpsPositionRef.current = point;
-                  setRoute(prev => [...prev, point]);
-                }
-
-                setCurrentLocation(point);
-            }
-          }
-        );
-      } catch (e) {
-          console.error("Geolocation error", e);
+      if (isNativeCapacitor()) {
+        await startNativeWatch().catch(async (capErr) => {
+          console.warn('Capacitor geolocation unavailable, falling back to browser API:', capErr);
+          await startBrowserWatch().catch((browserErr) => {
+            console.error('Browser geolocation failed:', browserErr);
+            setLocationError(browserErr.message || 'Unable to access location');
+          });
+        });
+      } else {
+        await startBrowserWatch().catch((browserErr) => {
+          console.error('Browser geolocation failed:', browserErr);
+          setLocationError(browserErr.message || 'Unable to access location');
+        });
       }
 
       startTimeRef.current = Date.now();
@@ -273,91 +314,45 @@ const useStriven = () => {
       console.error('Failed to start tracking:', error);
       alert('Failed to start step tracking. Please check sensor permissions.');
     }
-  }, []);
+  }, [isNativeCapacitor, startNativeWatch, startBrowserWatch]);
 
   const pauseTracking = useCallback(async () => {
     if (stepDetectorRef.current) {
       stepDetectorRef.current.stop();
     }
-    
-    // NEW: Stop Geolocation Watch (Capacitor)
-    if (watchIdRef.current !== null) {
-      await Geolocation.clearWatch({ id: watchIdRef.current });
-      watchIdRef.current = null;
-    }
-    
+    await clearGeoWatch(); // NEW
     pausedTimeRef.current += Date.now() - startTimeRef.current - duration * 1000;
-    
     setIsPaused(true);
     console.log('Tracking paused');
-  }, [duration]);
+  }, [clearGeoWatch, duration]);
 
   const resumeTracking = useCallback(async () => {
     try {
-      if (stepDetectorRef.current) {
-        await stepDetectorRef.current.start();
+      if (stepDetectorRef.current) await stepDetectorRef.current.start();
+
+      if (isNativeCapacitor()) {
+        await startNativeWatch().catch((capErr) => {
+          console.warn('Capacitor geolocation resume failed, fallback to browser:', capErr);
+          return startBrowserWatch();
+        });
+      } else {
+        await startBrowserWatch();
       }
 
-      // NEW: Resume Geolocation Watch (Capacitor)
-      try {
-         watchIdRef.current = await Geolocation.watchPosition(
-          { 
-            enableHighAccuracy: true, 
-            timeout: 10000, 
-            maximumAge: 0 
-          },
-          (position, err) => {
-            if (err) {
-                console.warn('Location tracking error:', err);
-                return;
-            }
-            if (position) {
-                const { latitude, longitude } = position.coords;
-                const point = [latitude, longitude];
-                
-                // Calculate GPS Distance
-                if (lastGpsPositionRef.current) {
-                  const dist = calculateDistance(
-                    lastGpsPositionRef.current[0], lastGpsPositionRef.current[1],
-                    latitude, longitude
-                  );
-                  
-                  if (dist > 0.01) {
-                    setDistance(prev => prev + dist);
-                    lastGpsPositionRef.current = point;
-                    setRoute(prev => [...prev, point]);
-                  }
-                } else {
-                  lastGpsPositionRef.current = point;
-                  setRoute(prev => [...prev, point]);
-                }
-
-                setCurrentLocation(point);
-            }
-          }
-        );
-      } catch (e) { console.error(e); }
-      
       startTimeRef.current = Date.now();
-      
       setIsPaused(false);
       console.log('Tracking resumed');
     } catch (error) {
       console.error('Failed to resume tracking:', error);
     }
-  }, []);
+  }, [isNativeCapacitor, startNativeWatch, startBrowserWatch]);
 
   const reset = useCallback(async () => {
     if (stepDetectorRef.current) {
       stepDetectorRef.current.stop();
       stepDetectorRef.current.reset();
     }
-    
-    // NEW: Clear Location Data (Capacitor)
-    if (watchIdRef.current !== null) {
-      await Geolocation.clearWatch({ id: watchIdRef.current });
-      watchIdRef.current = null;
-    }
+    await clearGeoWatch(); // NEW
     setRoute([]);
     setCurrentLocation(null);
     lastGpsPositionRef.current = null; // Reset GPS ref
@@ -371,19 +366,14 @@ const useStriven = () => {
     startTimeRef.current = null;
     pausedTimeRef.current = 0;
     console.log('Tracking reset');
-  }, []);
+  }, [clearGeoWatch]);
 
   const stopAndSave = useCallback(async () => {
     try {
       if (stepDetectorRef.current) {
         stepDetectorRef.current.stop();
       }
-      
-      // NEW: Stop Geolocation (Capacitor)
-      if (watchIdRef.current !== null) {
-        await Geolocation.clearWatch({ id: watchIdRef.current });
-        watchIdRef.current = null;
-      }
+      await clearGeoWatch(); // NEW
 
       if (steps === 0) {
         console.log('No steps to save');
@@ -466,7 +456,7 @@ const useStriven = () => {
       console.error('Failed to save activity:', error);
       throw error;
     }
-  }, [steps, distance, calories, duration, reset, route]);
+  }, [steps, distance, calories, duration, reset, route, clearGeoWatch]);
 
   return {
     steps,
@@ -481,6 +471,7 @@ const useStriven = () => {
     weeklyStats,
     currentLocation,
     route,
+    locationError, // NEW
     startTracking,
     pauseTracking,
     resumeTracking,

@@ -163,7 +163,8 @@ const Dashboard = ({
   weeklyStats = { totalSteps: 0, activeDays: 0 },
   onNavigateToStats = () => {},
   currentLocation = null, // NEW
-  route = [] // NEW
+  route = [], // NEW
+  locationError = null // NEW
 }) => {
   const dailyStepsGoal = 10000;
   const [showLicense, setShowLicense] = useState(false);

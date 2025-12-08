@@ -47,7 +47,7 @@ const MapController = ({ location, route }) => {
   return null;
 };
 
-const LiveMap = ({ route, currentLocation, readOnly = false, startName, endName }) => {
+const LiveMap = ({ route, currentLocation, readOnly = false, startName, endName, locationError }) => {
   const [startLocation, setStartLocation] = useState(startName || null);
   const [endLocation, setEndLocation] = useState(endName || null);
 
@@ -100,9 +100,20 @@ const LiveMap = ({ route, currentLocation, readOnly = false, startName, endName 
 
   // If live mode and no location yet
   if (!readOnly && !currentLocation) return (
-    <div className="h-full w-full bg-zinc-900 flex flex-col items-center justify-center text-zinc-500 animate-pulse">
-      <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mb-2"></div>
-      <span className="text-xs font-medium">Acquiring GPS...</span>
+    <div className="h-full w-full bg-zinc-900 flex flex-col items-center justify-center text-zinc-400 text-center px-4">
+      {locationError ? (
+        <>
+          <div className="text-sm font-bold mb-1">Location unavailable</div>
+          <div className="text-[11px] leading-snug">
+            {locationError}. Ensure permissions are granted and you are on HTTPS/localhost.
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+          <span className="text-xs font-medium">Acquiring GPS...</span>
+        </>
+      )}
     </div>
   );
 

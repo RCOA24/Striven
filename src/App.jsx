@@ -1,7 +1,7 @@
 // src/App.jsx
 import React, { useState, createContext, useContext, useEffect } from 'react';
 import { Activity } from 'lucide-react';
-import useStriven from './hooks/useStriven'; // DO NOT CHANGE this import!
+import useStriven from '../hooks/useStriven'; // DO NOT CHANGE this import!
 import useNotifications from './hooks/useNotifications';
 import MainLayout from './components/MainLayout';
 import Dashboard from './pages/Dashboard';
@@ -52,6 +52,7 @@ function App() {
     reset,
     stopAndSave,
     refreshActivities,
+    locationError, // NEW
   } = useStriven();
 
   const { notification, showNotification, hideNotification } = useNotifications();
@@ -158,6 +159,7 @@ function App() {
             onNavigateToStats={handleNavigateToStats}
             currentLocation={currentLocation} // NEW
             route={route} // NEW
+            locationError={locationError} // NEW
           />
         );
       case 'activity':
