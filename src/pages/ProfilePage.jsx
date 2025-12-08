@@ -113,24 +113,36 @@ const ProfilePage = ({ activities = [], weeklyStats = {} }) => {
       if (Capacitor.isNativePlatform()) {
         // --- MOBILE EXPORT (Save to Downloads) ---
         try {
-          // 1. Write file to Documents directory (user-accessible on Android/iOS)
-          await Filesystem.writeFile({
-            path: fileName,
-            data: dataStr,
-            directory: Directory.Documents,
-            encoding: Encoding.UTF8
-          });
+          // Try to write to Downloads directory (most accessible on Android)
+          // Falls back to Documents if Downloads is unavailable
+          let savedDirectory = Directory.Documents;
+          let savedPath = fileName;
 
-          // 2. Get the saved URI for confirmation
-          const uriResult = await Filesystem.getUri({
-            directory: Directory.Documents,
-            path: fileName
-          });
+          try {
+            // Android: Try saving to Downloads (requires Storage permission)
+            await Filesystem.writeFile({
+              path: fileName,
+              data: dataStr,
+              directory: Directory.ExternalStorage, // This maps to Downloads on Android 10+
+              encoding: Encoding.UTF8
+            });
+            savedDirectory = Directory.ExternalStorage;
+            savedPath = `Download/${fileName}`;
+          } catch (extErr) {
+            console.log('External storage failed, falling back to Documents:', extErr);
+            // Fallback: Save to Documents
+            await Filesystem.writeFile({
+              path: fileName,
+              data: dataStr,
+              directory: Directory.Documents,
+              encoding: Encoding.UTF8
+            });
+            savedPath = `Documents/${fileName}`;
+          }
 
-          // 3. Show success message with file location
-          showNotification('success', `Backup saved to Documents/${fileName}`);
+          showNotification('success', `Backup saved to ${savedPath}`);
           
-          console.log('File saved to:', uriResult.uri);
+          console.log('File saved to:', savedPath);
         } catch (mobileErr) {
           console.error('Mobile export error:', mobileErr);
           throw new Error('Mobile export failed: ' + mobileErr.message);
