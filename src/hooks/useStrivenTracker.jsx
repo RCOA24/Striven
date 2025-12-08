@@ -46,14 +46,18 @@ const useStrivenTracker = () => {
   }, []);
 
   const handlePosition = useCallback(({ latitude, longitude }) => {
-    const point = [latitude, longitude];
+    // Ensure coordinates are numbers
+    const lat = parseFloat(latitude);
+    const lng = parseFloat(longitude);
+    const point = [lat, lng];
+
     if (lastGpsPositionRef.current) {
       const dist = calculateDistance(
         lastGpsPositionRef.current[0], lastGpsPositionRef.current[1],
-        latitude, longitude
+        lat, lng
       );
-      // Lowered threshold to 5 meters for better responsiveness during testing
-      if (dist > 0.005) { 
+      // Lowered threshold to 3 meters (0.003 km) for better responsiveness
+      if (dist > 0.003) { 
         setDistance(prev => prev + dist);
         lastGpsPositionRef.current = point;
         setRoute(prev => [...prev, point]);
@@ -196,8 +200,11 @@ const useStrivenTracker = () => {
     };
   }, [isTracking, isPaused]);
 
+  // Update metrics when steps change
   useEffect(() => {
-    if (route.length === 0) {
+    // Use step-based distance if we have less than 2 GPS points (no valid segment yet)
+    // This allows distance to count indoors or on treadmills even if GPS is static
+    if (route.length < 2) {
       setDistance(steps * STEP_LENGTH_KM);
     }
     setCalories(steps * CALORIES_PER_STEP);
