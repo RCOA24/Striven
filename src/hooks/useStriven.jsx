@@ -1,6 +1,7 @@
 // src/hooks/useStriven.jsx
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { Geolocation } from '@capacitor/geolocation'; // Import Capacitor Geolocation
 import StepDetector from '../utils/StepDetector';
 import { 
   addActivity, 
@@ -209,37 +210,58 @@ const useStriven = () => {
 
       await stepDetectorRef.current.start();
       
-      // NEW: Start Geolocation Tracking
-      if ('geolocation' in navigator) {
-        watchIdRef.current = navigator.geolocation.watchPosition(
-          (position) => {
-            const { latitude, longitude } = position.coords;
-            const point = [latitude, longitude];
-            
-            // Calculate GPS Distance
-            if (lastGpsPositionRef.current) {
-              const dist = calculateDistance(
-                lastGpsPositionRef.current[0], lastGpsPositionRef.current[1],
-                latitude, longitude
-              );
-              
-              // Only count if moved > 10 meters (0.01 km) to reduce GPS drift noise
-              if (dist > 0.01) {
-                setDistance(prev => prev + dist);
-                lastGpsPositionRef.current = point;
-                setRoute(prev => [...prev, point]);
-              }
-            } else {
-              // First point
-              lastGpsPositionRef.current = point;
-              setRoute(prev => [...prev, point]);
-            }
+      // NEW: Start Geolocation Tracking (Capacitor)
+      try {
+        const permissionStatus = await Geolocation.checkPermissions();
+        if (permissionStatus.location !== 'granted') {
+             await Geolocation.requestPermissions();
+        }
 
-            setCurrentLocation(point);
+        // Clear existing watch if any
+        if (watchIdRef.current !== null) {
+            await Geolocation.clearWatch({ id: watchIdRef.current });
+        }
+
+        watchIdRef.current = await Geolocation.watchPosition(
+          { 
+            enableHighAccuracy: true, 
+            timeout: 10000, 
+            maximumAge: 0 
           },
-          (error) => console.warn('Location tracking error:', error),
-          { enableHighAccuracy: true, distanceFilter: 5 }
+          (position, err) => {
+            if (err) {
+                console.warn('Location tracking error:', err);
+                return;
+            }
+            if (position) {
+                const { latitude, longitude } = position.coords;
+                const point = [latitude, longitude];
+                
+                // Calculate GPS Distance
+                if (lastGpsPositionRef.current) {
+                  const dist = calculateDistance(
+                    lastGpsPositionRef.current[0], lastGpsPositionRef.current[1],
+                    latitude, longitude
+                  );
+                  
+                  // Only count if moved > 10 meters (0.01 km) to reduce GPS drift noise
+                  if (dist > 0.01) {
+                    setDistance(prev => prev + dist);
+                    lastGpsPositionRef.current = point;
+                    setRoute(prev => [...prev, point]);
+                  }
+                } else {
+                  // First point
+                  lastGpsPositionRef.current = point;
+                  setRoute(prev => [...prev, point]);
+                }
+
+                setCurrentLocation(point);
+            }
+          }
         );
+      } catch (e) {
+          console.error("Geolocation error", e);
       }
 
       startTimeRef.current = Date.now();
@@ -253,14 +275,14 @@ const useStriven = () => {
     }
   }, []);
 
-  const pauseTracking = useCallback(() => {
+  const pauseTracking = useCallback(async () => {
     if (stepDetectorRef.current) {
       stepDetectorRef.current.stop();
     }
     
-    // NEW: Stop Geolocation Watch
+    // NEW: Stop Geolocation Watch (Capacitor)
     if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
+      await Geolocation.clearWatch({ id: watchIdRef.current });
       watchIdRef.current = null;
     }
     
@@ -276,36 +298,45 @@ const useStriven = () => {
         await stepDetectorRef.current.start();
       }
 
-      // NEW: Resume Geolocation Watch
-      if ('geolocation' in navigator) {
-        watchIdRef.current = navigator.geolocation.watchPosition(
-          (position) => {
-            const { latitude, longitude } = position.coords;
-            const point = [latitude, longitude];
-            
-            // Calculate GPS Distance
-            if (lastGpsPositionRef.current) {
-              const dist = calculateDistance(
-                lastGpsPositionRef.current[0], lastGpsPositionRef.current[1],
-                latitude, longitude
-              );
-              
-              if (dist > 0.01) {
-                setDistance(prev => prev + dist);
-                lastGpsPositionRef.current = point;
-                setRoute(prev => [...prev, point]);
-              }
-            } else {
-              lastGpsPositionRef.current = point;
-              setRoute(prev => [...prev, point]);
-            }
-
-            setCurrentLocation(point);
+      // NEW: Resume Geolocation Watch (Capacitor)
+      try {
+         watchIdRef.current = await Geolocation.watchPosition(
+          { 
+            enableHighAccuracy: true, 
+            timeout: 10000, 
+            maximumAge: 0 
           },
-          (error) => console.warn('Location tracking error:', error),
-          { enableHighAccuracy: true, distanceFilter: 5 }
+          (position, err) => {
+            if (err) {
+                console.warn('Location tracking error:', err);
+                return;
+            }
+            if (position) {
+                const { latitude, longitude } = position.coords;
+                const point = [latitude, longitude];
+                
+                // Calculate GPS Distance
+                if (lastGpsPositionRef.current) {
+                  const dist = calculateDistance(
+                    lastGpsPositionRef.current[0], lastGpsPositionRef.current[1],
+                    latitude, longitude
+                  );
+                  
+                  if (dist > 0.01) {
+                    setDistance(prev => prev + dist);
+                    lastGpsPositionRef.current = point;
+                    setRoute(prev => [...prev, point]);
+                  }
+                } else {
+                  lastGpsPositionRef.current = point;
+                  setRoute(prev => [...prev, point]);
+                }
+
+                setCurrentLocation(point);
+            }
+          }
         );
-      }
+      } catch (e) { console.error(e); }
       
       startTimeRef.current = Date.now();
       
@@ -316,15 +347,15 @@ const useStriven = () => {
     }
   }, []);
 
-  const reset = useCallback(() => {
+  const reset = useCallback(async () => {
     if (stepDetectorRef.current) {
       stepDetectorRef.current.stop();
       stepDetectorRef.current.reset();
     }
     
-    // NEW: Clear Location Data
+    // NEW: Clear Location Data (Capacitor)
     if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
+      await Geolocation.clearWatch({ id: watchIdRef.current });
       watchIdRef.current = null;
     }
     setRoute([]);
@@ -348,9 +379,9 @@ const useStriven = () => {
         stepDetectorRef.current.stop();
       }
       
-      // NEW: Stop Geolocation
+      // NEW: Stop Geolocation (Capacitor)
       if (watchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
+        await Geolocation.clearWatch({ id: watchIdRef.current });
         watchIdRef.current = null;
       }
 

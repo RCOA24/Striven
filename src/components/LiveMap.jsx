@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -109,8 +109,15 @@ const LiveMap = ({ route, currentLocation, readOnly = false, startName, endName 
   // Determine center (fallback to route start or 0,0)
   const initialCenter = currentLocation || (route && route.length > 0 ? route[0] : [0,0]);
 
+  // Force re-render on Android when map is ready to prevent grey tiles
+  const mapKey = useMemo(() => {
+     if (readOnly) return `map-readonly-${route?.[0]?.[0] || 0}`;
+     return `map-live-${initialCenter[0]}-${initialCenter[1]}`;
+  }, [readOnly, route, initialCenter]);
+
   return (
     <MapContainer 
+      key={mapKey}
       center={initialCenter} 
       zoom={16} 
       scrollWheelZoom={false} 
