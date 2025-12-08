@@ -38,6 +38,7 @@ const useStrivenTracker = () => {
   const watchIdRef = useRef(null);
   const lastGpsPositionRef = useRef(null);
   const usingBrowserWatchRef = useRef(false);
+  const lastUpdateTsRef = useRef(0); // NEW: throttle GPS updates
   
   const isNativeCapacitor = useCallback(() => {
     return typeof window !== 'undefined' &&
@@ -45,8 +46,15 @@ const useStrivenTracker = () => {
       window.Capacitor.getPlatform() !== 'web';
   }, []);
 
-  const handlePosition = useCallback(({ latitude, longitude }) => {
-    // Ensure coordinates are numbers
+  const handlePosition = useCallback(({ latitude, longitude, accuracy }) => {
+    // Reject low-accuracy fixes (>30m) or missing coords
+    if (!latitude || !longitude || (accuracy && accuracy > 30)) return;
+
+    const now = Date.now();
+    // Throttle to one update every 2s to reduce jitter
+    if (now - lastUpdateTsRef.current < 2000) return;
+    lastUpdateTsRef.current = now;
+
     const lat = parseFloat(latitude);
     const lng = parseFloat(longitude);
     const point = [lat, lng];
@@ -56,8 +64,9 @@ const useStrivenTracker = () => {
         lastGpsPositionRef.current[0], lastGpsPositionRef.current[1],
         lat, lng
       );
-      // Lowered threshold to 3 meters (0.003 km) for better responsiveness
-      if (dist > 0.003) { 
+      // Ignore implausible jumps (>300m) and accept small movements (>3m)
+      if (dist > 0.3) return;
+      if (dist > 0.003) {
         setDistance(prev => prev + dist);
         lastGpsPositionRef.current = point;
         setRoute(prev => [...prev, point]);
@@ -202,8 +211,7 @@ const useStrivenTracker = () => {
 
   // Update metrics when steps change
   useEffect(() => {
-    // Use step-based distance if we have less than 2 GPS points (no valid segment yet)
-    // This allows distance to count indoors or on treadmills even if GPS is static
+    // Use step-based distance until we have at least 2 valid GPS points
     if (route.length < 2) {
       setDistance(steps * STEP_LENGTH_KM);
     }
