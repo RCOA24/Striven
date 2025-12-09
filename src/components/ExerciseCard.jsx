@@ -50,12 +50,12 @@ export default function ExerciseCard({ exercise, onClick }) {
         };
       }
 
-      // SOFT FAILURE: API Image failed -> Switch to Fallback GIF
+      // SOFT FAILURE: API Image failed -> Switch to Fallback GIF (mark as no preview)
       return {
         ...prev,
         src: FALLBACK_GIF,
         usingFallback: true,
-        hasError: false, // Keep false so the UI looks "Normal"
+        hasError: true,   // mark as error so "No Preview" shows
         loaded: true
       };
     });
@@ -92,16 +92,15 @@ export default function ExerciseCard({ exercise, onClick }) {
           onError={handleError}
         />
 
-        {/* 3. "GIF" Badge -> Show for BOTH API Image AND Fallback GIF */}
-        {/* We removed the check for !usingFallback so it's consistent */}
-        {!imgState.hasError && imgState.loaded && (
+        {/* GIF badge only when not fallback/error */}
+        {!imgState.hasError && imgState.loaded && !imgState.usingFallback && (
           <div className="absolute top-3 right-3 bg-emerald-500 text-black text-xs px-3 py-1.5 rounded-full font-bold flex items-center gap-1 shadow-lg animate-pulse z-20">
             <Sparkles className="w-3 h-3" />
-            GIF
+            Gif
           </div>
         )}
 
-        {/* 4. Error Badge -> Only if totally broken (SVG) */}
+        {/* Error badge for fallback/placeholder */}
         {imgState.hasError && imgState.loaded && (
           <div className="absolute top-3 right-3 bg-zinc-800/80 backdrop-blur-md text-zinc-400 text-xs px-3 py-1.5 rounded-full font-bold flex items-center gap-1 border border-white/5 z-20">
             <ImageOff className="w-3 h-3" />
