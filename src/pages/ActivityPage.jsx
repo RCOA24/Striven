@@ -121,28 +121,32 @@ const ActivityCard = ({ activity, onDelete, onViewMap }) => { // Added onViewMap
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setShowDeleteConfirm(false)}
-              className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm"
+              className="fixed inset-0 bg-black/60 z-[9998] backdrop-blur-sm"
             />
             <motion.div 
               initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-              className={`fixed bottom-0 left-0 right-0 ${COLORS.card} rounded-t-[2rem] p-6 z-50 border-t ${COLORS.border}`}
+              className={`fixed bottom-0 left-0 right-0 ${COLORS.card} rounded-t-[2rem] p-6 z-[9999] border-t ${COLORS.border} safe-bottom`}
             >
-              <h3 className="text-xl font-bold text-white text-center mb-2">Delete Activity?</h3>
-              <p className={`${COLORS.textSub} text-center text-sm mb-6`}>This action cannot be undone.</p>
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className="flex-1 py-3.5 bg-[#3a3a3c] rounded-xl font-bold text-white active:scale-95 transition-transform"
-                >
-                  Cancel
-                </button>
+              <h3 className="text-2xl font-bold text-white text-center mb-3">Delete Activity?</h3>
+              <p className={`${COLORS.textSub} text-center text-base mb-8`}>This action cannot be undone.</p>
+              
+              <div className="flex flex-col gap-3 w-full">
                 <button 
                   onClick={() => { onDelete(activity.id); setShowDeleteConfirm(false); }}
-                  className="flex-1 py-3.5 bg-[#ff453a] rounded-xl font-bold text-white active:scale-95 transition-transform shadow-lg shadow-red-900/20"
+                  className="w-full py-4 bg-[#ff453a] rounded-xl font-bold text-white text-lg active:scale-95 transition-transform shadow-lg shadow-red-900/20 touch-manipulation"
                 >
                   Delete
                 </button>
+                <button 
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="w-full py-4 bg-zinc-700 hover:bg-zinc-600 text-white rounded-xl font-bold text-lg active:scale-95 transition-all touch-manipulation"
+                >
+                  Cancel
+                </button>
               </div>
+              
+              {/* Safe area spacer for notch/home indicator */}
+              <div className="h-6" />
             </motion.div>
           </>
         )}
