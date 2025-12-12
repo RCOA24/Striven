@@ -16,6 +16,9 @@ const MicroNutrientRow = ({ label, value, unit }) => (
 );
 
 const ScannerResults = ({ result, onReset }) => {
+  // Guard: don't render if result is null/undefined
+  if (!result) return null;
+
   const totals = result.totals || result;
   const items = result.items || [result];
 
