@@ -380,6 +380,43 @@ Focus on: meal composition, hydration, and one habit to improve recovery. Avoid 
               </div>
             </div>
 
+            {/* AI Tips elevated near the top for emphasis */}
+            <div className="bg-gradient-to-b from-[#121216] to-[#0c0c10] rounded-2xl border border-white/8 p-5 shadow-[0_20px_60px_-35px_rgba(0,0,0,0.8)]">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2 rounded-full bg-emerald-500/15 border border-emerald-500/30">
+                  <Sparkles className="w-4 h-4 text-emerald-300" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-white">AI Coach</p>
+                  <p className="text-[11px] text-zinc-500">Curated tips for your target and habits</p>
+                </div>
+              </div>
+              {aiLoading && (
+                <p className="text-zinc-400 text-sm">Generating tips...</p>
+              )}
+              {aiError && (
+                <p className="text-amber-300 text-sm">{aiError}</p>
+              )}
+              {!aiLoading && !aiError && aiTips && (
+                <div className="space-y-3">
+                  <ul className="list-disc list-inside text-sm text-zinc-200 space-y-1">
+                    {aiTips.split(/\n|\r/).filter(Boolean).map((line, idx) => (
+                      <li key={idx}>{line.replace(/^[-•\s]+/, '')}</li>
+                    ))}
+                  </ul>
+                  <div className="flex items-center justify-between text-[11px] text-zinc-500">
+                    <span>Powered by Gemini 2.5 Flash</span>
+                    <button
+                      onClick={() => lastPayload && fetchAiTips(lastPayload)}
+                      className="text-emerald-300 underline underline-offset-4 active:opacity-70"
+                    >
+                      Refresh tips
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Macros & Water Section */}
             <div>
               <h3 className="text-lg font-bold font-apple mb-4 px-1">Daily Targets</h3>
@@ -408,40 +445,6 @@ Focus on: meal composition, hydration, and one habit to improve recovery. Avoid 
                   </div>
                   <span className="font-bold text-white">{result.tdee}</span>
               </div>
-            </div>
-
-            {/* AI Tips */}
-            <div className="bg-[#101012] rounded-2xl border border-white/5 p-4 shadow-xl">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="p-2 rounded-full bg-emerald-500/15 border border-emerald-500/30">
-                  <Sparkles className="w-4 h-4 text-emerald-300" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-white">AI Coach</p>
-                  <p className="text-[11px] text-zinc-500">Personalized pointers for this plan</p>
-                </div>
-              </div>
-              {aiLoading && (
-                <p className="text-zinc-400 text-sm">Generating tips...</p>
-              )}
-              {aiError && (
-                <p className="text-amber-300 text-sm">{aiError}</p>
-              )}
-              {!aiLoading && !aiError && aiTips && (
-                <div className="space-y-2">
-                  <ul className="list-disc list-inside text-sm text-zinc-200 space-y-1">
-                    {aiTips.split(/\n|\r/).filter(Boolean).map((line, idx) => (
-                      <li key={idx}>{line.replace(/^[-•\s]+/, '')}</li>
-                    ))}
-                  </ul>
-                  <button
-                    onClick={() => lastPayload && fetchAiTips(lastPayload)}
-                    className="text-[11px] text-emerald-300 underline underline-offset-4 active:opacity-70"
-                  >
-                    Refresh tips
-                  </button>
-                </div>
-              )}
             </div>
 
             {/* Actions */}
