@@ -204,7 +204,7 @@ const Dashboard = ({
         {/* Header */}
         <header className="flex md:hidden justify-center items-center gap-3 mb-8 py-2">
           
-          <h1 className="text-3xl font-bold tracking-tight">Striven</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Striven hihihihi</h1>
           
           <img src="/StrivenLogo.png" alt="Striven Logo" className="w-10 h-10 rounded-xl shadow-lg" />
         </header>
