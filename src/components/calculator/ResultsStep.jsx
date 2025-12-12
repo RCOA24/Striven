@@ -120,6 +120,17 @@ const ResultsStep = ({
             </div>
           </div>
         )}
+        {!aiLoading && !aiError && !aiTips && (
+          <button
+            onClick={onRefreshTips}
+            className="w-full mt-2 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/30 rounded-xl p-4 active:scale-[0.98] transition-all"
+          >
+            <div className="flex items-center justify-center gap-2">
+              <Sparkles className="w-4 h-4 text-emerald-400" />
+              <span className="font-semibold text-emerald-300">Get Personalized Tips</span>
+            </div>
+          </button>
+        )}
       </div>
 
       {/* Macros & Water Section */}

@@ -124,9 +124,6 @@ const CalorieCalculator = () => {
     setResult(computed);
     setLastPayload({ ...formData, ...computed });
     setStep(3);
-
-    // Kick off AI suggestions
-    fetchAiTips({ ...formData, ...computed });
   };
 
   const fetchAiTips = async (payload) => {
