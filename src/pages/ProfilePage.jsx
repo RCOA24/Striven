@@ -310,8 +310,22 @@ const ProfilePage = ({ activities = [], weeklyStats = {} }) => {
                     </div>
                     <div>
                         <div className="text-2xl font-bold text-white font-apple tracking-tight">{nutritionStats.target} kcal</div>
-                        <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest font-apple">Daily Goal</div>
-                        {aiTips && (
+                        <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest font-apple">Daily Goal</div>                         {/* Health risk compact notice */}
+                         {(() => {
+                           const warnings = [];
+                           if (nutritionStats.target > 0) {
+                             // We don't have tdee here; show minimal check for very low calories
+                             if (nutritionStats.target < 1200) warnings.push('Target calories may be too low.');
+                           }
+                           return warnings.length ? (
+                             <div className="mt-2 p-2 rounded-lg bg-amber-600/10 border border-amber-500/30">
+                               <p className="text-[10px] font-semibold text-amber-300">Health Notice</p>
+                               <ul className="list-disc list-inside text-[10px] text-amber-200 mt-1">
+                                 {warnings.map((w, i) => (<li key={i}>{w}</li>))}
+                               </ul>
+                             </div>
+                           ) : null;
+                         })()}                        {aiTips && (
                           <div className="mt-2 text-[11px] text-zinc-400">
                             <div className="font-semibold text-white/90 mb-1">AI Coach</div>
                             <ul className="list-disc list-inside space-y-0.5">

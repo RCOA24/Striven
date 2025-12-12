@@ -63,6 +63,7 @@ const HistoryModal = ({
                                                 <li key={i}>{t.replace(/^[-•\s]+/, '')}</li>
                                             ))}
                                         </ul>
+                                        {/* Optional: link to adjust plan if needed */}
                                     </div>
                                 )}
                 {/* Water Tracker - Visual Glasses */}
