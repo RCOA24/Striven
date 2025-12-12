@@ -62,6 +62,7 @@ const ProfilePage = ({ activities = [], weeklyStats = {} }) => {
   const [notification, setNotification] = useState(null); 
   const [showLicense, setShowLicense] = useState(false);
   const [nutritionStats, setNutritionStats] = useState({ target: 0, totalLogged: 0 });
+  const [aiTips, setAiTips] = useState('');
   const [viewBestMap, setViewBestMap] = useState(null); // State for map
 
   // Show notification
@@ -98,6 +99,7 @@ const ProfilePage = ({ activities = [], weeklyStats = {} }) => {
             target: profile ? profile.targetCalories : 0,
             totalLogged: logs ? logs.length : 0
         });
+        if (profile?.aiTips) setAiTips(profile.aiTips);
     };
     loadNutrition();
   }, []);
@@ -309,6 +311,16 @@ const ProfilePage = ({ activities = [], weeklyStats = {} }) => {
                     <div>
                         <div className="text-2xl font-bold text-white font-apple tracking-tight">{nutritionStats.target} kcal</div>
                         <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest font-apple">Daily Goal</div>
+                        {aiTips && (
+                          <div className="mt-2 text-[11px] text-zinc-400">
+                            <div className="font-semibold text-white/90 mb-1">AI Coach</div>
+                            <ul className="list-disc list-inside space-y-0.5">
+                              {aiTips.split(/\n|\r/).filter(Boolean).slice(0,3).map((t, i) => (
+                                <li key={i}>{t.replace(/^[-•\s]+/, '')}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                     </div>
                 </div>
                 <div className="z-10 text-right">

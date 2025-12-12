@@ -1,11 +1,11 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { 
   Calculator, Activity, ChevronRight, RotateCcw, Flame, Target, 
   TrendingUp, ArrowLeft, Apple, Dumbbell, Check, Ruler, Weight, 
   Calendar, Info, Droplets, Sparkles
 } from 'lucide-react';
 import { AppContext } from '../App';
-import { saveNutritionProfile } from '../utils/db';
+import { saveNutritionProfile, getNutritionProfile } from '../utils/db';
 
 const CalorieCalculator = () => {
   const { setCurrentPage } = useContext(AppContext);
@@ -23,6 +23,53 @@ const CalorieCalculator = () => {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
   const [lastPayload, setLastPayload] = useState(null);
+  const [hasExistingProfile, setHasExistingProfile] = useState(false);
+
+  // On mount, attempt to resume an existing saved plan
+  useEffect(() => {
+    (async () => {
+      try {
+        const saved = await getNutritionProfile();
+        if (saved) {
+          setHasExistingProfile(true);
+          // Prefill form from saved profile when available
+          setFormData(prev => ({
+            gender: saved.gender || prev.gender,
+            age: saved.age || prev.age,
+            height: saved.height || prev.height,
+            weight: saved.weight || prev.weight,
+            activity: saved.activity || prev.activity,
+            goal: saved.goal || prev.goal
+          }));
+          const computed = {
+            bmr: saved.bmr,
+            tdee: saved.tdee,
+            target: saved.targetCalories,
+            water: saved.waterTarget,
+            macros: {
+              protein: saved.protein,
+              fats: saved.fats,
+              carbs: saved.carbs
+            }
+          };
+          setResult(computed);
+          setLastPayload({
+            gender: saved.gender,
+            age: saved.age,
+            height: saved.height,
+            weight: saved.weight,
+            activity: saved.activity,
+            goal: saved.goal,
+            ...computed
+          });
+          setStep(3);
+          if (saved.aiTips) setAiTips(saved.aiTips);
+        }
+      } catch {
+        // ignore resume errors
+      }
+    })();
+  }, []);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -134,7 +181,9 @@ Focus on: meal composition, hydration, and one habit to improve recovery. Avoid 
         waterTarget: result.water, // Save water target
         protein: result.macros.protein,
         fats: result.macros.fats,
-        carbs: result.macros.carbs
+        carbs: result.macros.carbs,
+        aiTips: aiTips || '',
+        inputPayload: lastPayload || null
     });
     
     setCurrentPage('food');
@@ -192,6 +241,28 @@ Focus on: meal composition, hydration, and one habit to improve recovery. Avoid 
               <h2 className="text-2xl font-bold font-apple mb-2">Tell us about yourself</h2>
               <p className="text-zinc-400 text-sm">We need this to calculate your metabolic rate.</p>
             </div>
+
+            {hasExistingProfile && (
+              <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span>A saved plan was found.</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setStep(3)}
+                      className="px-3 py-1 rounded-lg bg-emerald-500 text-black font-bold text-xs active:scale-95"
+                    >
+                      Resume
+                    </button>
+                    <button
+                      onClick={() => reset()}
+                      className="px-3 py-1 rounded-lg bg-black/30 border border-white/20 text-white font-medium text-xs active:scale-95"
+                    >
+                      Recalculate
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Gender Selection */}
             <div className="grid grid-cols-2 gap-4">

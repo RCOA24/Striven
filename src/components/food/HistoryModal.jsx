@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { getNutritionProfile } from '../../utils/db';
 import { X, ScanLine, Utensils, Clock, Trash2, Calendar, Target, Ruler, Weight, Droplets, Plus, Minus, Info, ChevronDown, ChevronUp } from 'lucide-react';
 
 const HistoryModal = ({ 
@@ -15,6 +16,16 @@ const HistoryModal = ({
   onSetGoal 
 }) => {
   const [expandedDates, setExpandedDates] = useState({});
+    const [aiTips, setAiTips] = useState('');
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const profile = await getNutritionProfile();
+                if (profile?.aiTips) setAiTips(profile.aiTips);
+            } catch {}
+        })();
+    }, []);
 
   const toggleDate = (date) => {
     setExpandedDates(prev => ({
@@ -43,6 +54,17 @@ const HistoryModal = ({
         
         <div className="flex-1 overflow-y-auto">
             <div className="px-6 pt-6 pb-2 space-y-4">
+                                {/* AI Tips (if available) */}
+                                {aiTips && (
+                                    <div className="bg-gradient-to-b from-[#121216] to-[#0c0c10] rounded-2xl border border-white/8 p-4">
+                                        <div className="text-xs text-zinc-500 mb-1">AI Coach</div>
+                                        <ul className="list-disc list-inside text-[13px] text-zinc-200 space-y-0.5">
+                                            {aiTips.split(/\n|\r/).filter(Boolean).slice(0,3).map((t, i) => (
+                                                <li key={i}>{t.replace(/^[-•\s]+/, '')}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
                 {/* Water Tracker - Visual Glasses */}
                 <div className="bg-blue-900/10 border border-blue-500/20 rounded-2xl p-4">
                     <div className="flex items-center justify-between mb-4">
