@@ -2,7 +2,7 @@ import React, { useState, useContext } from 'react';
 import { 
   Calculator, Activity, ChevronRight, RotateCcw, Flame, Target, 
   TrendingUp, ArrowLeft, Apple, Dumbbell, Check, Ruler, Weight, 
-  Calendar, Info, Droplets // Added Droplets
+  Calendar, Info, Droplets, Sparkles
 } from 'lucide-react';
 import { AppContext } from '../App';
 import { saveNutritionProfile } from '../utils/db';
@@ -19,6 +19,10 @@ const CalorieCalculator = () => {
     goal: 'maintain'
   });
   const [result, setResult] = useState(null);
+  const [aiTips, setAiTips] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState('');
+  const [lastPayload, setLastPayload] = useState(null);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -54,7 +58,7 @@ const CalorieCalculator = () => {
     
     const waterTarget = Math.round(weightNum * waterMultiplier);
 
-    setResult({
+    const computed = {
       bmr: Math.round(bmr),
       tdee: Math.round(tdee),
       target: Math.round(targetCalories),
@@ -64,8 +68,59 @@ const CalorieCalculator = () => {
         fats: Math.round((targetCalories * 0.25) / 9),
         carbs: Math.round((targetCalories * 0.45) / 4)
       }
-    });
+    };
+    setResult(computed);
+    setLastPayload({ ...formData, ...computed });
     setStep(3);
+
+    // Kick off AI suggestions
+    fetchAiTips({ ...formData, ...computed });
+  };
+
+  const fetchAiTips = async (payload) => {
+    const proxyUrl = import.meta.env.VITE_AI_TIPS_URL;
+    const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
+    // Prefer proxy to avoid exposing keys; fallback to direct only if proxy is absent and key exists.
+    if (!proxyUrl && !apiKey) {
+      setAiTips('');
+      return;
+    }
+    setAiLoading(true);
+    setAiError('');
+    try {
+      const prompt = `You are a concise fitness & nutrition coach. Provide 3 short bullet tips personalized for this user. Keep each bullet under 18 words.
+User: ${payload.gender}, age ${payload.age}, height ${payload.height}cm, weight ${payload.weight}kg
+Goal: ${payload.goal}
+Activity factor: ${payload.activity}
+Daily target: ${payload.target} kcal | Protein ${payload.macros.protein}g | Carbs ${payload.macros.carbs}g | Fats ${payload.macros.fats}g | Water ${payload.water}ml
+Focus on: meal composition, hydration, and one habit to improve recovery. Avoid generic advice.`;
+
+      const requestBody = proxyUrl
+        ? { prompt }
+        : {
+            contents: [{ parts: [{ text: prompt }] }]
+          };
+
+      const resp = await fetch(
+        proxyUrl || `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody)
+        }
+      );
+      if (!resp.ok) throw new Error('AI service unavailable');
+      const data = await resp.json();
+      const text = proxyUrl
+        ? data.text || ''
+        : data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      setAiTips((text || '').trim());
+    } catch (err) {
+      setAiError('Could not load AI tips.');
+      setAiTips('');
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   const handleSaveAndTrack = async () => {
@@ -353,6 +408,40 @@ const CalorieCalculator = () => {
                   </div>
                   <span className="font-bold text-white">{result.tdee}</span>
               </div>
+            </div>
+
+            {/* AI Tips */}
+            <div className="bg-[#101012] rounded-2xl border border-white/5 p-4 shadow-xl">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="p-2 rounded-full bg-emerald-500/15 border border-emerald-500/30">
+                  <Sparkles className="w-4 h-4 text-emerald-300" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-white">AI Coach</p>
+                  <p className="text-[11px] text-zinc-500">Personalized pointers for this plan</p>
+                </div>
+              </div>
+              {aiLoading && (
+                <p className="text-zinc-400 text-sm">Generating tips...</p>
+              )}
+              {aiError && (
+                <p className="text-amber-300 text-sm">{aiError}</p>
+              )}
+              {!aiLoading && !aiError && aiTips && (
+                <div className="space-y-2">
+                  <ul className="list-disc list-inside text-sm text-zinc-200 space-y-1">
+                    {aiTips.split(/\n|\r/).filter(Boolean).map((line, idx) => (
+                      <li key={idx}>{line.replace(/^[-•\s]+/, '')}</li>
+                    ))}
+                  </ul>
+                  <button
+                    onClick={() => lastPayload && fetchAiTips(lastPayload)}
+                    className="text-[11px] text-emerald-300 underline underline-offset-4 active:opacity-70"
+                  >
+                    Refresh tips
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Actions */}
