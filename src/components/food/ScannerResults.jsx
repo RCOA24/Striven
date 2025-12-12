@@ -51,6 +51,11 @@ const ScannerResults = ({ result, onReset }) => {
           </div>
         ) : (
           <>
+            {result.summary && (
+              <div className="bg-white/5 rounded-2xl p-3 border border-white/10 mb-3">
+                <p className="text-[12px] text-zinc-300 leading-relaxed">{result.summary}</p>
+              </div>
+            )}
             <div className="grid grid-cols-4 gap-3 mb-4">
               <NutrientBox label="Kcal" value={Math.round(totals.calories || 0)} color="text-white" bg="bg-white/10" />
               <NutrientBox label="Prot" value={`${Math.round(totals.protein || 0)}g`} color="text-blue-400" bg="bg-blue-500/10" />

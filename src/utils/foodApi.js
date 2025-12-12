@@ -121,7 +121,7 @@ async function analyzeWithGemini(imageBlob, onStatus) {
     reader.readAsDataURL(processedBlob);
   });
 
-  // 2. Filipino Nutritionist Expert Prompt (Dual-Naming Strategy)
+  // 2. Filipino Nutritionist Expert Prompt (Dual-Naming Strategy + Summary)
   const promptText = `
     You are a Filipino Nutritionist AI Expert specializing in both Filipino and global cuisine.
     
@@ -136,6 +136,8 @@ async function analyzeWithGemini(imageBlob, onStatus) {
     - portion_desc: e.g., "1 plate (200g rice)", "1 serving"
     - calories, protein, carbs, fat: For ONE serving of this item
     
+    Also include a brief paragraph field named "summary" explaining the meal in natural language for the user (e.g., describing a silog combination: rice + egg + meat), and highlight sodium and hidden fats if relevant.
+    
     Return ONLY a raw JSON object (no markdown).
     
     If NOT food: {"is_food": false}
@@ -143,6 +145,7 @@ async function analyzeWithGemini(imageBlob, onStatus) {
     If IS food:
     {
       "is_food": true,
+      "summary": "Short descriptive overview of the meal",
       "items": [
         {
           "display_name": "Food Name (e.g. Sinigang na Baboy)",
@@ -322,6 +325,7 @@ function aggregateItems(items) {
 // 4. MAIN EXPORT
 // ==========================================
 export async function analyzeFood(imageBlob, onStatus) {
+  const mode = (import.meta.env.VITE_FOOD_AI_MODE || 'hybrid').toLowerCase();
   try {
     // Attempt 0: Gemini with Filipino nutritionist expertise (Multi-Item + Dual-Naming)
     if (onStatus) onStatus("Analyzing with Filipino Nutritionist AI...");
@@ -335,6 +339,7 @@ export async function analyzeFood(imageBlob, onStatus) {
         name: geminiResult.items.map(i => i.display_name).join(', '),
         items: geminiResult.items,
         totals,
+        summary: geminiResult.summary || undefined,
         confidence: avgConfidence || 0.9,
         isUnknown: geminiResult.items.some(i => !i.verified),
         source: 'Gemini (Filipino Expert) + OpenFoodFacts'
@@ -342,6 +347,11 @@ export async function analyzeFood(imageBlob, onStatus) {
     }
   } catch (geminiError) {
     console.warn('Gemini Filipino analysis failed, trying detection fallback...', geminiError);
+  }
+
+  // If configured to use Gemini only, short-circuit here
+  if (mode === 'gemini') {
+    throw new Error('Gemini could not confidently identify multiple items. Try a clearer photo.');
   }
 
   try {
@@ -409,6 +419,7 @@ export async function analyzeFood(imageBlob, onStatus) {
       name: item.display_name,
       items: [item],
       totals: aggregateItems([item]),
+      summary: undefined,
       confidence: item.confidence || 0.7,
       isUnknown: !item.verified,
       source: 'HF Classifier + OFF'
