@@ -44,6 +44,38 @@ const FoodScanner = () => {
   const [waterIntake, setWaterIntake] = useState(0); // NEW
   const [waterTarget, setWaterTarget] = useState(2500); // NEW
 
+  // --- 0. Request Camera Permissions (Android 6+) ---
+  const requestCameraPermissions = useCallback(async () => {
+    try {
+      // Check if running on native platform
+      if (window.Capacitor?.getPlatform && window.Capacitor.getPlatform() === 'android') {
+        // Dynamically import Capacitor Camera only on Android
+        try {
+          const { Camera: CapCamera } = await import('@capacitor/camera');
+          const permission = await CapCamera.requestPermissions({ permissions: ['camera'] });
+          if (permission.camera === 'granted' || permission.camera === 'prompt-only') {
+            return true;
+          }
+        } catch (capErr) {
+          console.warn('Capacitor camera permission request failed, trying web API:', capErr);
+        }
+      }
+      
+      // Fallback: Try web API (works on iOS and web)
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        stream.getTracks().forEach(track => track.stop());
+        return true;
+      } catch (err) {
+        console.error('Camera permission denied:', err);
+        return false;
+      }
+    } catch (error) {
+      console.error('Permission request error:', error);
+      return false;
+    }
+  }, []);
+
   // --- 1. Camera Initialization ---
   const startCamera = useCallback(async () => {
     if (!cameraEnabled) return; // Don't start if disabled
@@ -51,6 +83,13 @@ const FoodScanner = () => {
     if (stream) stream.getTracks().forEach(track => track.stop());
 
     try {
+      // Request permissions first (especially important on Android)
+      const hasPermission = await requestCameraPermissions();
+      if (!hasPermission) {
+        setError("Camera access denied. You can still upload photos.");
+        return;
+      }
+
       const constraints = { 
         video: { 
           facingMode: facingMode, 
@@ -96,7 +135,7 @@ const FoodScanner = () => {
       console.error("Camera error:", err);
       setError("Camera access denied. You can still upload photos.");
     }
-  }, [facingMode, cameraEnabled]); // Added cameraEnabled dependency
+  }, [facingMode, cameraEnabled, requestCameraPermissions]); // Added requestCameraPermissions
 
   useEffect(() => {
     startCamera();

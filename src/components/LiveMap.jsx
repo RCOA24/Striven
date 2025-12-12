@@ -137,8 +137,9 @@ const LiveMap = ({ route, currentLocation, readOnly = false, startName, endName,
       zoom={16} 
       scrollWheelZoom={false} 
       zoomControl={false}
-      className="h-full w-full z-0 bg-zinc-900"
+      className="!h-full !w-full z-0 bg-zinc-900"
       dragging={true} // Allow dragging to inspect route
+      style={{ height: '100%', width: '100%' }}
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'

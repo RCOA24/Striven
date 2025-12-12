@@ -228,18 +228,20 @@ const Dashboard = ({
             )}
 
             {isTracking && viewMode === 'map' ? (
-               <div className="w-full aspect-square max-w-[280px] lg:max-w-[400px] mx-auto mb-8 lg:mb-0 rounded-[2rem] overflow-hidden shadow-2xl border border-zinc-800 relative">
-                  <LiveMap route={route} currentLocation={currentLocation} locationError={locationError} />
-                  {/* Overlay Stats on Map */}
-                  <div className="absolute bottom-4 left-4 right-4 bg-black/60 backdrop-blur-md rounded-xl p-3 flex justify-between items-center border border-white/10 z-[400]">
-                      <div>
-                        <div className="text-xs text-zinc-400 font-bold uppercase">Steps</div>
-                        <div className="text-lg font-bold text-white">{steps.toLocaleString()}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xs text-zinc-400 font-bold uppercase">Dist</div>
-                        <div className="text-lg font-bold text-emerald-400">{distance.toFixed(2)}km</div>
-                      </div>
+               <div className="w-full max-w-[280px] lg:max-w-[400px] mx-auto mb-8 lg:mb-0 rounded-[2rem] overflow-hidden shadow-2xl border border-zinc-800 relative" style={{ width: 'clamp(280px, 100%, 400px)', height: 'clamp(280px, 100vw, 400px)' }}>
+                  <div className="w-full h-full flex flex-col">
+                    <LiveMap route={route} currentLocation={currentLocation} locationError={locationError} />
+                    {/* Overlay Stats on Map */}
+                    <div className="absolute bottom-4 left-4 right-4 bg-black/60 backdrop-blur-md rounded-xl p-3 flex justify-between items-center border border-white/10 z-[400]">
+                        <div>
+                          <div className="text-xs text-zinc-400 font-bold uppercase">Steps</div>
+                          <div className="text-lg font-bold text-white">{steps.toLocaleString()}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xs text-zinc-400 font-bold uppercase">Dist</div>
+                          <div className="text-lg font-bold text-emerald-400">{distance.toFixed(2)}km</div>
+                        </div>
+                    </div>
                   </div>
                </div>
             ) : (
