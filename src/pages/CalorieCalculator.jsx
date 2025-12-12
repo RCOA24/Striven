@@ -24,6 +24,7 @@ const CalorieCalculator = () => {
   const [aiError, setAiError] = useState('');
   const [lastPayload, setLastPayload] = useState(null);
   const [hasExistingProfile, setHasExistingProfile] = useState(false);
+  const [validationError, setValidationError] = useState('');
 
   // On mount, attempt to resume an existing saved plan
   useEffect(() => {
@@ -81,7 +82,12 @@ const CalorieCalculator = () => {
 
   const calculate = () => {
     const { gender, age, height, weight, activity, goal } = formData;
-    if (!age || !height || !weight) return;
+    if (!age || !height || !weight) {
+      setValidationError('Please complete age, height, and weight.');
+      setStep(1);
+      return;
+    }
+    setValidationError('');
 
     let bmr = (10 * parseFloat(weight)) + (6.25 * parseFloat(height)) - (5 * parseFloat(age));
     bmr += gender === 'male' ? 5 : -161;
@@ -193,6 +199,9 @@ Focus on: meal composition, hydration, and one habit to improve recovery. Avoid 
     setResult(null);
     setStep(1);
     setFormData({ gender: 'male', age: '', height: '', weight: '', activity: '1.2', goal: 'maintain' });
+    setHasExistingProfile(false);
+    setAiTips('');
+    setValidationError('');
   };
 
   // Activity Options Data
@@ -241,6 +250,12 @@ Focus on: meal composition, hydration, and one habit to improve recovery. Avoid 
               <h2 className="text-2xl font-bold font-apple mb-2">Tell us about yourself</h2>
               <p className="text-zinc-400 text-sm">We need this to calculate your metabolic rate.</p>
             </div>
+
+            {validationError && (
+              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-sm">
+                {validationError}
+              </div>
+            )}
 
             {hasExistingProfile && (
               <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 text-sm">
