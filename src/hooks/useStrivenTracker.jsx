@@ -224,8 +224,17 @@ const useStrivenTracker = () => {
     if (!navigator.geolocation) throw new Error('Geolocation API not supported');
     if (!window.isSecureContext) throw new Error('Geolocation requires HTTPS/localhost');
 
+    // For initial position, use lower accuracy for faster lock on desktop
+    // High accuracy on desktop takes too long (network-based fallback)
+    const isDesktop = !('ontouchstart' in window);
+    const initialAccuracy = isDesktop ? false : true;
+
     await new Promise((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(() => resolve(), (err) => reject(err), { enableHighAccuracy: true, timeout: 8000 });
+      navigator.geolocation.getCurrentPosition(() => resolve(), (err) => reject(err), { 
+        enableHighAccuracy: initialAccuracy, 
+        timeout: isDesktop ? 5000 : 8000,
+        maximumAge: 0
+      });
     });
 
     usingBrowserWatchRef.current = true;
@@ -235,8 +244,12 @@ const useStrivenTracker = () => {
         console.warn('Browser geolocation watch error:', err);
         setLocationError(err.message || 'Location error');
       },
-      // FIXED: Added maximumAge: 10000 to allow cached positions (faster lock)
-      { enableHighAccuracy: true, maximumAge: 10000, timeout: 30000 }
+      // Use balanced accuracy for continuous tracking (faster than high accuracy)
+      { 
+        enableHighAccuracy: false, 
+        maximumAge: 5000,  // Cache positions for 5 seconds
+        timeout: 10000     // Reduced from 30s for faster fallback
+      }
     );
   }, [handlePosition]);
 

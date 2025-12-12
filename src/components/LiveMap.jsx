@@ -125,6 +125,9 @@ const LiveMap = ({ route, currentLocation, readOnly = false, startName, endName,
         <>
           <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mb-2"></div>
           <span className="text-xs font-medium">Acquiring GPS...</span>
+          <span className="text-[10px] text-zinc-500 mt-2 max-w-[200px]">
+            Takes longer on desktop/laptop. Move outdoors for faster lock or allow browser location.
+          </span>
         </>
       )}
     </div>
