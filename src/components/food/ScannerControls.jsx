@@ -8,7 +8,9 @@ export const ScannerHeader = ({
   cameraEnabled, 
   hasTorch, 
   flashOn, 
-  imageCaptured 
+  imageCaptured,
+  aiMode,
+  onToggleAiMode,
 }) => (
   <div className="relative z-10 flex justify-between items-center p-4 safe-top pt-8">
     <div className="flex items-center space-x-2 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/5 shadow-lg">
@@ -17,6 +19,12 @@ export const ScannerHeader = ({
     </div>
     
     <div className="flex space-x-3">
+      <div className="flex flex-col items-end">
+        <button onClick={onToggleAiMode} className="icon-btn">
+          <span className="text-[10px] font-bold">{aiMode === 'gemini' ? 'FAST' : 'HYBRID'}</span>
+        </button>
+        <span className="text-[9px] text-zinc-400 mt-1">{aiMode === 'gemini' ? 'Best with clear lighting' : 'Thorough analysis'}</span>
+      </div>
       <button onClick={onOpenCalculator} className="icon-btn">
         <Calculator className="w-5 h-5" />
       </button>

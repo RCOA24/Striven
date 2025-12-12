@@ -55,6 +55,27 @@ async function processImageForAI(imageBlob) {
 // ==========================================
 // 1. HELPER: OPEN FOOD FACTS (Fallback Database)
 // ==========================================
+// Generic fetch with retry and exponential backoff for quota friendliness
+async function fetchWithRetry(url, options = {}, cfg = {}) {
+  const {
+    retries = 3,
+    backoffBase = 300, // ms
+    backoffMax = 2000, // ms
+    retryOn = [429, 503],
+  } = cfg;
+
+  let attempt = 0;
+  while (true) {
+    const res = await fetch(url, options);
+    if (!retryOn.includes(res.status) || attempt >= retries) {
+      return res;
+    }
+    // Exponential backoff with jitter
+    const delay = Math.min(backoffMax, backoffBase * Math.pow(2, attempt)) + Math.floor(Math.random() * 100);
+    await new Promise(r => setTimeout(r, delay));
+    attempt += 1;
+  }
+}
 async function fetchNutritionFromOFF(searchTerm, displayName, onStatus) {
   try {
     if (onStatus) onStatus(`Searching database for "${displayName}"...`);
@@ -66,7 +87,8 @@ async function fetchNutritionFromOFF(searchTerm, displayName, onStatus) {
     // Try exact search first
     let url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(cleanQuery)}&search_simple=1&action=process&json=1&page_size=5&fields=${fields}&sort_by=popularity`;
 
-    let res = await fetch(url);
+    await rateLimiter.wait();
+    let res = await fetchWithRetry(url, undefined, { retries: 2, backoffBase: 300 });
     let data = await res.json();
 
     // If no results, try a looser search (splitting words)
@@ -74,7 +96,8 @@ async function fetchNutritionFromOFF(searchTerm, displayName, onStatus) {
       const firstWord = cleanQuery.split(' ')[0];
       if (firstWord && firstWord.length > 3) {
         url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(firstWord)}&search_simple=1&action=process&json=1&page_size=5&fields=${fields}&sort_by=popularity`;
-        res = await fetch(url);
+        await rateLimiter.wait();
+        res = await fetchWithRetry(url, undefined, { retries: 2, backoffBase: 300 });
         data = await res.json();
       }
     }
@@ -138,7 +161,7 @@ async function analyzeWithGemini(imageBlob, onStatus) {
     
     Also include a brief paragraph field named "summary" explaining the meal in natural language for the user (e.g., describing a silog combination: rice + egg + meat), and highlight sodium and hidden fats if relevant.
     
-    Return ONLY a raw JSON object (no markdown).
+    Return ONLY a raw JSON object (no markdown). Do NOT include any explanatory text, code fences, or additional commentary.
     
     If NOT food: {"is_food": false}
     
@@ -161,8 +184,9 @@ async function analyzeWithGemini(imageBlob, onStatus) {
     }
   `;
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+  await rateLimiter.wait();
+  const response = await fetchWithRetry(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -182,15 +206,31 @@ async function analyzeWithGemini(imageBlob, onStatus) {
   if (onStatus) onStatus("Parsing AI results...");
 
   const data = await response.json();
-  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-  
-  // Clean markdown code blocks if Gemini adds them (```json ... ```)
-  const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-  
-  const jsonMatch = cleanJson.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error("Invalid JSON from Gemini");
-  
-  const result = JSON.parse(jsonMatch[0]);
+  // Try multiple candidates for robustness
+  const parts = data.candidates?.flatMap(c => c.content?.parts || []) || [];
+  let rawText = "";
+  for (const p of parts) {
+    if (p.text && p.text.includes('{')) { rawText = p.text; break; }
+  }
+  if (!rawText && parts[0]?.text) rawText = parts[0].text;
+
+  // Clean markdown/code fences and extract JSON block or array
+  const clean = (rawText || "").replace(/```json|```/g, '').trim();
+  let jsonStr = null;
+  const objMatch = clean.match(/\{[\s\S]*\}/);
+  const arrMatch = clean.match(/\[[\s\S]*\]/);
+  if (objMatch) jsonStr = objMatch[0];
+  else if (arrMatch) jsonStr = arrMatch[0];
+  else throw new Error("Invalid JSON from Gemini");
+
+  let result;
+  try {
+    result = JSON.parse(jsonStr);
+  } catch (e) {
+    // Attempt to fix trailing commas or invalid quotes
+    const fixed = jsonStr.replace(/,\s*([}\]])/g, '$1');
+    result = JSON.parse(fixed);
+  }
   
   if (!result.is_food) throw new Error("Gemini could not identify food");
   
@@ -211,6 +251,8 @@ async function analyzeWithGemini(imageBlob, onStatus) {
         item.verified = false;
         item.source = 'Gemini (unverified)';
       }
+      // Small pacing delay between DB calls (quota friendly)
+      await new Promise(r => setTimeout(r, 200));
     }
   }
   
@@ -230,11 +272,12 @@ async function detectFoodItems(imageBlob, onStatus) {
   const MODEL = "keremberke/yolov8m-food-detection";
   const apiUrl = `https://router.huggingface.co/hf-inference/models/${MODEL}`;
 
-  const response = await fetch(apiUrl, {
+  await rateLimiter.wait();
+  const response = await fetchWithRetry(apiUrl, {
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "image/jpeg" },
     method: "POST",
     body: processedBlob,
-  });
+  }, { retries: 2, backoffBase: 300 });
 
   if (response.status === 503) {
     if (onStatus) onStatus("Model warming up...");
@@ -248,7 +291,7 @@ async function detectFoodItems(imageBlob, onStatus) {
   if (!Array.isArray(detections)) throw new Error("YOLO detection failed");
 
   return detections
-    .filter(det => (det.score || 0) >= 0.2)
+    .filter(det => (det.score || 0) >= 0.3)
     .map(det => ({
       label: det.label ? det.label.replace(/_/g, ' ') : 'Food item',
       score: det.score || 0,
@@ -269,11 +312,12 @@ async function analyzeWithHuggingFace(imageBlob, onStatus) {
   const MODEL = "nateraw/food"; 
   const apiUrl = `https://router.huggingface.co/hf-inference/models/${MODEL}`;
 
-  const response = await fetch(apiUrl, {
+  await rateLimiter.wait();
+  const response = await fetchWithRetry(apiUrl, {
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "image/jpeg" },
     method: "POST",
     body: processedBlob,
-  });
+  }, { retries: 2, backoffBase: 300 });
 
   if (response.status === 503) {
     if (onStatus) onStatus("Model warming up...");
@@ -324,8 +368,8 @@ function aggregateItems(items) {
 // ==========================================
 // 4. MAIN EXPORT
 // ==========================================
-export async function analyzeFood(imageBlob, onStatus) {
-  const mode = (import.meta.env.VITE_FOOD_AI_MODE || 'hybrid').toLowerCase();
+export async function analyzeFood(imageBlob, onStatus, modeOverride) {
+  const mode = (modeOverride || import.meta.env.VITE_FOOD_AI_MODE || 'hybrid').toLowerCase();
   try {
     // Attempt 0: Gemini with Filipino nutritionist expertise (Multi-Item + Dual-Naming)
     if (onStatus) onStatus("Analyzing with Filipino Nutritionist AI...");
@@ -349,9 +393,41 @@ export async function analyzeFood(imageBlob, onStatus) {
     console.warn('Gemini Filipino analysis failed, trying detection fallback...', geminiError);
   }
 
-  // If configured to use Gemini only, short-circuit here
+  // If configured to use Gemini only but items missing, attempt YOLO to avoid generic fallback
   if (mode === 'gemini') {
-    throw new Error('Gemini could not confidently identify multiple items. Try a clearer photo.');
+    try {
+      const detections = await detectFoodItems(imageBlob, onStatus);
+      if (detections.length > 0) {
+        const items = [];
+        for (const det of detections) {
+          const nutrition = await fetchNutritionFromOFF(det.label, det.label, onStatus);
+          items.push({
+            display_name: det.label || 'Food item',
+            search_term: det.label || 'Food item',
+            calories: nutrition?.calories || 0,
+            protein: nutrition?.protein || 0,
+            carbs: nutrition?.carbs || 0,
+            fat: nutrition?.fat || 0,
+            sugar: nutrition?.sugar || 0,
+            fiber: nutrition?.fiber || 0,
+            sodium: nutrition?.sodium || 0,
+            confidence: det.score || 0,
+            verified: !!nutrition,
+            source: 'YOLO Detection + OpenFoodFacts'
+          });
+        }
+        return {
+          name: items.map(i => i.display_name).join(', '),
+          items,
+          totals: aggregateItems(items),
+          summary: undefined,
+          confidence: items.reduce((s, i) => s + (i.confidence || 0), 0) / items.length,
+          isUnknown: items.some(i => !i.verified),
+          source: 'YOLO Detection + OpenFoodFacts'
+        };
+      }
+    } catch {}
+    throw new Error('Could not identify food clearly. Try a clearer photo or better lighting.');
   }
 
   try {
@@ -429,3 +505,26 @@ export async function analyzeFood(imageBlob, onStatus) {
     throw new Error('Could not identify food. Try a clearer angle or better lighting.');
   }
 }
+
+// Simple rate limiter: max N requests per second
+const rateLimiter = (() => {
+  const windowMs = 1000;
+  const maxPerWindow = 4;
+  let timestamps = [];
+  return {
+    async wait() {
+      const now = Date.now();
+      // Drop old timestamps
+      timestamps = timestamps.filter(t => now - t < windowMs);
+      if (timestamps.length < maxPerWindow) {
+        timestamps.push(now);
+        return;
+      }
+      const earliest = timestamps[0];
+      const waitMs = windowMs - (now - earliest);
+      await new Promise(r => setTimeout(r, Math.max(50, waitMs)));
+      // After wait, record
+      timestamps.push(Date.now());
+    }
+  };
+})();

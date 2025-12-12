@@ -37,6 +37,17 @@ const FoodScanner = () => {
   const [showHistory, setShowHistory] = useState(false);
   const [error, setError] = useState(null);
   const [shutterEffect, setShutterEffect] = useState(false);
+  // AI Mode Toggle
+  const [aiMode, setAiMode] = useState(() => {
+    const saved = localStorage.getItem('foodAiMode');
+    return saved || (import.meta.env.VITE_FOOD_AI_MODE || 'hybrid');
+  });
+  const toggleAiMode = useCallback(() => {
+    const next = aiMode === 'gemini' ? 'hybrid' : 'gemini';
+    setAiMode(next);
+    localStorage.setItem('foodAiMode', next);
+    showNotification({ title: 'AI Mode', message: `Switched to ${next.toUpperCase()}`, type: 'info' });
+  }, [aiMode, showNotification]);
   
   // Nutrition State
   const [nutritionGoal, setNutritionGoal] = useState(null);
@@ -285,7 +296,7 @@ const FoodScanner = () => {
         // Direct pass to API - API handles resizing/compression
         const aiResult = await analyzeFood(file, (status) => {
             setStatusText(status); 
-        });
+        }, aiMode);
 
         setResult(aiResult);
         if (!aiResult.isUnknown) {
@@ -342,7 +353,7 @@ const FoodScanner = () => {
         try {
             const aiResult = await analyzeFood(blob, (status) => {
                 setStatusText(status); 
-            });
+            }, aiMode);
 
             setResult(aiResult);
             if (!aiResult.isUnknown) {
@@ -448,6 +459,8 @@ const FoodScanner = () => {
           hasTorch={hasTorch}
           flashOn={flashOn}
           imageCaptured={imageCaptured}
+          aiMode={aiMode}
+          onToggleAiMode={toggleAiMode}
         />
       )}
 

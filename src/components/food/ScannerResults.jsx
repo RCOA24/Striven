@@ -56,6 +56,11 @@ const ScannerResults = ({ result, onReset }) => {
                 <p className="text-[12px] text-zinc-300 leading-relaxed">{result.summary}</p>
               </div>
             )}
+            {((result.confidence || 0) < 0.6 || result.isUnknown) && (
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-3 mb-3">
+                <p className="text-[11px] text-yellow-200">Tip: Try another angle with better lighting, keep items separated, and avoid reflections for higher accuracy.</p>
+              </div>
+            )}
             <div className="grid grid-cols-4 gap-3 mb-4">
               <NutrientBox label="Kcal" value={Math.round(totals.calories || 0)} color="text-white" bg="bg-white/10" />
               <NutrientBox label="Prot" value={`${Math.round(totals.protein || 0)}g`} color="text-blue-400" bg="bg-blue-500/10" />
