@@ -215,24 +215,22 @@ async function analyzeWithGemini(imageBlob, onStatus) {
 }
 
 // ==========================================
-// 3. FALLBACK: HUGGING FACE
+// 3. DETECTION: YOLO FOOD DETECTOR (keremberke/yolov8m-food-detection)
 // ==========================================
-async function analyzeWithHuggingFace(imageBlob, onStatus) {
+async function detectFoodItems(imageBlob, onStatus) {
   const apiKey = import.meta.env.VITE_HUGGINGFACE_API_KEY;
   if (!apiKey) throw new Error("Missing HF API Key");
 
-  if (onStatus) onStatus("Connecting to Vision Model...");
+  if (onStatus) onStatus("Scanning for individual items...");
 
-  // Use processed image here too
   const processedBlob = await processImageForAI(imageBlob);
-
-  const MODEL = "nateraw/food"; 
+  const MODEL = "keremberke/yolov8m-food-detection";
   const apiUrl = `https://router.huggingface.co/hf-inference/models/${MODEL}`;
 
   const response = await fetch(apiUrl, {
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "image/jpeg" },
     method: "POST",
-    body: processedBlob, 
+    body: processedBlob,
   });
 
   if (response.status === 503) {
@@ -240,7 +238,46 @@ async function analyzeWithHuggingFace(imageBlob, onStatus) {
     const errorData = await response.json();
     const waitTime = errorData.estimated_time || 2;
     await new Promise(r => setTimeout(r, waitTime * 1000));
-    return analyzeWithHuggingFace(imageBlob, onStatus); 
+    return detectFoodItems(imageBlob, onStatus);
+  }
+
+  const detections = await response.json();
+  if (!Array.isArray(detections)) throw new Error("YOLO detection failed");
+
+  return detections
+    .filter(det => (det.score || 0) >= 0.2)
+    .map(det => ({
+      label: det.label ? det.label.replace(/_/g, ' ') : 'Food item',
+      score: det.score || 0,
+      box: det.box || null,
+    }));
+}
+
+// ==========================================
+// 4. FALLBACK: HUGGING FACE (Classifier)
+// ==========================================
+async function analyzeWithHuggingFace(imageBlob, onStatus) {
+  const apiKey = import.meta.env.VITE_HUGGINGFACE_API_KEY;
+  if (!apiKey) throw new Error("Missing HF API Key");
+
+  if (onStatus) onStatus("Connecting to Vision Model...");
+
+  const processedBlob = await processImageForAI(imageBlob);
+  const MODEL = "nateraw/food"; 
+  const apiUrl = `https://router.huggingface.co/hf-inference/models/${MODEL}`;
+
+  const response = await fetch(apiUrl, {
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "image/jpeg" },
+    method: "POST",
+    body: processedBlob,
+  });
+
+  if (response.status === 503) {
+    if (onStatus) onStatus("Model warming up...");
+    const errorData = await response.json();
+    const waitTime = errorData.estimated_time || 2;
+    await new Promise(r => setTimeout(r, waitTime * 1000));
+    return analyzeWithHuggingFace(imageBlob, onStatus);
   }
 
   const result = await response.json();
@@ -251,14 +288,13 @@ async function analyzeWithHuggingFace(imageBlob, onStatus) {
     // Increased threshold slightly for quality
     if (top.score < 0.20) throw new Error("HF Confidence Low");
 
-    const nutrition = await fetchNutritionFromOFF(top.label, onStatus);
+    const nutrition = await fetchNutritionFromOFF(top.label, top.label, onStatus);
     const readableName = top.label.replace(/_/g, ' ');
 
     if (nutrition && nutrition.calories > 0) {
       return { ...nutrition, confidence: top.score, isUnknown: false };
     }
     
-    // If OFF fails, return basic info so user can manually edit
     return { name: readableName, calories: 0, protein: 0, carbs: 0, fat: 0, confidence: top.score, isUnknown: true };
   }
   
@@ -266,7 +302,7 @@ async function analyzeWithHuggingFace(imageBlob, onStatus) {
 }
 
 // ==========================================
-// 3.1 AGGREGATION HELPERS
+// 4.1 AGGREGATION HELPERS
 // ==========================================
 function aggregateItems(items) {
   const totals = items.reduce((acc, item) => {
