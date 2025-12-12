@@ -44,6 +44,24 @@ const FoodScanner = () => {
   const [waterIntake, setWaterIntake] = useState(0); // NEW
   const [waterTarget, setWaterTarget] = useState(2500); // NEW
 
+  const toLogPayload = (aiResult) => {
+    const totals = aiResult?.totals || {};
+    const name = aiResult?.items?.length > 1
+      ? `Meal: ${aiResult.items.map(i => i.name).join(', ')}`
+      : aiResult?.name || 'Food';
+
+    return {
+      name,
+      calories: totals.calories ?? aiResult.calories ?? 0,
+      protein: totals.protein ?? aiResult.protein ?? 0,
+      carbs: totals.carbs ?? aiResult.carbs ?? 0,
+      fat: totals.fat ?? aiResult.fat ?? 0,
+      sugar: totals.sugar ?? aiResult.sugar ?? 0,
+      fiber: totals.fiber ?? aiResult.fiber ?? 0,
+      sodium: totals.sodium ?? aiResult.sodium ?? 0,
+    };
+  };
+
   // --- 0. Request Camera Permissions (Android 6+) ---
   const requestCameraPermissions = useCallback(async () => {
     try {
@@ -271,13 +289,15 @@ const FoodScanner = () => {
 
         setResult(aiResult);
         if (!aiResult.isUnknown) {
-            await saveFoodLog(aiResult);
-            await loadHistory();
-            showNotification({
-                type: 'success',
-                title: 'Food Logged',
-                message: `${aiResult.name} added to your history.`
-            });
+          const logPayload = toLogPayload(aiResult);
+          await saveFoodLog(logPayload);
+          await loadHistory();
+          const count = aiResult.items?.length || 1;
+          showNotification({
+            type: 'success',
+            title: 'Food Logged',
+            message: `${count > 1 ? `${count} items` : logPayload.name} added to your history.`
+          });
         }
     } catch (err) {
         console.error(err);
@@ -326,13 +346,15 @@ const FoodScanner = () => {
 
             setResult(aiResult);
             if (!aiResult.isUnknown) {
-                await saveFoodLog(aiResult);
-                await loadHistory();
-                showNotification({
-                    type: 'success',
-                    title: 'Food Logged',
-                    message: `${aiResult.name} added to your history.`
-                });
+              const logPayload = toLogPayload(aiResult);
+              await saveFoodLog(logPayload);
+              await loadHistory();
+              const count = aiResult.items?.length || 1;
+              showNotification({
+                type: 'success',
+                title: 'Food Logged',
+                message: `${count > 1 ? `${count} items` : logPayload.name} added to your history.`
+              });
             }
         } catch (err) {
             console.error(err);

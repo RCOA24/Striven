@@ -55,12 +55,12 @@ async function processImageForAI(imageBlob) {
 // ==========================================
 // 1. HELPER: OPEN FOOD FACTS (Fallback Database)
 // ==========================================
-async function fetchNutritionFromOFF(query, onStatus) {
+async function fetchNutritionFromOFF(searchTerm, displayName, onStatus) {
   try {
-    if (onStatus) onStatus(`Searching database for "${query}"...`);
+    if (onStatus) onStatus(`Searching database for "${displayName}"...`);
     
     // Clean query more aggressively
-    const cleanQuery = query.replace(/_/g, ' ').replace(/[^\w\s]/gi, '').trim().toLowerCase();
+    const cleanQuery = searchTerm.replace(/_/g, ' ').replace(/[^\w\s]/gi, '').trim().toLowerCase();
     const fields = "product_name,nutriments";
     
     // Try exact search first
@@ -87,11 +87,13 @@ async function fetchNutritionFromOFF(query, onStatus) {
     ) || data.products[0];
 
     return {
-      name: cleanQuery, // Keep the AI's detected name for display
+      display_name: displayName,
+      search_term: searchTerm,
       calories: Math.round(product.nutriments?.['energy-kcal_100g'] || product.nutriments?.energy_value || 0),
       protein: Math.round(product.nutriments?.proteins_100g || 0),
       carbs: Math.round(product.nutriments?.carbohydrates_100g || 0),
       fat: Math.round(product.nutriments?.fat_100g || 0),
+      verified: true
     };
   } catch (e) {
     console.warn("OFF API Error:", e);
@@ -119,29 +121,40 @@ async function analyzeWithGemini(imageBlob, onStatus) {
     reader.readAsDataURL(processedBlob);
   });
 
-  // 2. Improved Prompt Engineering
+  // 2. Filipino Nutritionist Expert Prompt (Dual-Naming Strategy)
   const promptText = `
-    Analyze this food image professionally. 
-    1. Identify the dish based on visual texture, ingredients, and plating.
-    2. Context: Prioritize Filipino/Asian cuisine if applicable.
-    3. Estimation: Estimate nutritional values for ONE standard serving size (e.g., 1 cup or 1 bowl).
+    You are a Filipino Nutritionist AI Expert specializing in both Filipino and global cuisine.
     
-    Return ONLY a raw JSON object (no markdown formatting).
+    ANALYZE this food image and identify EACH DISTINCT ITEM visible. Pay special attention to:
+    - Filipino dishes: Distinguish cultural specifics (e.g., "Chicken Joy" vs generic "Fried Chicken", "Sinigang" vs generic "Meat Stew")
+    - Rice & Sauce: Filipino meals often combine white rice + sauce-heavy dishes (adobo, sinigang, etc.). Detect rice separately!
+    - Hidden calories: Cooking oil/butter in sauces, coconut milk, fried preparations
     
-    If it is NOT food, return: {"isUnknown": true}
+    For EACH food item detected, return:
+    - display_name: The culturally-specific or local name (e.g., "Tortang Talong", "Lumpia", "Tokwa't Baboy")
+    - search_term: The English/generic equivalent for database lookup (e.g., "Eggplant Omelet", "Spring Roll", "Fried Tofu and Pork")
+    - portion_desc: e.g., "1 plate (200g rice)", "1 serving"
+    - calories, protein, carbs, fat: For ONE serving of this item
     
-    If it IS food, return:
-    { 
-      "name": "Food Name (e.g. Sinigang na Baboy)", 
-      "calories": 0, 
-      "protein": 0, 
-      "carbs": 0, 
-      "fat": 0, 
-      "sugar": 0,
-      "fiber": 0,
-      "sodium": 0,
-      "confidence": 0.95, 
-      "isUnknown": false 
+    Return ONLY a raw JSON object (no markdown).
+    
+    If NOT food: {"is_food": false}
+    
+    If IS food:
+    {
+      "is_food": true,
+      "items": [
+        {
+          "display_name": "Food Name (e.g. Sinigang na Baboy)",
+          "search_term": "English/generic equivalent (e.g. Pork Stew)",
+          "portion_desc": "1 bowl (300g)",
+          "calories": 250,
+          "protein": 20,
+          "carbs": 15,
+          "fat": 12,
+          "confidence": 0.9
+        }
+      ]
     }
   `;
 
@@ -176,9 +189,29 @@ async function analyzeWithGemini(imageBlob, onStatus) {
   
   const result = JSON.parse(jsonMatch[0]);
   
-  if (result.isUnknown) throw new Error("Gemini could not identify food");
+  if (!result.is_food) throw new Error("Gemini could not identify food");
   
-  return { ...result, confidence: 0.98 }; 
+  // Verify each item against OFF database using search_term (Dual-Naming Strategy)
+  if (result.items && Array.isArray(result.items)) {
+    for (let item of result.items) {
+      const dbNutrition = await fetchNutritionFromOFF(item.search_term, item.display_name, onStatus);
+      if (dbNutrition) {
+        // Use database values for accuracy
+        item.calories = dbNutrition.calories;
+        item.protein = dbNutrition.protein;
+        item.carbs = dbNutrition.carbs;
+        item.fat = dbNutrition.fat;
+        item.verified = true;
+        item.source = 'Gemini + OpenFoodFacts';
+      } else {
+        // Keep Gemini's estimate if DB lookup fails
+        item.verified = false;
+        item.source = 'Gemini (unverified)';
+      }
+    }
+  }
+  
+  return result; 
 }
 
 // ==========================================
@@ -233,24 +266,119 @@ async function analyzeWithHuggingFace(imageBlob, onStatus) {
 }
 
 // ==========================================
+// 3.1 AGGREGATION HELPERS
+// ==========================================
+function aggregateItems(items) {
+  const totals = items.reduce((acc, item) => {
+    acc.calories += item.calories || 0;
+    acc.protein += item.protein || 0;
+    acc.carbs += item.carbs || 0;
+    acc.fat += item.fat || 0;
+    acc.sugar += item.sugar || 0;
+    acc.fiber += item.fiber || 0;
+    acc.sodium += item.sodium || 0;
+    return acc;
+  }, { calories: 0, protein: 0, carbs: 0, fat: 0, sugar: 0, fiber: 0, sodium: 0 });
+  return totals;
+}
+
+// ==========================================
 // 4. MAIN EXPORT
 // ==========================================
 export async function analyzeFood(imageBlob, onStatus) {
   try {
-    // Attempt 1: Gemini (Best Quality)
-    return await analyzeWithGemini(imageBlob, onStatus);
-  } catch (geminiError) {
-    console.warn("Gemini failed, switching to Hugging Face...", geminiError);
+    // Attempt 0: Gemini with Filipino nutritionist expertise (Multi-Item + Dual-Naming)
+    if (onStatus) onStatus("Analyzing with Filipino Nutritionist AI...");
+    const geminiResult = await analyzeWithGemini(imageBlob, onStatus);
     
-    if (onStatus) onStatus("Gemini unsure. Trying backup AI...");
-    
-    try {
-      // Attempt 2: Hugging Face + OpenFoodFacts
-      return await analyzeWithHuggingFace(imageBlob, onStatus);
-    } catch (hfError) {
-      console.error("All AI models failed");
-      // Return a gentle error state instead of crashing
-      throw new Error("Could not identify food. Try getting closer or better lighting.");
+    if (geminiResult.is_food && geminiResult.items && geminiResult.items.length > 0) {
+      const totals = aggregateItems(geminiResult.items);
+      const avgConfidence = geminiResult.items.reduce((s, i) => s + (i.confidence || 0), 0) / geminiResult.items.length;
+
+      return {
+        name: geminiResult.items.map(i => i.display_name).join(', '),
+        items: geminiResult.items,
+        totals,
+        confidence: avgConfidence || 0.9,
+        isUnknown: geminiResult.items.some(i => !i.verified),
+        source: 'Gemini (Filipino Expert) + OpenFoodFacts'
+      };
     }
+  } catch (geminiError) {
+    console.warn('Gemini Filipino analysis failed, trying detection fallback...', geminiError);
+  }
+
+  try {
+    // Attempt 1: Detection-first pipeline (YOLO + OFF)
+    const detections = await detectFoodItems(imageBlob, onStatus);
+
+    if (detections.length > 0) {
+      if (onStatus) onStatus(`Detected ${detections.length} item${detections.length > 1 ? 's' : ''}. Classifying...`);
+
+      const items = [];
+      for (const det of detections) {
+        const nutrition = await fetchNutritionFromOFF(det.label, det.label, onStatus);
+
+        items.push({
+          display_name: det.label || 'Food item',
+          search_term: det.label || 'Food item',
+          calories: nutrition?.calories || 0,
+          protein: nutrition?.protein || 0,
+          carbs: nutrition?.carbs || 0,
+          fat: nutrition?.fat || 0,
+          sugar: nutrition?.sugar || 0,
+          fiber: nutrition?.fiber || 0,
+          sodium: nutrition?.sodium || 0,
+          confidence: det.score || 0,
+          verified: !!nutrition,
+          source: 'YOLO Detection + OpenFoodFacts'
+        });
+      }
+
+      const totals = aggregateItems(items);
+      const avgConfidence = items.reduce((s, i) => s + (i.confidence || 0), 0) / items.length;
+
+      return {
+        name: items.map(i => i.display_name).join(', '),
+        items,
+        totals,
+        confidence: avgConfidence || 0.85,
+        isUnknown: items.some(i => !i.verified),
+        source: 'YOLO Detection + OpenFoodFacts'
+      };
+    }
+  } catch (detectionError) {
+    console.warn('Detection pipeline failed, trying HF fallback...', detectionError);
+  }
+
+  try {
+    // Attempt 2: HF generic classifier fallback
+    if (onStatus) onStatus('Using backup vision model...');
+    const single = await analyzeWithHuggingFace(imageBlob, onStatus);
+    
+    // Wrap HF result in items array structure
+    const item = {
+      display_name: single.name || 'Food',
+      search_term: single.name || 'Food',
+      calories: single.calories || 0,
+      protein: single.protein || 0,
+      carbs: single.carbs || 0,
+      fat: single.fat || 0,
+      confidence: single.confidence || 0,
+      verified: !!single.calories,
+      source: 'HF Classifier + OFF'
+    };
+    
+    return {
+      name: item.display_name,
+      items: [item],
+      totals: aggregateItems([item]),
+      confidence: item.confidence || 0.7,
+      isUnknown: !item.verified,
+      source: 'HF Classifier + OFF'
+    };
+  } catch (hfError) {
+    console.error('All AI models failed');
+    throw new Error('Could not identify food. Try a clearer angle or better lighting.');
   }
 }
