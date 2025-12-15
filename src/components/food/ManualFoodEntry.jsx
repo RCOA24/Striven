@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Search, Loader2, Plus, Edit3 } from 'lucide-react';
 import { fetchNutritionFromOFF } from '../../utils/foodApi';
 
@@ -8,6 +8,9 @@ const ManualFoodEntry = ({ isOpen, onClose, onSave }) => {
   const [searchResults, setSearchResults] = useState([]);
   const [selectedFood, setSelectedFood] = useState(null);
   const [manualMode, setManualMode] = useState(false);
+  const abortControllerRef = React.useRef(null);
+  const [servingSize, setServingSize] = useState(100); // Default 100g
+  const [hasSearched, setHasSearched] = useState(false); // Track if search was performed
   
   // Form state for manual entry
   const [formData, setFormData] = useState({
@@ -21,32 +24,79 @@ const ManualFoodEntry = ({ isOpen, onClose, onSave }) => {
     sodium: ''
   });
 
+  // Cleanup on modal close
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  // Auto-search with debounce
+  useEffect(() => {
+    if (!isOpen || !searchQuery.trim() || manualMode || selectedFood) {
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      handleSearch();
+    }, 300); // Wait 300ms after user stops typing - faster feedback
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, manualMode, selectedFood, isOpen]);
+
   if (!isOpen) return null;
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
     
+    // Cancel previous request if still pending
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    // Create new abort controller for this search
+    abortControllerRef.current = new AbortController();
+    const currentQuery = searchQuery; // Capture current query to check for race conditions
+    
     setSearching(true);
     setSearchResults([]);
     setSelectedFood(null);
+    setHasSearched(true);
     
     try {
-      const result = await fetchNutritionFromOFF(searchQuery, searchQuery, null);
-      if (result) {
-        setSearchResults([result]);
-      } else {
-        setSearchResults([]);
+      const result = await fetchNutritionFromOFF(currentQuery, currentQuery, null);
+      
+      // Only update results if this is still the current query (prevent race conditions)
+      if (currentQuery === searchQuery && !abortControllerRef.current.signal.aborted) {
+        if (result) {
+          setSearchResults([result]);
+        } else {
+          setSearchResults([]);
+        }
       }
     } catch (error) {
-      console.error('Search failed:', error);
-      setSearchResults([]);
+      // Ignore abort errors (user typed again before this search completed)
+      if (error.name !== 'AbortError') {
+        console.error('Search failed:', error);
+      }
+      // Only clear results if still current query
+      if (currentQuery === searchQuery && !abortControllerRef.current.signal.aborted) {
+        setSearchResults([]);
+      }
     } finally {
-      setSearching(false);
+      // Only update searching state if this is still the current query
+      if (currentQuery === searchQuery && !abortControllerRef.current.signal.aborted) {
+        setSearching(false);
+      }
     }
   };
 
   const handleSelectFood = (food) => {
     setSelectedFood(food);
+    setServingSize(100); // Reset to 100g
+    // Store base values (per 100g)
     setFormData({
       name: food.name || food.display_name || '',
       calories: food.calories || '',
@@ -84,15 +134,18 @@ const ManualFoodEntry = ({ isOpen, onClose, onSave }) => {
       return;
     }
 
+    // Calculate final values based on serving size
+    const multiplier = selectedFood?.per100g ? servingSize / 100 : 1;
+
     const foodData = {
       name: formData.name.trim(),
-      calories: parseFloat(formData.calories) || 0,
-      protein: parseFloat(formData.protein) || 0,
-      carbs: parseFloat(formData.carbs) || 0,
-      fat: parseFloat(formData.fat) || 0,
-      sugar: parseFloat(formData.sugar) || 0,
-      fiber: parseFloat(formData.fiber) || 0,
-      sodium: parseFloat(formData.sodium) || 0,
+      calories: Math.round((parseFloat(formData.calories) || 0) * multiplier),
+      protein: Math.round((parseFloat(formData.protein) || 0) * multiplier),
+      carbs: Math.round((parseFloat(formData.carbs) || 0) * multiplier),
+      fat: Math.round((parseFloat(formData.fat) || 0) * multiplier),
+      sugar: Math.round((parseFloat(formData.sugar) || 0) * multiplier),
+      fiber: Math.round((parseFloat(formData.fiber) || 0) * multiplier),
+      sodium: Math.round((parseFloat(formData.sodium) || 0) * multiplier),
       confidence: 1.0,
       verified: true
     };
@@ -106,6 +159,8 @@ const ManualFoodEntry = ({ isOpen, onClose, onSave }) => {
     setSearchResults([]);
     setSelectedFood(null);
     setManualMode(false);
+    setServingSize(100);
+    setHasSearched(false); // Reset search state
     setFormData({
       name: '',
       calories: '',
@@ -143,11 +198,19 @@ const ManualFoodEntry = ({ isOpen, onClose, onSave }) => {
                   <input
                     type="text"
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setHasSearched(false); // Reset when user types
+                    }}
                     onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                     placeholder="Search food database..."
                     className="w-full pl-10 pr-4 py-3 bg-zinc-800 border border-white/10 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 transition-colors"
                   />
+                  {searching && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <Loader2 className="w-4 h-4 text-emerald-500 animate-spin" />
+                    </div>
+                  )}
                 </div>
                 <button
                   onClick={handleSearch}
@@ -161,6 +224,7 @@ const ManualFoodEntry = ({ isOpen, onClose, onSave }) => {
               {/* Search Results */}
               {searchResults.length > 0 && (
                 <div className="space-y-2">
+                  <p className="text-xs text-zinc-500 font-medium uppercase tracking-wider">Nutrition per 100g</p>
                   {searchResults.map((food, idx) => (
                     <div
                       key={idx}
@@ -179,7 +243,18 @@ const ManualFoodEntry = ({ isOpen, onClose, onSave }) => {
                 </div>
               )}
 
-              {searchResults.length === 0 && searchQuery && !searching && (
+              {/* Searching State */}
+              {searching && (
+                <div className="flex items-center justify-center py-8 text-center">
+                  <div className="space-y-3">
+                    <Loader2 className="w-8 h-8 text-emerald-500 animate-spin mx-auto" />
+                    <p className="text-sm text-zinc-300 font-medium">Searching...</p>
+                    <p className="text-xs text-zinc-500">Please wait</p>
+                  </div>
+                </div>
+              )}
+
+              {hasSearched && searchResults.length === 0 && !searching && (
                 <div className="text-center py-6 text-zinc-500">
                   <p className="mb-3">No results found</p>
                   <button
@@ -242,8 +317,52 @@ const ManualFoodEntry = ({ isOpen, onClose, onSave }) => {
                 />
               </div>
 
-              {/* Macros Grid */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* Serving Size - Only show if from database */}
+              {selectedFood?.per100g && (
+                <div>
+                  <label className="block text-xs text-zinc-400 mb-2 font-medium">Serving Size (grams) *</label>
+                  <input
+                    type="number"
+                    value={servingSize}
+                    onChange={(e) => setServingSize(parseFloat(e.target.value) || 100)}
+                    placeholder="100"
+                    className="w-full px-4 py-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 transition-colors"
+                  />
+                  <p className="text-[10px] text-zinc-500 mt-1">Nutrition values below are per 100g. Adjust serving size to scale automatically.</p>
+                </div>
+              )}
+
+              {/* Calculated Macros Display - Show scaled values */}
+              {selectedFood?.per100g && (
+                <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4">
+                  <p className="text-xs text-emerald-400 font-bold mb-2 uppercase tracking-wider">Calculated for {servingSize}g</p>
+                  <div className="grid grid-cols-4 gap-3 text-center">
+                    <div>
+                      <div className="text-lg font-bold text-white">{Math.round((parseFloat(formData.calories) || 0) * servingSize / 100)}</div>
+                      <div className="text-[10px] text-zinc-400 uppercase">kcal</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold text-blue-400">{Math.round((parseFloat(formData.protein) || 0) * servingSize / 100)}g</div>
+                      <div className="text-[10px] text-zinc-400 uppercase">protein</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold text-yellow-400">{Math.round((parseFloat(formData.carbs) || 0) * servingSize / 100)}g</div>
+                      <div className="text-[10px] text-zinc-400 uppercase">carbs</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold text-rose-400">{Math.round((parseFloat(formData.fat) || 0) * servingSize / 100)}g</div>
+                      <div className="text-[10px] text-zinc-400 uppercase">fat</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Base Macros Grid - Show as "per 100g" if from database */}
+              <div>
+                {selectedFood?.per100g && (
+                  <p className="text-xs text-zinc-500 mb-2 font-medium uppercase tracking-wider">Base Values (per 100g)</p>
+                )}
+                <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-zinc-400 mb-2 font-medium">Calories (kcal) *</label>
                   <input
@@ -251,7 +370,8 @@ const ManualFoodEntry = ({ isOpen, onClose, onSave }) => {
                     value={formData.calories}
                     onChange={(e) => handleInputChange('calories', e.target.value)}
                     placeholder="250"
-                    className="w-full px-4 py-3 bg-zinc-800 border border-white/10 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 transition-colors"
+                    readOnly={selectedFood?.per100g}
+                    className="w-full px-4 py-3 bg-zinc-800 border border-white/10 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 transition-colors read-only:opacity-60 read-only:cursor-not-allowed"
                   />
                 </div>
                 <div>
@@ -261,7 +381,8 @@ const ManualFoodEntry = ({ isOpen, onClose, onSave }) => {
                     value={formData.protein}
                     onChange={(e) => handleInputChange('protein', e.target.value)}
                     placeholder="20"
-                    className="w-full px-4 py-3 bg-zinc-800 border border-white/10 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 transition-colors"
+                    readOnly={selectedFood?.per100g}
+                    className="w-full px-4 py-3 bg-zinc-800 border border-white/10 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 transition-colors read-only:opacity-60 read-only:cursor-not-allowed"
                   />
                 </div>
                 <div>
@@ -271,7 +392,8 @@ const ManualFoodEntry = ({ isOpen, onClose, onSave }) => {
                     value={formData.carbs}
                     onChange={(e) => handleInputChange('carbs', e.target.value)}
                     placeholder="30"
-                    className="w-full px-4 py-3 bg-zinc-800 border border-white/10 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 transition-colors"
+                    readOnly={selectedFood?.per100g}
+                    className="w-full px-4 py-3 bg-zinc-800 border border-white/10 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 transition-colors read-only:opacity-60 read-only:cursor-not-allowed"
                   />
                 </div>
                 <div>
@@ -281,9 +403,11 @@ const ManualFoodEntry = ({ isOpen, onClose, onSave }) => {
                     value={formData.fat}
                     onChange={(e) => handleInputChange('fat', e.target.value)}
                     placeholder="10"
-                    className="w-full px-4 py-3 bg-zinc-800 border border-white/10 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 transition-colors"
+                    readOnly={selectedFood?.per100g}
+                    className="w-full px-4 py-3 bg-zinc-800 border border-white/10 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 transition-colors read-only:opacity-60 read-only:cursor-not-allowed"
                   />
                 </div>
+              </div>
               </div>
 
               {/* Optional Fields */}

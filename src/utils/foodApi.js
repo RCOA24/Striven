@@ -141,6 +141,7 @@ async function fetchNutritionFromOFF(searchTerm, displayName, onStatus) {
       sugar: Math.round(product.nutriments?.sugars_100g || 0),
       fiber: Math.round(product.nutriments?.fiber_100g || 0),
       sodium: Math.round((product.nutriments?.sodium_100g || 0) * 1000), // Convert g to mg
+      per100g: true, // Flag to indicate these are per 100g values
       verified: true
     };
   } catch (e) {
