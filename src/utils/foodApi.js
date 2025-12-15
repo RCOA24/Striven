@@ -564,3 +564,6 @@ const rateLimiter = (() => {
     }
   };
 })();
+
+// Export for manual food entry
+export { fetchNutritionFromOFF };

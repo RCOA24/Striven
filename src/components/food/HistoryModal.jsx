@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getNutritionProfile } from '../../utils/db';
 import { X, ScanLine, Utensils, Clock, Trash2, Calendar, Target, Ruler, Weight, Droplets, Plus, Minus, Info, ChevronDown, ChevronUp } from 'lucide-react';
+import ManualFoodEntry from './ManualFoodEntry';
 
 const HistoryModal = ({ 
   isOpen, 
@@ -13,10 +14,12 @@ const HistoryModal = ({
   waterTarget = 2500, // Default if not passed
   onAddWater, 
   onDelete, 
-  onSetGoal 
+  onSetGoal,
+  onAddManual
 }) => {
   const [expandedDates, setExpandedDates] = useState({});
-    const [aiTips, setAiTips] = useState('');
+  const [aiTips, setAiTips] = useState('');
+  const [showManualEntry, setShowManualEntry] = useState(false);
 
     useEffect(() => {
         (async () => {
@@ -219,6 +222,15 @@ const HistoryModal = ({
             </div>
             
             <div className="p-4 space-y-4">
+            {/* Add Food Manually Button */}
+            <button
+                onClick={() => setShowManualEntry(true)}
+                className="w-full py-3 bg-white/5 border border-white/10 rounded-2xl text-white font-bold flex items-center justify-center gap-2 hover:bg-white/10 active:scale-95 transition-all"
+            >
+                <Plus className="w-4 h-4" />
+                Add Food Manually
+            </button>
+
             {history.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-40 text-zinc-500 space-y-4">
                 <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">
@@ -312,6 +324,16 @@ const HistoryModal = ({
             </div>
         </div>
       </div>
+
+      {/* Manual Food Entry Modal */}
+      <ManualFoodEntry 
+        isOpen={showManualEntry}
+        onClose={() => setShowManualEntry(false)}
+        onSave={async (foodData) => {
+          await onAddManual(foodData);
+          setShowManualEntry(false);
+        }}
+      />
     </div>
   );
 };

@@ -274,6 +274,25 @@ const FoodScanner = () => {
     }
   };
 
+  const handleAddManual = async (foodData) => {
+    try {
+        await saveFoodLog(foodData);
+        await loadHistory();
+        showNotification({
+            type: 'success',
+            title: 'Food Added',
+            message: `${foodData.name} logged successfully.`
+        });
+    } catch (error) {
+        console.error("Manual food log failed", error);
+        showNotification({
+            type: 'error',
+            title: 'Error',
+            message: 'Could not save food.'
+        });
+    }
+  };
+
   // --- 3. NEW: Upload Logic ---
   const triggerFileUpload = () => {
     if (fileInputRef.current) {
@@ -517,6 +536,7 @@ const FoodScanner = () => {
         onAddWater={handleAddWater} // NEW
         onDelete={handleDelete}
         onSetGoal={() => { setShowHistory(false); setCurrentPage('calculator'); }}
+        onAddManual={handleAddManual}
       />
 
       <style>{`
