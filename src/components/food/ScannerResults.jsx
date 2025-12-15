@@ -23,9 +23,9 @@ const ScannerResults = ({ result, onReset }) => {
   const items = result.items || [result];
 
   return (
-    <div className="fixed inset-0 z-20 flex flex-col items-end justify-end pointer-events-none pb-0 sm:pb-4">
-      <div className="bg-gradient-to-t from-black via-black to-transparent absolute inset-0 pointer-events-none" />
-      <div className="relative mx-4 mb-2 sm:mb-4 bg-zinc-900/98 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl animate-in slide-in-from-bottom-10 fade-in duration-300 w-[calc(100%-2rem)] max-w-lg max-h-[85vh] sm:max-h-[80vh] flex flex-col pointer-events-auto overflow-hidden">
+    <div className="fixed inset-0 z-20 flex items-center justify-center pointer-events-none p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm pointer-events-auto" onClick={onReset} />
+      <div className="relative bg-zinc-900/98 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl animate-in slide-in-from-bottom-10 fade-in duration-300 w-full max-w-2xl max-h-[90vh] flex flex-col pointer-events-auto overflow-hidden">
         <div className="flex justify-between items-start p-5 pb-3 flex-shrink-0 border-b border-white/5">
           <div className="flex-1 pr-2">
             <h2 className="text-lg sm:text-xl font-bold text-white capitalize tracking-tight leading-tight">
