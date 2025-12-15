@@ -23,28 +23,28 @@ const ScannerResults = ({ result, onReset }) => {
   const items = result.items || [result];
 
   return (
-    <div className="fixed inset-0 z-20 flex items-center justify-center pointer-events-none p-4">
+    <div className="fixed inset-0 z-20 flex items-center justify-center pointer-events-none p-2 xs:p-3 sm:p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm pointer-events-auto" onClick={onReset} />
-      <div className="relative bg-zinc-900/98 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl animate-in slide-in-from-bottom-10 fade-in duration-300 w-full max-w-2xl max-h-[90vh] flex flex-col pointer-events-auto overflow-hidden">
-        <div className="flex justify-between items-start p-5 pb-3 flex-shrink-0 border-b border-white/5">
-          <div className="flex-1 pr-2">
-            <h2 className="text-lg sm:text-xl font-bold text-white capitalize tracking-tight leading-tight">
+      <div className="relative bg-zinc-900/98 backdrop-blur-xl border border-white/10 rounded-2xl sm:rounded-3xl shadow-2xl animate-in slide-in-from-bottom-10 fade-in duration-300 w-full max-w-2xl max-h-[85vh] xs:max-h-[82vh] sm:max-h-[80vh] flex flex-col pointer-events-auto overflow-hidden">
+        <div className="flex justify-between items-start p-3 xs:p-4 pb-2 flex-shrink-0 border-b border-white/5 gap-2">
+          <div className="flex-1 pr-1 min-w-0">
+            <h2 className="text-sm xs:text-base sm:text-lg font-bold text-white capitalize tracking-tight leading-tight truncate">
               {items.length > 1 ? `${items.length} items detected` : result.name}
             </h2>
             {!result.isUnknown && (
-              <div className="flex items-center space-x-2 mt-2">
-                <CheckCircle className="w-4 h-4 text-emerald-500" />
-                <span className="text-emerald-500 text-xs font-bold tracking-wide uppercase">Successfully Logged</span>
+              <div className="flex items-center space-x-1.5 mt-1">
+                <CheckCircle className="w-3 h-3 text-emerald-500 flex-shrink-0" />
+                <span className="text-emerald-500 text-[10px] xs:text-xs font-bold tracking-wide uppercase truncate">Successfully Logged</span>
               </div>
             )}
           </div>
-          <button onClick={onReset} className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors active:scale-95 flex items-center gap-2 px-3 border border-white/5 flex-shrink-0">
-            <RefreshCw className="w-4 h-4 text-white" />
-            <span className="text-xs font-bold text-white hidden sm:inline">Next Scan</span>
+          <button onClick={onReset} className="p-1 xs:p-1.5 bg-white/10 rounded-full hover:bg-white/20 transition-colors active:scale-95 flex items-center gap-1 xs:gap-2 px-2 xs:px-2.5 border border-white/5 flex-shrink-0">
+            <RefreshCw className="w-3 h-3 xs:w-3.5 h-3.5 text-white" />
+            <span className="text-[10px] xs:text-xs font-bold text-white hidden sm:inline">Next</span>
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
+        <div className="flex-1 overflow-y-auto px-3 xs:px-4 py-2 xs:py-3 space-y-2 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
 
         {result.isUnknown ? (
           <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4">
@@ -103,9 +103,9 @@ const ScannerResults = ({ result, onReset }) => {
           </>
         )}
         
-        <div className="flex items-center justify-between text-[9px] sm:text-[10px] text-zinc-500 border-t border-white/5 pt-3 uppercase tracking-wider flex-shrink-0">
-          <span>Confidence: {Math.round((result.confidence || 0) * 100)}%</span>
-          <span className="text-right max-w-[60%]">{result.source || (result.confidence >= 0.95 ? 'Gemini Vision' : 'OpenFoodFacts DB')}</span>
+        <div className="flex items-center justify-between text-[7px] xs:text-[8px] sm:text-[9px] text-zinc-500 border-t border-white/5 px-3 xs:px-4 py-1.5 xs:py-2 uppercase tracking-wider flex-shrink-0 gap-2">
+          <span className="truncate">Confidence: {Math.round((result.confidence || 0) * 100)}%</span>
+          <span className="text-right max-w-[50%] xs:max-w-[55%] truncate">{result.source || (result.confidence >= 0.95 ? 'Gemini Vision' : 'OpenFoodFacts DB')}</span>
         </div>
         </div>
       </div>
