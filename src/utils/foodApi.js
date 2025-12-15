@@ -76,6 +76,16 @@ async function fetchWithRetry(url, options = {}, cfg = {}) {
     attempt += 1;
   }
 }
+// Common foods fallback for when OFF fails
+const COMMON_FOODS = {
+  "chicken wings": { calories: 203, protein: 20, carbs: 0, fat: 13, sugar: 0, fiber: 0, sodium: 80 },
+  "rice": { calories: 130, protein: 2.7, carbs: 28, fat: 0.3, sugar: 0.1, fiber: 0.4, sodium: 1 },
+  "fried chicken": { calories: 246, protein: 30, carbs: 12, fat: 12, sugar: 0, fiber: 0, sodium: 80 },
+  "apple": { calories: 52, protein: 0.3, carbs: 14, fat: 0.2, sugar: 10, fiber: 2.4, sodium: 1 },
+  "banana": { calories: 89, protein: 1.1, carbs: 23, fat: 0.3, sugar: 12, fiber: 2.6, sodium: 1 },
+  "egg": { calories: 155, protein: 13, carbs: 1.1, fat: 11, sugar: 1.1, fiber: 0, sodium: 124 },
+};
+
 async function fetchNutritionFromOFF(searchTerm, displayName, onStatus) {
   try {
     if (onStatus) onStatus(`Searching database for "${displayName}"...`);
@@ -84,42 +94,68 @@ async function fetchNutritionFromOFF(searchTerm, displayName, onStatus) {
     const cleanQuery = searchTerm.replace(/_/g, ' ').replace(/[^\w\s]/gi, '').trim().toLowerCase();
     const fields = "product_name,nutriments";
     
-    // Try exact search first
-    let url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(cleanQuery)}&search_simple=1&action=process&json=1&page_size=5&fields=${fields}&sort_by=popularity`;
+    const hasCalories = (p) => p.nutriments && (p.nutriments['energy-kcal_100g'] > 0 || p.nutriments.energy_value > 0);
+
+    // 1. Try exact search
+    let url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(cleanQuery)}&search_simple=1&action=process&json=1&page_size=10&fields=${fields}&sort_by=popularity`;
 
     await rateLimiter.wait();
     let res = await fetchWithRetry(url, undefined, { retries: 2, backoffBase: 300 });
     let data = await res.json();
 
-    // If no results, try a looser search (splitting words)
-    if (!data.products || data.products.length === 0) {
+    let product = data.products?.find(hasCalories);
+
+    // 2. If no product with calories, try first word (if different and long enough)
+    if (!product) {
       const firstWord = cleanQuery.split(' ')[0];
-      if (firstWord && firstWord.length > 3) {
-        url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(firstWord)}&search_simple=1&action=process&json=1&page_size=5&fields=${fields}&sort_by=popularity`;
+      if (firstWord && firstWord.length > 3 && firstWord !== cleanQuery) {
+        url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(firstWord)}&search_simple=1&action=process&json=1&page_size=10&fields=${fields}&sort_by=popularity`;
         await rateLimiter.wait();
         res = await fetchWithRetry(url, undefined, { retries: 2, backoffBase: 300 });
         data = await res.json();
+        product = data.products?.find(hasCalories);
       }
     }
 
-    if (!data.products || data.products.length === 0) return null;
+    // 3. Fallback: Check hardcoded common foods
+    if (!product && COMMON_FOODS[cleanQuery]) {
+       return {
+        name: displayName,
+        display_name: displayName,
+        search_term: searchTerm,
+        ...COMMON_FOODS[cleanQuery],
+        verified: true
+      };
+    }
 
-    // Filter for products that actually have calorie data
-    const product = data.products.find(p => 
-      p.nutriments && (p.nutriments['energy-kcal_100g'] > 0 || p.nutriments.energy_value > 0)
-    ) || data.products[0];
+    if (!product) return null;
 
     return {
+      name: displayName,
       display_name: displayName,
       search_term: searchTerm,
       calories: Math.round(product.nutriments?.['energy-kcal_100g'] || product.nutriments?.energy_value || 0),
       protein: Math.round(product.nutriments?.proteins_100g || 0),
       carbs: Math.round(product.nutriments?.carbohydrates_100g || 0),
       fat: Math.round(product.nutriments?.fat_100g || 0),
+      sugar: Math.round(product.nutriments?.sugars_100g || 0),
+      fiber: Math.round(product.nutriments?.fiber_100g || 0),
+      sodium: Math.round((product.nutriments?.sodium_100g || 0) * 1000), // Convert g to mg
       verified: true
     };
   } catch (e) {
     console.warn("OFF API Error:", e);
+    // Final fallback check on error
+    const cleanQuery = searchTerm.replace(/_/g, ' ').replace(/[^\w\s]/gi, '').trim().toLowerCase();
+    if (COMMON_FOODS[cleanQuery]) {
+        return {
+            name: displayName,
+            display_name: displayName,
+            search_term: searchTerm,
+            ...COMMON_FOODS[cleanQuery],
+            verified: true
+        };
+    }
     return null;
   }
 }
@@ -339,7 +375,7 @@ async function analyzeWithHuggingFace(imageBlob, onStatus) {
     const readableName = top.label.replace(/_/g, ' ');
 
     if (nutrition && nutrition.calories > 0) {
-      return { ...nutrition, confidence: top.score, isUnknown: false };
+      return { ...nutrition, name: readableName, confidence: top.score, isUnknown: false };
     }
     
     return { name: readableName, calories: 0, protein: 0, carbs: 0, fat: 0, confidence: top.score, isUnknown: true };
