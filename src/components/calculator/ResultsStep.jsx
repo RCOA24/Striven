@@ -130,19 +130,31 @@ const ResultsStep = ({
               </div>
             ) : aiTips ? (
               <div className="space-y-3">
-                <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-2 mb-3">
                   <Sparkles className="w-3 h-3 text-yellow-500" />
-                  <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Top Strategy</span>
+                  <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Top Strategies</span>
                 </div>
                 <ul className="space-y-2.5">
-                  {aiTips.split(/\n/).filter(line => line.trim().length > 0).slice(0, 3).map((line, idx) => (
-                    <li key={idx} className="flex gap-2 text-sm text-zinc-300 leading-relaxed">
-                      <span className="text-emerald-500 mt-1.5">•</span>
-                      <span>{line.replace(/^[-•\s]+/, '')}</span>
-                    </li>
-                  ))}
+                  {aiTips
+                    .split(/\n/)
+                    .map(line => line.trim())
+                    .filter(line => {
+                      // Filter out empty lines and intro text
+                      if (!line) return false;
+                      const lowerLine = line.toLowerCase();
+                      if (lowerLine.includes('here are') || lowerLine.includes('tips for')) return false;
+                      if (lowerLine.includes('strategies') || lowerLine.includes('goal')) return false;
+                      return true;
+                    })
+                    .slice(0, 3)
+                    .map((line, idx) => (
+                      <li key={idx} className="flex gap-3 text-sm text-zinc-300 leading-relaxed">
+                        <span className="text-emerald-500 font-bold flex-shrink-0 mt-0.5">{idx + 1}.</span>
+                        <span>{line.replace(/^[-•\d.:\s]+/, '').trim()}</span>
+                      </li>
+                    ))}
                 </ul>
-                <div className="pt-2 border-t border-zinc-800 flex justify-end">
+                <div className="pt-3 border-t border-zinc-800 flex justify-end">
                    <button onClick={onRefreshTips} className="text-[10px] text-zinc-500 hover:text-emerald-400 flex items-center gap-1 transition-colors">
                      <RotateCcw size={10} /> Refresh Tips
                    </button>

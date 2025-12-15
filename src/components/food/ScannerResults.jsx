@@ -23,10 +23,10 @@ const ScannerResults = ({ result, onReset }) => {
   const items = result.items || [result];
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 z-20 pb-12 pt-12 bg-gradient-to-t from-black via-black/90 to-transparent">
-      <div className="mx-4 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-10 fade-in duration-300 mb-4 safe-bottom">
-        <div className="flex justify-between items-start mb-5">
-          <div>
+    <div className="absolute bottom-0 left-0 right-0 z-20 pb-12 pt-12 bg-gradient-to-t from-black via-black/90 to-transparent max-h-[85vh] flex items-end overflow-hidden">
+      <div className="mx-4 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-10 fade-in duration-300 mb-4 safe-bottom w-full max-h-[80vh] overflow-y-auto flex flex-col">
+        <div className="flex justify-between items-start mb-5 flex-shrink-0">
+          <div className="flex-1 pr-2">
             <h2 className="text-2xl font-bold text-white capitalize tracking-tight leading-tight">
               {items.length > 1 ? `${items.length} items detected` : result.name}
             </h2>
@@ -37,14 +37,16 @@ const ScannerResults = ({ result, onReset }) => {
               </div>
             )}
           </div>
-          <button onClick={onReset} className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors active:scale-95 flex items-center gap-2 px-4 border border-white/5">
+          <button onClick={onReset} className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors active:scale-95 flex items-center gap-2 px-4 border border-white/5 flex-shrink-0">
             <RefreshCw className="w-4 h-4 text-white" />
             <span className="text-xs font-bold text-white">Next Scan</span>
           </button>
         </div>
 
+        <div className="flex-1 overflow-y-auto pr-2 space-y-3 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
+
         {result.isUnknown ? (
-          <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 mb-4">
+          <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4">
             <p className="text-yellow-200 text-sm">
               We identified this as <strong>{result.name}</strong>, but exact nutrition data is unavailable.
             </p>
@@ -52,16 +54,16 @@ const ScannerResults = ({ result, onReset }) => {
         ) : (
           <>
             {result.summary && (
-              <div className="bg-white/5 rounded-2xl p-3 border border-white/10 mb-3">
+              <div className="bg-white/5 rounded-2xl p-3 border border-white/10">
                 <p className="text-[12px] text-zinc-300 leading-relaxed">{result.summary}</p>
               </div>
             )}
             {((result.confidence || 0) < 0.6 || result.isUnknown) && (
-              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-3 mb-3">
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-3">
                 <p className="text-[11px] text-yellow-200">Tip: Try another angle with better lighting, keep items separated, and avoid reflections for higher accuracy.</p>
               </div>
             )}
-            <div className="grid grid-cols-4 gap-3 mb-4">
+            <div className="grid grid-cols-4 gap-3">
               <NutrientBox label="Kcal" value={Math.round(totals.calories || 0)} color="text-white" bg="bg-white/10" />
               <NutrientBox label="Prot" value={`${Math.round(totals.protein || 0)}g`} color="text-blue-400" bg="bg-blue-500/10" />
               <NutrientBox label="Carb" value={`${Math.round(totals.carbs || 0)}g`} color="text-yellow-400" bg="bg-yellow-500/10" />
@@ -69,7 +71,7 @@ const ScannerResults = ({ result, onReset }) => {
             </div>
 
             {(totals.sugar > 0 || totals.fiber > 0 || totals.sodium > 0) && (
-              <div className="bg-black/20 rounded-xl p-3 mb-4">
+              <div className="bg-black/20 rounded-xl p-3">
                 {totals.sugar > 0 && <MicroNutrientRow label="Sugar" value={Math.round(totals.sugar)} unit="g" />}
                 {totals.fiber > 0 && <MicroNutrientRow label="Fiber" value={Math.round(totals.fiber)} unit="g" />}
                 {totals.sodium > 0 && <MicroNutrientRow label="Sodium" value={Math.round(totals.sodium)} unit="mg" />}
@@ -77,7 +79,7 @@ const ScannerResults = ({ result, onReset }) => {
             )}
 
             {items.length > 1 && (
-              <div className="bg-white/5 rounded-2xl p-3 border border-white/10 space-y-2 mb-3">
+              <div className="bg-white/5 rounded-2xl p-3 border border-white/10 space-y-2">
                 {items.map((item, idx) => (
                   <div key={idx} className="flex items-center justify-between text-sm text-white bg-black/40 rounded-xl px-3 py-2 border border-white/5">
                     <div className="flex flex-col">
@@ -100,9 +102,10 @@ const ScannerResults = ({ result, onReset }) => {
           </>
         )}
         
-        <div className="flex items-center justify-between text-[10px] text-zinc-500 border-t border-white/5 pt-3 uppercase tracking-wider">
+        <div className="flex items-center justify-between text-[10px] text-zinc-500 border-t border-white/5 pt-3 mt-3 uppercase tracking-wider flex-shrink-0">
           <span>AI Confidence: {Math.round((result.confidence || 0) * 100)}%</span>
           <span>Source: {result.source || (result.confidence >= 0.95 ? 'Gemini Vision' : 'OpenFoodFacts DB')}</span>
+        </div>
         </div>
       </div>
     </div>

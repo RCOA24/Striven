@@ -56,21 +56,21 @@ const FoodScanner = () => {
   const [waterTarget, setWaterTarget] = useState(2500); // NEW
 
   const toLogPayload = (aiResult) => {
-    const totals = aiResult?.totals || {};
-    const name = aiResult?.items?.length > 1
-      ? `Meal: ${aiResult.items.map(i => i.name).join(', ')}`
-      : aiResult?.name || 'Food';
-
-    return {
-      name,
-      calories: totals.calories ?? aiResult.calories ?? 0,
-      protein: totals.protein ?? aiResult.protein ?? 0,
-      carbs: totals.carbs ?? aiResult.carbs ?? 0,
-      fat: totals.fat ?? aiResult.fat ?? 0,
-      sugar: totals.sugar ?? aiResult.sugar ?? 0,
-      fiber: totals.fiber ?? aiResult.fiber ?? 0,
-      sodium: totals.sodium ?? aiResult.sodium ?? 0,
-    };
+    const items = aiResult?.items || [aiResult];
+    
+    // Return array of individual items instead of concatenated single item
+    return items.map(item => ({
+      name: item.display_name || item.name || 'Food',
+      calories: item.calories ?? 0,
+      protein: item.protein ?? 0,
+      carbs: item.carbs ?? 0,
+      fat: item.fat ?? 0,
+      sugar: item.sugar ?? 0,
+      fiber: item.fiber ?? 0,
+      sodium: item.sodium ?? 0,
+      confidence: item.confidence ?? 0,
+      verified: item.verified ?? false,
+    }));
   };
 
   // --- 0. Request Camera Permissions (Android 6+) ---
@@ -300,14 +300,17 @@ const FoodScanner = () => {
 
         setResult(aiResult);
         if (!aiResult.isUnknown) {
-          const logPayload = toLogPayload(aiResult);
-          await saveFoodLog(logPayload);
+          const logPayloads = toLogPayload(aiResult);
+          // Save each item individually
+          for (const payload of logPayloads) {
+            await saveFoodLog(payload);
+          }
           await loadHistory();
           const count = aiResult.items?.length || 1;
           showNotification({
             type: 'success',
             title: 'Food Logged',
-            message: `${count > 1 ? `${count} items` : logPayload.name} added to your history.`
+            message: `${count > 1 ? `${count} items` : logPayloads[0].name} added to your history.`
           });
         }
     } catch (err) {
@@ -357,14 +360,17 @@ const FoodScanner = () => {
 
             setResult(aiResult);
             if (!aiResult.isUnknown) {
-              const logPayload = toLogPayload(aiResult);
-              await saveFoodLog(logPayload);
+              const logPayloads = toLogPayload(aiResult);
+              // Save each item individually
+              for (const payload of logPayloads) {
+                await saveFoodLog(payload);
+              }
               await loadHistory();
               const count = aiResult.items?.length || 1;
               showNotification({
                 type: 'success',
                 title: 'Food Logged',
-                message: `${count > 1 ? `${count} items` : logPayload.name} added to your history.`
+                message: `${count > 1 ? `${count} items` : logPayloads[0].name} added to your history.`
               });
             }
         } catch (err) {
