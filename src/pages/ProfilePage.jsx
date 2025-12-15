@@ -326,12 +326,29 @@ const ProfilePage = ({ activities = [], weeklyStats = {} }) => {
                              </div>
                            ) : null;
                          })()}                        {aiTips && (
-                          <div className="mt-2 text-[11px] text-zinc-400">
-                            <div className="font-semibold text-white/90 mb-1">AI Coach</div>
-                            <ul className="list-disc list-inside space-y-0.5">
-                              {aiTips.split(/\n|\r/).filter(Boolean).slice(0,3).map((t, i) => (
-                                <li key={i}>{t.replace(/^[-•\s]+/, '')}</li>
-                              ))}
+                          <div className="mt-2 text-[11px] text-zinc-300">
+                            <div className="font-semibold text-white/90 mb-1.5 flex items-center gap-1">
+                              <span className="text-yellow-500">✨</span>
+                              <span>Top Strategies</span>
+                            </div>
+                            <ul className="space-y-1">
+                              {aiTips
+                                .split(/\n/)
+                                .map(line => line.trim())
+                                .filter(line => {
+                                  if (!line) return false;
+                                  const lowerLine = line.toLowerCase();
+                                  if (lowerLine.includes('here are') || lowerLine.includes('tips for')) return false;
+                                  if (lowerLine.includes('strategies') || lowerLine.includes('goal')) return false;
+                                  return true;
+                                })
+                                .slice(0, 3)
+                                .map((line, idx) => (
+                                  <li key={idx} className="flex gap-2">
+                                    <span className="text-emerald-500 font-bold flex-shrink-0">{idx + 1}.</span>
+                                    <span>{line.replace(/^[-•\d.:\s]+/, '').trim()}</span>
+                                  </li>
+                                ))}
                             </ul>
                           </div>
                         )}

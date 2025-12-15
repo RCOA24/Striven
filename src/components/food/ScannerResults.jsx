@@ -23,11 +23,11 @@ const ScannerResults = ({ result, onReset }) => {
   const items = result.items || [result];
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 z-20 pb-12 pt-12 bg-gradient-to-t from-black via-black/90 to-transparent max-h-[85vh] flex items-end overflow-hidden">
-      <div className="mx-4 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-10 fade-in duration-300 mb-4 safe-bottom w-full max-h-[80vh] overflow-y-auto flex flex-col">
-        <div className="flex justify-between items-start mb-5 flex-shrink-0">
+    <div className="fixed bottom-0 left-0 right-0 z-20 pb-6 bg-gradient-to-t from-black via-black to-transparent flex items-end pointer-events-none">
+      <div className="mx-4 bg-zinc-900/98 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl animate-in slide-in-from-bottom-10 fade-in duration-300 w-full max-h-[75vh] flex flex-col pointer-events-auto">
+        <div className="flex justify-between items-start p-5 pb-3 flex-shrink-0">
           <div className="flex-1 pr-2">
-            <h2 className="text-2xl font-bold text-white capitalize tracking-tight leading-tight">
+            <h2 className="text-xl font-bold text-white capitalize tracking-tight leading-tight">
               {items.length > 1 ? `${items.length} items detected` : result.name}
             </h2>
             {!result.isUnknown && (
@@ -43,7 +43,7 @@ const ScannerResults = ({ result, onReset }) => {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto pr-2 space-y-3 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
+        <div className="flex-1 overflow-y-auto px-5 pb-5 space-y-3 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
 
         {result.isUnknown ? (
           <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4">
@@ -102,7 +102,7 @@ const ScannerResults = ({ result, onReset }) => {
           </>
         )}
         
-        <div className="flex items-center justify-between text-[10px] text-zinc-500 border-t border-white/5 pt-3 mt-3 uppercase tracking-wider flex-shrink-0">
+        <div className="flex items-center justify-between text-[10px] text-zinc-500 border-t border-white/5 pt-3 mt-3 uppercase tracking-wider">
           <span>AI Confidence: {Math.round((result.confidence || 0) * 100)}%</span>
           <span>Source: {result.source || (result.confidence >= 0.95 ? 'Gemini Vision' : 'OpenFoodFacts DB')}</span>
         </div>

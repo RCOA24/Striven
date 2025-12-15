@@ -232,7 +232,8 @@ const HistoryModal = ({
                             {isExpanded && (
                                 <div className="px-3 pb-3 space-y-2 border-t border-white/5 pt-3">
                                     {group.items.map((item, i) => (
-                                        <div key={item.id || i} className="flex items-center justify-between bg-black/20 border border-white/5 p-3 rounded-xl hover:bg-white/5 transition-colors group">
+                                        <div key={item.id || i} className="bg-black/20 border border-white/5 rounded-xl hover:bg-white/5 transition-colors group">
+                                        <div className="flex items-center justify-between p-3">
                                         <div className="flex items-center space-x-3 min-w-0 flex-1">
                                             <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center border border-white/5 flex-shrink-0">
                                             <Utensils className="w-4 h-4 text-zinc-400" />
@@ -260,6 +261,30 @@ const HistoryModal = ({
                                             <Trash2 className="w-4 h-4" />
                                             </button>
                                         </div>
+                                        </div>
+                                        {/* Nutritional Breakdown */}
+                                        {(item.protein > 0 || item.carbs > 0 || item.fat > 0) && (
+                                            <div className="px-3 pb-3 flex items-center gap-2 text-[10px]">
+                                                {item.protein > 0 && (
+                                                    <div className="px-2 py-1 rounded-md bg-blue-500/10 border border-blue-500/20">
+                                                        <span className="text-blue-400 font-bold">{Math.round(item.protein)}g</span>
+                                                        <span className="text-blue-400/60 ml-0.5">P</span>
+                                                    </div>
+                                                )}
+                                                {item.carbs > 0 && (
+                                                    <div className="px-2 py-1 rounded-md bg-yellow-500/10 border border-yellow-500/20">
+                                                        <span className="text-yellow-400 font-bold">{Math.round(item.carbs)}g</span>
+                                                        <span className="text-yellow-400/60 ml-0.5">C</span>
+                                                    </div>
+                                                )}
+                                                {item.fat > 0 && (
+                                                    <div className="px-2 py-1 rounded-md bg-rose-500/10 border border-rose-500/20">
+                                                        <span className="text-rose-400 font-bold">{Math.round(item.fat)}g</span>
+                                                        <span className="text-rose-400/60 ml-0.5">F</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                         </div>
                                     ))}
                                 </div>
