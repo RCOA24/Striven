@@ -43,7 +43,7 @@ const HistoryModal = ({
   const glassesConsumed = Math.floor(waterIntake / glassSize);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in p-3 sm:p-4 pt-4 sm:pt-0">
+    <div className="fixed inset-0 z-[9999] flex items-start sm:items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in p-3 sm:p-4 pt-4 sm:pt-0">
       <div className="bg-zinc-900 w-full max-w-md rounded-3xl flex flex-col shadow-2xl border border-white/10 max-h-[92vh] sm:max-h-[80vh] animate-in zoom-in-95 duration-200 overflow-hidden mt-0 sm:mt-0">
         <div className="flex items-center justify-between p-6 border-b border-white/5 flex-shrink-0">
           <h2 className="text-xl font-bold text-white">Food & Water</h2>
