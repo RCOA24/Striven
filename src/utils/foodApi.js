@@ -18,8 +18,8 @@ async function processImageForAI(imageBlob) {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
 
-      // Calculate new dimensions (Max 1024px)
-      const MAX_SIZE = 1024;
+      // Calculate new dimensions (Max 1536px for better AI accuracy)
+      const MAX_SIZE = 1536;
       let width = img.width;
       let height = img.height;
 
@@ -44,7 +44,7 @@ async function processImageForAI(imageBlob) {
       canvas.toBlob((blob) => {
         if (blob) resolve(blob);
         else reject(new Error("Image processing failed"));
-      }, 'image/jpeg', 0.85); // 85% quality is the sweet spot for AI
+      }, 'image/jpeg', 0.90); // 90% quality for better AI accuracy
     };
     
     img.onerror = (err) => reject(err);

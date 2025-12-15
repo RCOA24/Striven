@@ -325,17 +325,20 @@ const FoodScanner = () => {
 
     try {
       const video = videoRef.current;
-      const minDim = Math.min(video.videoWidth, video.videoHeight);
+      // Use larger dimension for higher quality (or full HD if available)
+      const targetSize = Math.max(video.videoWidth, video.videoHeight, 1920);
       
       const canvas = document.createElement('canvas');
-      canvas.width = minDim;
-      canvas.height = minDim;
+      canvas.width = targetSize;
+      canvas.height = targetSize;
       
       const ctx = canvas.getContext('2d');
+      // Center crop from video to square canvas
+      const minDim = Math.min(video.videoWidth, video.videoHeight);
       const startX = (video.videoWidth - minDim) / 2;
       const startY = (video.videoHeight - minDim) / 2;
       
-      ctx.drawImage(video, startX, startY, minDim, minDim, 0, 0, minDim, minDim);
+      ctx.drawImage(video, startX, startY, minDim, minDim, 0, 0, targetSize, targetSize);
 
       canvas.toBlob(async (blob) => {
         if (!blob) throw new Error("Capture failed");
@@ -353,7 +356,7 @@ const FoodScanner = () => {
         } finally {
             setIsProcessing(false);
         }
-      }, 'image/jpeg', 0.95);
+      }, 'image/jpeg', 0.98);
 
     } catch (e) {
       console.error(e);
