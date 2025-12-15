@@ -43,8 +43,8 @@ const HistoryModal = ({
   const glassesConsumed = Math.floor(waterIntake / glassSize);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in p-4">
-      <div className="bg-zinc-900 w-full max-w-md rounded-3xl flex flex-col shadow-2xl border border-white/10 max-h-[80vh] animate-in zoom-in-95 duration-200 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in p-3 sm:p-4 pt-4 sm:pt-0">
+      <div className="bg-zinc-900 w-full max-w-md rounded-3xl flex flex-col shadow-2xl border border-white/10 max-h-[92vh] sm:max-h-[80vh] animate-in zoom-in-95 duration-200 overflow-hidden mt-0 sm:mt-0">
         <div className="flex items-center justify-between p-6 border-b border-white/5 flex-shrink-0">
           <h2 className="text-xl font-bold text-white">Food & Water</h2>
           <button onClick={onClose} className="p-2 bg-white/5 rounded-full hover:bg-white/10 active:scale-95 transition-colors">
@@ -57,13 +57,29 @@ const HistoryModal = ({
                                 {/* AI Tips (if available) */}
                                 {aiTips && (
                                     <div className="bg-gradient-to-b from-[#121216] to-[#0c0c10] rounded-2xl border border-white/8 p-4">
-                                        <div className="text-xs text-zinc-500 mb-1">AI Coach</div>
-                                        <ul className="list-disc list-inside text-[13px] text-zinc-200 space-y-0.5">
-                                            {aiTips.split(/\n|\r/).filter(Boolean).slice(0,3).map((t, i) => (
-                                                <li key={i}>{t.replace(/^[-•\s]+/, '')}</li>
-                                            ))}
+                                        <div className="font-semibold text-white/90 mb-1.5 flex items-center gap-1">
+                                            <span className="text-yellow-500">✨</span>
+                                            <span className="text-sm">Top Strategies</span>
+                                        </div>
+                                        <ul className="space-y-1 text-[12px] text-zinc-300">
+                                            {aiTips
+                                                .split(/\n/)
+                                                .map(line => line.trim())
+                                                .filter(line => {
+                                                    if (!line) return false;
+                                                    const lowerLine = line.toLowerCase();
+                                                    if (lowerLine.includes('here are') || lowerLine.includes('tips for')) return false;
+                                                    if (lowerLine.includes('strategies') || lowerLine.includes('goal')) return false;
+                                                    return true;
+                                                })
+                                                .slice(0, 3)
+                                                .map((line, idx) => (
+                                                    <li key={idx} className="flex gap-2">
+                                                        <span className="text-emerald-500 font-bold flex-shrink-0">{idx + 1}.</span>
+                                                        <span>{line.replace(/^[-•\d.:\s]+/, '').trim()}</span>
+                                                    </li>
+                                                ))}
                                         </ul>
-                                        {/* Optional: link to adjust plan if needed */}
                                     </div>
                                 )}
                 {/* Water Tracker - Visual Glasses */}
