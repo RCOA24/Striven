@@ -23,11 +23,12 @@ const ScannerResults = ({ result, onReset }) => {
   const items = result.items || [result];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-20 pb-6 bg-gradient-to-t from-black via-black to-transparent flex items-end pointer-events-none">
-      <div className="mx-4 bg-zinc-900/98 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl animate-in slide-in-from-bottom-10 fade-in duration-300 w-full max-h-[75vh] flex flex-col pointer-events-auto">
-        <div className="flex justify-between items-start p-5 pb-3 flex-shrink-0">
+    <div className="fixed inset-0 z-20 flex flex-col items-end justify-end pointer-events-none pb-0 sm:pb-4">
+      <div className="bg-gradient-to-t from-black via-black to-transparent absolute inset-0 pointer-events-none" />
+      <div className="relative mx-4 mb-2 sm:mb-4 bg-zinc-900/98 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl animate-in slide-in-from-bottom-10 fade-in duration-300 w-[calc(100%-2rem)] max-w-lg max-h-[85vh] sm:max-h-[80vh] flex flex-col pointer-events-auto overflow-hidden">
+        <div className="flex justify-between items-start p-5 pb-3 flex-shrink-0 border-b border-white/5">
           <div className="flex-1 pr-2">
-            <h2 className="text-xl font-bold text-white capitalize tracking-tight leading-tight">
+            <h2 className="text-lg sm:text-xl font-bold text-white capitalize tracking-tight leading-tight">
               {items.length > 1 ? `${items.length} items detected` : result.name}
             </h2>
             {!result.isUnknown && (
@@ -37,13 +38,13 @@ const ScannerResults = ({ result, onReset }) => {
               </div>
             )}
           </div>
-          <button onClick={onReset} className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors active:scale-95 flex items-center gap-2 px-4 border border-white/5 flex-shrink-0">
+          <button onClick={onReset} className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors active:scale-95 flex items-center gap-2 px-3 border border-white/5 flex-shrink-0">
             <RefreshCw className="w-4 h-4 text-white" />
-            <span className="text-xs font-bold text-white">Next Scan</span>
+            <span className="text-xs font-bold text-white hidden sm:inline">Next Scan</span>
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 pb-5 space-y-3 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
 
         {result.isUnknown ? (
           <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4">
@@ -102,9 +103,9 @@ const ScannerResults = ({ result, onReset }) => {
           </>
         )}
         
-        <div className="flex items-center justify-between text-[10px] text-zinc-500 border-t border-white/5 pt-3 mt-3 uppercase tracking-wider">
-          <span>AI Confidence: {Math.round((result.confidence || 0) * 100)}%</span>
-          <span>Source: {result.source || (result.confidence >= 0.95 ? 'Gemini Vision' : 'OpenFoodFacts DB')}</span>
+        <div className="flex items-center justify-between text-[9px] sm:text-[10px] text-zinc-500 border-t border-white/5 pt-3 uppercase tracking-wider flex-shrink-0">
+          <span>Confidence: {Math.round((result.confidence || 0) * 100)}%</span>
+          <span className="text-right max-w-[60%]">{result.source || (result.confidence >= 0.95 ? 'Gemini Vision' : 'OpenFoodFacts DB')}</span>
         </div>
         </div>
       </div>
