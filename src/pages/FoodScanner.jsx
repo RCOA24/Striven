@@ -299,20 +299,7 @@ const FoodScanner = () => {
         }, aiMode);
 
         setResult(aiResult);
-        if (!aiResult.isUnknown) {
-          const logPayloads = toLogPayload(aiResult);
-          // Save each item individually
-          for (const payload of logPayloads) {
-            await saveFoodLog(payload);
-          }
-          await loadHistory();
-          const count = aiResult.items?.length || 1;
-          showNotification({
-            type: 'success',
-            title: 'Food Logged',
-            message: `${count > 1 ? `${count} items` : logPayloads[0].name} added to your history.`
-          });
-        }
+        // Automatic saving removed - handled by ScannerResults onSave
     } catch (err) {
         console.error(err);
         setError(err.message || "Could not analyze the uploaded image.");
@@ -359,20 +346,7 @@ const FoodScanner = () => {
             }, aiMode);
 
             setResult(aiResult);
-            if (!aiResult.isUnknown) {
-              const logPayloads = toLogPayload(aiResult);
-              // Save each item individually
-              for (const payload of logPayloads) {
-                await saveFoodLog(payload);
-              }
-              await loadHistory();
-              const count = aiResult.items?.length || 1;
-              showNotification({
-                type: 'success',
-                title: 'Food Logged',
-                message: `${count > 1 ? `${count} items` : logPayloads[0].name} added to your history.`
-              });
-            }
+            // Automatic saving removed - handled by ScannerResults onSave
         } catch (err) {
             console.error(err);
             setError(err.message || "Couldn't identify food.");
@@ -385,6 +359,47 @@ const FoodScanner = () => {
       console.error(e);
       setError("System error during capture.");
       setIsProcessing(false);
+    }
+  };
+
+  const handleSave = async (selectedItems) => {
+    if (!selectedItems || selectedItems.length === 0) return;
+
+    try {
+        const logPayloads = selectedItems.map(item => ({
+            name: item.display_name || item.name || 'Food',
+            calories: item.calories ?? 0,
+            protein: item.protein ?? 0,
+            carbs: item.carbs ?? 0,
+            fat: item.fat ?? 0,
+            sugar: item.sugar ?? 0,
+            fiber: item.fiber ?? 0,
+            sodium: item.sodium ?? 0,
+            confidence: item.confidence ?? 0,
+            verified: item.verified ?? false,
+        }));
+
+        for (const payload of logPayloads) {
+            await saveFoodLog(payload);
+        }
+        
+        await loadHistory();
+        
+        const count = logPayloads.length;
+        showNotification({
+            type: 'success',
+            title: 'Food Logged',
+            message: `${count > 1 ? `${count} items` : logPayloads[0].name} added to your history.`
+        });
+        
+        resetScanner();
+    } catch (err) {
+        console.error("Save failed", err);
+        showNotification({
+            type: 'error',
+            title: 'Error',
+            message: 'Could not save food logs.'
+        });
     }
   };
 
@@ -484,6 +499,7 @@ const FoodScanner = () => {
       <ScannerResults 
         result={result}
         onReset={resetScanner}
+        onSave={handleSave}
       />
 
       <HistoryModal 
