@@ -23,9 +23,9 @@ const ScannerResults = ({ result, onReset }) => {
   const items = result.items || [result];
 
   return (
-    <div className="fixed inset-0 z-20 flex items-center justify-center pointer-events-none p-2 xs:p-3 sm:p-4">
+    <div className="fixed inset-0 z-20 flex items-start sm:items-center justify-center pointer-events-none p-2 xs:p-3 sm:p-4 pt-4 sm:pt-0">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm pointer-events-auto" onClick={onReset} />
-      <div className="relative bg-zinc-900/98 backdrop-blur-xl border border-white/10 rounded-2xl sm:rounded-3xl shadow-2xl animate-in slide-in-from-bottom-10 fade-in duration-300 w-full max-w-2xl max-h-[85vh] xs:max-h-[82vh] sm:max-h-[80vh] flex flex-col pointer-events-auto overflow-hidden">
+      <div className="relative bg-zinc-900/98 backdrop-blur-xl border border-white/10 rounded-2xl sm:rounded-3xl shadow-2xl animate-in slide-in-from-bottom-10 fade-in duration-300 w-full max-w-2xl max-h-[92vh] sm:max-h-[80vh] flex flex-col pointer-events-auto overflow-hidden">
         <div className="flex justify-between items-start p-3 xs:p-4 pb-2 flex-shrink-0 border-b border-white/5 gap-2">
           <div className="flex-1 pr-1 min-w-0">
             <h2 className="text-sm xs:text-base sm:text-lg font-bold text-white capitalize tracking-tight leading-tight truncate">
