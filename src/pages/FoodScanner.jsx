@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback, useContext, useMemo } 
 import { Zap, Clock, Utensils, CheckCircle, RefreshCw, X, ScanLine, RotateCcw, Loader2, ZoomIn, ZoomOut, Image as ImageIcon, Trash2, Calculator, Target, Camera, Calendar, Ruler, Weight } from 'lucide-react'; // Added Ruler, Weight
 import { saveFoodLog, getFoodLogs, getNutritionProfile, deleteFoodLog, saveWaterLog, getWaterLogs } from '../utils/db'; // Added water functions
 import { analyzeFood } from '../utils/foodApi';
+import { supabase } from '../lib/supabaseClient'; // NEW: For edge functions
 import { AppContext } from '../App';
 
 // Components
@@ -9,6 +10,39 @@ import ScannerViewfinder from '../components/food/ScannerViewfinder';
 import { ScannerHeader, ScannerFooter } from '../components/food/ScannerControls';
 import ScannerResults from '../components/food/ScannerResults';
 import HistoryModal from '../components/food/HistoryModal';
+
+/**
+ * NEW: Secure edge function that calls Gemini API server-side
+ * Keeps API key secret and handles large image processing
+ */
+async function analyzeWithEdgeFunction(blob, onStatus) {
+  if (onStatus) onStatus("Optimizing image quality...");
+
+  // Convert blob to base64
+  const base64Data = await new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result.split(',')[1]);
+    reader.readAsDataURL(blob);
+  });
+
+  if (onStatus) onStatus("Consulting Gemini AI...");
+
+  // Call edge function
+  const { data, error } = await supabase.functions.invoke('analyze-food', {
+    body: {
+      image: base64Data,
+      imageType: blob.type || 'image/jpeg'
+    }
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Edge function error');
+  }
+
+  if (onStatus) onStatus("Parsing AI results...");
+
+  return data;
+}
 
 const FoodScanner = () => {
   const { setCurrentPage, showNotification } = useContext(AppContext); // Get notification handler
@@ -312,10 +346,10 @@ const FoodScanner = () => {
     setStatusText("Processing uploaded image...");
 
     try {
-        // Direct pass to API - API handles resizing/compression
-        const aiResult = await analyzeFood(file, (status) => {
+        // Use secure edge function instead of client-side API
+        const aiResult = await analyzeWithEdgeFunction(file, (status) => {
             setStatusText(status); 
-        }, aiMode);
+        });
 
         setResult(aiResult);
         // Automatic saving removed - handled by ScannerResults onSave
@@ -363,9 +397,9 @@ const FoodScanner = () => {
         if (!blob) throw new Error("Capture failed");
 
         try {
-            const aiResult = await analyzeFood(blob, (status) => {
+            const aiResult = await analyzeWithEdgeFunction(blob, (status) => {
                 setStatusText(status); 
-            }, aiMode);
+            });
 
             setResult(aiResult);
             // Automatic saving removed - handled by ScannerResults onSave

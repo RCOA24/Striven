@@ -15,13 +15,23 @@ import Intro from './components/Intro';
 import { deleteActivity } from './utils/db';
 import FoodScanner from './pages/FoodScanner'; // NEW: FoodScanner page
 import CalorieCalculator from './pages/CalorieCalculator'; // NEW: Import Calculator
+import Leaderboards from './pages/Leaderboards'; // NEW: Leaderboards
+import { onAuthStateChange, getSession, handleAuthCallback } from './services/authService'; // NEW: Auth service
 
 // CREATE CONTEXT
 export const AppContext = createContext();
 
 function App() {
   const [currentPage, setCurrentPage] = useState('dashboard'); // ← 'organizer' for power mode
+  
+  // Always show intro on every app load
   const [showIntro, setShowIntro] = useState(true);
+  
+  // NEW: Auth State
+  const [user, setUser] = useState(null);
+  const [session, setSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [hasSyncedAfterSignIn, setHasSyncedAfterSignIn] = useState(false);
 
   // Handle PWA Shortcuts & Deep Linking
   useEffect(() => {
@@ -34,6 +44,7 @@ function App() {
     }
   }, []);
 
+  // Move hooks that are needed by auth BEFORE the auth useEffect
   const {
     steps,
     isTracking,
@@ -44,18 +55,137 @@ function App() {
     sensorSupported,
     activities,
     weeklyStats,
-    currentLocation, // NEW
-    route, // NEW
+    currentLocation,
+    route,
     startTracking,
     pauseTracking,
     resumeTracking,
     reset,
     stopAndSave,
     refreshActivities,
-    locationError, // NEW
+    locationError,
   } = useStrivenTracker();
 
   const { notification, showNotification, hideNotification } = useNotifications();
+
+  // NEW: Auth State Listener with PKCE Callback Handler
+  useEffect(() => {
+    let mounted = true;
+    let authTimeout = null;
+
+    // Safety timeout - ensure authLoading is set to false after 3 seconds max
+    authTimeout = setTimeout(() => {
+      if (mounted) {
+        console.log('Auth timeout - showing app');
+        setAuthLoading(false);
+      }
+    }, 3000);
+
+    // Initialize auth: handle PKCE callback and check for existing session
+    const initAuth = async () => {
+      try {
+        // Step 1: Handle PKCE callback if returning from OAuth provider (quick check)
+        const { session: callbackSession, error: callbackError } = await handleAuthCallback();
+        if (callbackError) {
+          console.warn('Auth callback error (may be expected on first load):', callbackError.message);
+        }
+
+        const activeSession = callbackSession;
+        
+        if (mounted) {
+          setSession(activeSession);
+          if (activeSession?.user) {
+            setUser({
+              id: activeSession.user.id,
+              email: activeSession.user.email,
+              name: activeSession.user.user_metadata?.full_name || 
+                    activeSession.user.user_metadata?.name,
+              avatar: activeSession.user.user_metadata?.avatar_url || 
+                      activeSession.user.user_metadata?.picture
+            });
+          }
+          setAuthLoading(false);
+          clearTimeout(authTimeout);
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+        if (mounted) {
+          setAuthLoading(false);
+        }
+      }
+    };
+
+    initAuth();
+
+    // Subscribe to auth changes
+    const subscription = onAuthStateChange((event, newSession, userData) => {
+      if (!mounted) return;
+
+      console.log('Auth state changed:', event);
+      setSession(newSession);
+      setUser(userData);
+      setAuthLoading(false);
+
+      // Handle specific events
+      if (event === 'SIGNED_IN') {
+        showNotification({
+          type: 'success',
+          title: 'Welcome back!',
+          message: `Signed in as ${userData?.name || userData?.email}`,
+          duration: 3000
+        });
+        
+        // SPRINT 2: Sync data to cloud when user logs in (only once per session)
+        if (userData && !hasSyncedAfterSignIn) {
+          setHasSyncedAfterSignIn(true);
+          import('./services/syncService').then((module) => {
+            module.syncToCloud(userData).then(({ success, error, isCooldown }) => {
+              if (success) {
+                console.log('✅ Data synced to cloud automatically');
+                showNotification({
+                  type: 'success',
+                  title: 'Data Synced',
+                  message: 'Your score has been uploaded',
+                  duration: 2000,
+                });
+              } else if (isCooldown) {
+                console.log('⚠️ Sync cooldown active:', error?.message);
+              } else if (error) {
+                console.error('⚠️ Sync failed:', error.message);
+              }
+            });
+          }).catch(err => console.error('Failed to load sync service:', err));
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setHasSyncedAfterSignIn(false);
+        showNotification({
+          type: 'info',
+          title: 'Signed out',
+          message: 'See you next time!',
+          duration: 2000
+        });
+      } else if (event === 'TOKEN_REFRESHED') {
+        console.log('Session refreshed automatically');
+        
+        // SPRINT 2: Also sync on token refresh to keep cloud data fresh
+        if (userData) {
+          import('./services/syncService').then((module) => {
+            module.syncToCloud(userData).then(({ success, error }) => {
+              if (success) {
+                console.log('✅ Data synced to cloud (token refresh)');
+              }
+            });
+          }).catch(err => console.error('Failed to load sync service:', err));
+        }
+      }
+    });
+
+    return () => {
+      mounted = false;
+      clearTimeout(authTimeout);
+      subscription?.unsubscribe();
+    };
+  }, [showNotification, hasSyncedAfterSignIn]);
 
   // Handle deleting an activity
   const handleDeleteActivity = async (activityId) => {
@@ -167,7 +297,9 @@ function App() {
       case 'stats':
         return <StatsPage weeklyStats={weeklyStats} activities={activities} />;
       case 'profile':
-        return <ProfilePage activities={activities} weeklyStats={weeklyStats} />;
+        return <ProfilePage activities={activities} weeklyStats={weeklyStats} user={user} />;
+      case 'leaderboards': // NEW: Leaderboards
+        return <Leaderboards />;
       case 'exercises':
         return <ExerciseLibrary />;
       case 'organizer':
@@ -198,7 +330,14 @@ function App() {
   };
 
   return (
-    <AppContext.Provider value={{ currentPage, setCurrentPage, showNotification }}>
+    <AppContext.Provider value={{ 
+      currentPage, 
+      setCurrentPage, 
+      showNotification,
+      user, // NEW: Expose user to all components
+      session, // NEW: Expose session
+      authLoading // NEW: Expose loading state
+    }}>
       {/* Notification */}
       <Notification
         type={notification.type}
