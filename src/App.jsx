@@ -18,10 +18,26 @@ import CalorieCalculator from './pages/CalorieCalculator'; // NEW: Import Calcul
 import Leaderboards from './pages/Leaderboards'; // NEW: Leaderboards
 // Ensure the curly braces are present and the name is spelled exactly like this:
 import { handleAuthCallback, onAuthStateChange } from './services/authService';
+import { supabase } from './lib/supabaseClient';
 
 
 // CREATE CONTEXT
 export const AppContext = createContext();
+
+// Helper functions for OAuth - defined outside component to avoid hook issues
+const hasAuthCallback = () => {
+  const hashParams = new URLSearchParams(window.location.hash.substring(1));
+  const queryParams = new URLSearchParams(window.location.search);
+  return hashParams.has('access_token') || 
+         hashParams.has('error') ||
+         queryParams.has('code') ||
+         queryParams.has('error');
+};
+
+const cleanAuthUrl = () => {
+  const cleanUrl = window.location.origin + window.location.pathname;
+  window.history.replaceState({}, document.title, cleanUrl);
+};
 
 function App() {
   // Persist current page to restore after OAuth redirect
@@ -42,18 +58,18 @@ function App() {
     }
   }, [currentPage]);
   
-  // FIX: Skip intro if returning from OAuth callback
-  const hasAuthCallback = () => {
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const queryParams = new URLSearchParams(window.location.search);
-    return hashParams.has('access_token') || 
-           hashParams.has('error') ||
-           queryParams.has('code') ||
-           queryParams.has('error');
-  };
-  
-  // FIX: Always show intro on load UNLESS returning from OAuth
-  const [showIntro, setShowIntro] = useState(!hasAuthCallback());
+  // Intro logic: Show intro only if user has never completed it
+  // Store completion in localStorage so it persists across sessions
+  const [showIntro, setShowIntro] = useState(() => {
+    // Skip intro if returning from OAuth (we'll show the app directly)
+    if (hasAuthCallback()) return false;
+    // Otherwise, check if user has completed intro before
+    try {
+      return localStorage.getItem('striven_intro_complete') !== 'true';
+    } catch (e) {
+      return true;
+    }
+  });
   
   // NEW: Auth State
   const [user, setUser] = useState(null);
@@ -100,29 +116,44 @@ function App() {
   useEffect(() => {
     let mounted = true;
     let authTimeout = null;
+    let isProcessingCallback = hasAuthCallback();
 
-    // Safety timeout - ensure authLoading is set to false after 3 seconds max
+    // Safety timeout - ensure authLoading is set to false after 2 seconds max
     authTimeout = setTimeout(() => {
-      if (mounted) {
+      if (mounted && authLoading) {
         console.log('Auth timeout - showing app');
         setAuthLoading(false);
       }
-    }, 3000);
+    }, 2000);
 
     // Initialize auth: handle PKCE callback and check for existing session
     const initAuth = async () => {
       try {
-        // Step 1: Handle PKCE callback if returning from OAuth provider (quick check)
-        const { session: callbackSession, error: callbackError } = await handleAuthCallback();
-        if (callbackError) {
-          console.warn('Auth callback error (may be expected on first load):', callbackError.message);
+        let activeSession = null;
+        
+        // Step 1: If returning from OAuth, exchange the code
+        if (isProcessingCallback) {
+          console.log('Processing OAuth callback...');
+          const { session: callbackSession, error: callbackError } = await handleAuthCallback();
+          
+          if (callbackError) {
+            console.warn('Auth callback error:', callbackError.message);
+          } else {
+            activeSession = callbackSession;
+          }
+          
+          // Clean the URL immediately after processing
+          cleanAuthUrl();
+        } else {
+          // Just get existing session
+          const { data: { session } } = await supabase.auth.getSession();
+          activeSession = session;
         }
-
-        const activeSession = callbackSession;
         
         if (mounted) {
-          setSession(activeSession);
           if (activeSession?.user) {
+            console.log('Setting user from session:', activeSession.user.id);
+            setSession(activeSession);
             setUser({
               id: activeSession.user.id,
               email: activeSession.user.email,
@@ -131,61 +162,71 @@ function App() {
               avatar: activeSession.user.user_metadata?.avatar_url || 
                       activeSession.user.user_metadata?.picture
             });
+            
+            // If this was an OAuth callback, show notification and auto-sync
+            if (isProcessingCallback) {
+              showNotification({
+                type: 'success',
+                title: 'Welcome back!',
+                message: `Signed in as ${activeSession.user.user_metadata?.full_name || activeSession.user.email}`,
+                duration: 3000
+              });
+              
+              // Auto-sync after successful OAuth
+              import('./services/syncService').then((module) => {
+                module.syncToCloud().then(({ success }) => {
+                  if (success) {
+                    showNotification({
+                      type: 'success',
+                      title: 'Data Synced',
+                      message: 'Your score has been uploaded',
+                      duration: 2000,
+                    });
+                  }
+                });
+              }).catch(err => console.error('Failed to sync:', err));
+            }
+          } else {
+            setSession(null);
+            setUser(null);
           }
+          
           setAuthLoading(false);
           clearTimeout(authTimeout);
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
         if (mounted) {
+          if (isProcessingCallback) {
+            cleanAuthUrl();
+          }
           setAuthLoading(false);
+          clearTimeout(authTimeout);
         }
       }
     };
 
     initAuth();
 
-    // Subscribe to auth changes
+    // Subscribe to auth changes (for sign out and token refresh)
     const subscription = onAuthStateChange((event, newSession, userData) => {
       if (!mounted) return;
 
       console.log('Auth state changed:', event);
+      
+      // Update state for all events
       setSession(newSession);
       setUser(userData);
-      setAuthLoading(false);
-
-      // Handle specific events
-      if (event === 'SIGNED_IN') {
+      
+      // Only show notifications for non-callback events
+      // The callback flow handles its own notifications
+      if (event === 'SIGNED_IN' && !isProcessingCallback) {
         showNotification({
           type: 'success',
           title: 'Welcome back!',
           message: `Signed in as ${userData?.name || userData?.email}`,
           duration: 3000
         });
-        
-        // SPRINT 2: Sync data to cloud when user logs in (only once per session)
-        // Note: We use a ref or check the state, but since this closure is created once,
-        // we rely on the fact that SIGNED_IN usually happens once.
-        // To be safe, we can check if we just handled a callback.
-        if (userData) {
-          import('./services/syncService').then((module) => {
-            module.syncToCloud(userData).then(({ success, error, isCooldown }) => {
-              if (success) {
-                console.log('✅ Data synced to cloud automatically');
-                showNotification({
-                  type: 'success',
-                  title: 'Data Synced',
-                  message: 'Your score has been uploaded',
-                  duration: 2000,
-                });
-              } else if (isCooldown) {
-                console.log('⚠️ Sync cooldown active:', error?.message);
-              } else if (error) {
-                console.error('⚠️ Sync failed:', error.message);
-              }
-            });
-          }).catch(err => console.error('Failed to load sync service:', err));
-        }
       } else if (event === 'SIGNED_OUT') {
         setHasSyncedAfterSignIn(false);
         showNotification({
@@ -196,17 +237,6 @@ function App() {
         });
       } else if (event === 'TOKEN_REFRESHED') {
         console.log('Session refreshed automatically');
-        
-        // SPRINT 2: Also sync on token refresh to keep cloud data fresh
-        if (userData) {
-          import('./services/syncService').then((module) => {
-            module.syncToCloud(userData).then(({ success, error }) => {
-              if (success) {
-                console.log('✅ Data synced to cloud (token refresh)');
-              }
-            });
-          }).catch(err => console.error('Failed to load sync service:', err));
-        }
       }
     });
 
@@ -215,7 +245,7 @@ function App() {
       clearTimeout(authTimeout);
       subscription?.unsubscribe();
     };
-  }, [showNotification]); // Removed hasSyncedAfterSignIn to prevent re-running auth init
+  }, [showNotification]);
 
   // Handle deleting an activity
   const handleDeleteActivity = async (activityId) => {
@@ -239,8 +269,13 @@ function App() {
     }
   };
 
-  // Handle intro completion
+  // Handle intro completion - persist to localStorage
   const handleIntroComplete = () => {
+    try {
+      localStorage.setItem('striven_intro_complete', 'true');
+    } catch (e) {
+      // Ignore storage errors
+    }
     setShowIntro(false);
   };
 

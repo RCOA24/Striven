@@ -111,7 +111,7 @@ export const syncToCloud = async (userArg = null) => {
       // Dynamically import to avoid circular dependency
       const { signInWithGoogle } = await import('./authService');
       // This will redirect to Google - return immediately without awaiting
-      signInWithGoogle();
+      await signInWithGoogle(); // Added await to ensure redirect starts before returning
       return {
         success: false,
         data: null,

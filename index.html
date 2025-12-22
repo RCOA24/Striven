@@ -16,7 +16,8 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     <script>
-        if ('serviceWorker' in navigator) {
+        // Only register service worker in production to avoid HMR issues in dev
+        if ('serviceWorker' in navigator && !window.location.host.includes('localhost')) {
             window.addEventListener('load', () => {
                 // Ensure sw.js is in your public folder or served at root
                 navigator.serviceWorker.register('/sw.js')

@@ -315,7 +315,7 @@ const Dashboard = ({
                   <TrendingUp className="w-5 h-5" />
                 </div>
                 <div className="text-left">
-                  <div className="text-sm font-bold text-white">Weekly Trends</div>
+                  <div className="text-sm font-bold text-white">Statistics</div>
                   <div className="text-xs text-zinc-500">Avg: {weeklyAverage.toLocaleString()} steps</div>
                 </div>
               </div>
@@ -347,18 +347,7 @@ const Dashboard = ({
         
       </div>
 
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fadeIn {
-          animation: fadeIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-        }
-        .animate-slideUpFade {
-          animation: fadeIn 0.4s ease-out forwards;
-        }
-      `}</style>
+      {/* Styles moved to style.css to prevent React warnings */}
 
       <LicenseModal isOpen={showLicense} onClose={() => setShowLicense(false)} />
     </div>

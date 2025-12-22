@@ -1,14 +1,13 @@
 import React from 'react';
-import { Home, Activity, TrendingUp, User, Dumbbell, Settings, Scan, Crown } from 'lucide-react'; // +Crown for leaderboard
+import { Home, Activity, TrendingUp, User, Dumbbell, Settings, Scan, Crown, Footprints } from 'lucide-react'; // +Crown for leaderboard
 
 const MainLayout = ({ children, currentPage, onNavigate }) => {
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: Home },
-    { id: 'activity', label: 'Activity', icon: Activity },
-    { id: 'stats', label: 'Stats', icon: TrendingUp },
-    { id: 'leaderboards', label: 'League', icon: Crown }, // NEW: Leaderboards
+    { id: 'dashboard', label: 'Steps', icon: Footprints },
+    { id: 'activity', label: 'History', icon: Activity },
+    { id: 'leaderboards', label: 'League', icon: Crown },
     { id: 'food', label: 'Food', icon: Scan },
-    { id: 'exercises', label: 'Exercises', icon: Dumbbell },
+    { id: 'exercises', label: 'Gym', icon: Dumbbell },
     { id: 'profile', label: 'Profile', icon: User },
   ];
 
@@ -60,19 +59,19 @@ const MainLayout = ({ children, currentPage, onNavigate }) => {
 
       {/* Bottom Navigation Bar - Mobile */}
       <nav className="md:hidden bg-zinc-900/90 backdrop-blur-xl border-t border-white/10 fixed bottom-0 left-0 right-0 z-50 pb-safe">
-        <div className="flex items-center justify-around px-2 py-2">
+        <div className="flex items-center justify-between px-2 py-2 overflow-x-auto no-scrollbar">
           {navItems.map((item) => (
             <button
               key={item.id}
               onClick={() => onNavigate(item.id)}
-              className={`flex flex-col items-center space-y-1 px-3 py-2 rounded-xl transition-all duration-200 ${
+              className={`flex-shrink-0 flex flex-col items-center justify-center space-y-1 px-1 py-2 rounded-xl transition-all duration-200 min-w-[60px] ${
                 currentPage === item.id
                   ? 'text-emerald-500'
                   : 'text-zinc-500'
               }`}
             >
               <item.icon className={`w-6 h-6 ${currentPage === item.id ? 'fill-current' : ''}`} />
-              <span className="text-[10px] font-medium">{item.label}</span>
+              <span className="text-[10px] font-medium whitespace-nowrap">{item.label}</span>
             </button>
           ))}
         </div>

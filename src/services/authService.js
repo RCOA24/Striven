@@ -171,20 +171,38 @@ export const onAuthStateChange = (callback) => {
  */
 export const handleAuthCallback = async () => {
   try {
-    // Supabase client is configured with detectSessionInUrl: true,
-    // so the session is already retrieved from the URL hash
-    const { data: { session }, error } = await supabase.auth.getSession();
+    // Check if there's a code in the URL that needs to be exchanged (PKCE flow)
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
     
-    if (error) {
-      console.error('Error handling auth callback:', error);
-      return { session: null, error };
+    if (code) {
+      console.log('Found auth code in URL, exchanging for session...');
+      // Explicitly exchange the code for a session
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+      
+      if (error) {
+        console.error('Error exchanging code for session:', error);
+        return { session: null, error };
+      }
+      
+      console.log('✓ PKCE code exchanged, session retrieved:', data.session?.user?.id);
+      return { session: data.session, error: null };
     }
-
-    if (session) {
-      console.log('✓ PKCE callback handled, session retrieved:', session.user?.id);
+    
+    // Check for hash-based tokens (implicit flow fallback)
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    if (hashParams.has('access_token')) {
+      // Let Supabase handle the hash-based session
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (session) {
+        console.log('✓ Hash-based session retrieved:', session.user?.id);
+      }
+      return { session, error };
     }
-
-    return { session, error: null };
+    
+    // No auth callback params, just get existing session
+    const { data: { session }, error } = await supabase.auth.getSession();
+    return { session, error };
   } catch (error) {
     console.error('Unexpected error in auth callback:', error);
     return { session: null, error };

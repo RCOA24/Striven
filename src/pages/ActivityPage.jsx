@@ -203,8 +203,8 @@ const CalendarView = ({ activities, selectedDate, onDateSelect }) => {
 
       {/* Grid Labels */}
       <div className="grid grid-cols-7 gap-1 mb-2 text-center">
-        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => (
-          <div key={d} className="text-[10px] font-bold text-[#8e8e93] uppercase">{d}</div>
+        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+          <div key={i} className="text-[10px] font-bold text-[#8e8e93] uppercase">{d}</div>
         ))}
       </div>
 

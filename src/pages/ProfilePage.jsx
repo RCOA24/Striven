@@ -252,11 +252,6 @@ const ProfilePage = ({ activities = [], weeklyStats = {} }) => {
 
   return (
     <div className="w-full max-w-3xl mx-auto pb-24">
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;500;600;700&display=swap');
-        .font-apple { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-      `}</style>
-
       {/* Header */}
       <div className="mb-8 px-4 pt-4">
         <div className="flex items-center justify-between mb-1">

@@ -5,7 +5,7 @@ import { syncToCloud } from '../services/syncService';
 import { AppContext } from '../App';
 
 const Leaderboards = () => {
-  const { user, showNotification, authLoading } = useContext(AppContext);
+  const { user, session, showNotification, authLoading } = useContext(AppContext);
 
   const [leaderboard, setLeaderboard] = useState([]);
   const [userRank, setUserRank] = useState(null);
@@ -17,13 +17,10 @@ const Leaderboards = () => {
   // Memoize fetchLeaderboard so it doesn't change on every render
   const fetchLeaderboard = useCallback(async (isInitial = false) => {
     if (isInitial) setLoading(true);
-    setError(null);
+    // Don't clear error immediately to avoid flashing if we have data
     
     try {
-      // 1. Get current session to ensure headers are set for RLS
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      // 2. Fetch the top 50 profiles
+      // 1. Fetch the top 50 profiles
       const { data, error: fetchError } = await supabase
         .from('profiles')
         .select('username, striven_score')
@@ -33,15 +30,17 @@ const Leaderboards = () => {
       if (fetchError) throw fetchError;
 
       setLeaderboard(data || []);
+      setError(null); // Clear error only on success
       
-      // 3. If user is logged in, fetch their specific rank
-      if (session?.user || user?.id) {
-        const userId = session?.user?.id || user?.id;
-        
+      // 2. If user is logged in, fetch their specific rank
+      // Use session from context instead of calling getSession again
+      const currentUserId = session?.user?.id || user?.id;
+
+      if (currentUserId) {
         const { data: userProfile } = await supabase
           .from('profiles')
           .select('striven_score, username')
-          .eq('id', userId)
+          .eq('id', currentUserId)
           .single();
 
         if (userProfile) {
@@ -59,14 +58,11 @@ const Leaderboards = () => {
       }
     } catch (err) {
       console.error('Leaderboard Fetch Error:', err);
-      // Only set error state if we have no data at all
-      if (leaderboard.length === 0) {
-        setError(err.message || 'Failed to connect to the league');
-      }
+      setError(err.message || 'Failed to connect to the league');
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [session, user]);
 
   // Handle Sync Logic
   const handleSyncNow = async () => {
@@ -119,9 +115,8 @@ const Leaderboards = () => {
 
   // Effect 2: Initial Fetch & Subscription
   useEffect(() => {
-    // DO NOT fetch while auth is still determining if we are logged in
-    if (authLoading) return;
-
+    // Start fetching immediately - don't wait for auth to complete
+    // The leaderboard is public data, auth only affects showing "You" badge
     fetchLeaderboard(true);
 
     // Setup real-time listener
@@ -136,7 +131,15 @@ const Leaderboards = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [authLoading, fetchLeaderboard]);
+  }, [fetchLeaderboard]);
+
+  // Effect 3: Refetch user rank when auth state changes
+  useEffect(() => {
+    // When user/session becomes available, refetch to get user rank
+    if (!authLoading && (user || session)) {
+      fetchLeaderboard(false);
+    }
+  }, [authLoading, user, session]);
 
   const getMedalBadge = (rank) => {
     if (rank === 1) return <Crown className="w-5 h-5 text-yellow-400" />;
@@ -145,7 +148,7 @@ const Leaderboards = () => {
     return null;
   };
 
-  if (loading || authLoading) {
+  if (loading) {
     return (
       <div className="w-full max-w-3xl mx-auto pb-24 px-4 pt-4">
         <div className="flex items-center justify-between mb-8">
@@ -169,7 +172,6 @@ const Leaderboards = () => {
 
   return (
     <div className="w-full max-w-3xl mx-auto pb-32 px-4 font-apple">
-      <style>{`.font-apple { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; }`}</style>
       
       {/* Header */}
       <div className="flex items-center justify-between pt-6 mb-6">
@@ -246,7 +248,7 @@ const Leaderboards = () => {
 
       {/* Fixed Sticky footer for your specific rank if you are not in top 50 */}
       {userRank && userRank.rank > 50 && (
-        <div className="fixed bottom-24 left-4 right-4 max-w-3xl mx-auto">
+        <div className="fixed bottom-24 left-4 right-4 max-w-3xl mx-auto z-40">
            <div className="bg-emerald-600 p-4 rounded-2xl flex items-center justify-between shadow-2xl shadow-black">
               <div className="flex items-center gap-3">
                 <div className="bg-white/20 px-2 py-1 rounded text-white font-bold">#{userRank.rank}</div>
