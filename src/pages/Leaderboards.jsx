@@ -5,66 +5,84 @@ import { syncToCloud } from '../services/syncService';
 import { AppContext } from '../App';
 
 const Leaderboards = () => {
-  const { user, session, showNotification, authLoading } = useContext(AppContext);
+  const { user, session, showNotification } = useContext(AppContext);
 
   const [leaderboard, setLeaderboard] = useState([]);
   const [userRank, setUserRank] = useState(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState(null);
-  const [showLongLoadingMessage, setShowLongLoadingMessage] = useState(false);
 
-  // Memoize fetchLeaderboard so it doesn't change on every render
-  const fetchLeaderboard = useCallback(async (isInitial = false) => {
-    if (isInitial) setLoading(true);
-    // Don't clear error immediately to avoid flashing if we have data
+  // Simple, fast leaderboard fetch
+  const fetchLeaderboard = useCallback(async (showLoader = true) => {
+    if (showLoader) setLoading(true);
+    setError(null);
     
     try {
-      // 1. Fetch the top 50 profiles
+      console.log('📊 Fetching leaderboard...');
+      const startTime = Date.now();
+      
+      // Single fast query - just get top 25 with id for matching
       const { data, error: fetchError } = await supabase
         .from('profiles')
-        .select('username, striven_score')
+        .select('id, username, striven_score')
         .order('striven_score', { ascending: false })
-        .limit(50);
+        .limit(25);
 
       if (fetchError) throw fetchError;
 
+      console.log(`✅ Fetched ${data?.length || 0} profiles in ${Date.now() - startTime}ms`);
       setLeaderboard(data || []);
-      setError(null); // Clear error only on success
       
-      // 2. If user is logged in, fetch their specific rank
-      // Use session from context instead of calling getSession again
+      // Calculate user rank from the fetched data
       const currentUserId = session?.user?.id || user?.id;
-
-      if (currentUserId) {
-        const { data: userProfile } = await supabase
-          .from('profiles')
-          .select('striven_score, username')
-          .eq('id', currentUserId)
-          .single();
-
-        if (userProfile) {
-          const { count } = await supabase
-            .from('profiles')
-            .select('id', { count: 'exact', head: true })
-            .gt('striven_score', userProfile.striven_score);
-
+      if (currentUserId && data) {
+        const userIndex = data.findIndex(p => p.id === currentUserId);
+        if (userIndex !== -1) {
+          // User is in top 25
           setUserRank({
-            rank: (count || 0) + 1,
-            score: userProfile.striven_score,
-            username: userProfile.username,
+            rank: userIndex + 1,
+            score: data[userIndex].striven_score,
+            username: data[userIndex].username,
+            inTop25: true
           });
+        } else {
+          // User not in top 25, fetch their specific profile
+          const { data: userProfile } = await supabase
+            .from('profiles')
+            .select('striven_score, username')
+            .eq('id', currentUserId)
+            .single();
+            
+          if (userProfile) {
+            // Count how many people have higher scores
+            const { count } = await supabase
+              .from('profiles')
+              .select('id', { count: 'exact', head: true })
+              .gt('striven_score', userProfile.striven_score);
+              
+            setUserRank({
+              rank: (count || 0) + 1,
+              score: userProfile.striven_score,
+              username: userProfile.username,
+              inTop25: false
+            });
+          } else {
+            setUserRank(null);
+          }
         }
+      } else {
+        setUserRank(null);
       }
     } catch (err) {
-      console.error('Leaderboard Fetch Error:', err);
-      setError(err.message || 'Failed to connect to the league');
+      console.error('❌ Leaderboard Error:', err);
+      setError(err?.message || 'Failed to load leaderboard');
     } finally {
       setLoading(false);
     }
   }, [session, user]);
 
-  // Handle Sync Logic
+  // Handle Sync
   const handleSyncNow = async () => {
     setSyncing(true);
     try {
@@ -77,9 +95,11 @@ const Leaderboards = () => {
           message: 'Your rank has been updated',
           duration: 3000,
         });
+        // Refresh leaderboard without loader for instant feel
         await fetchLeaderboard(false);
       } else if (result.isRedirecting) {
-        return; // Page will reload from OAuth
+        // OAuth redirect - don't do anything, page will reload
+        return;
       } else if (result.isCooldown) {
         showNotification({
           type: 'info',
@@ -102,26 +122,16 @@ const Leaderboards = () => {
     }
   };
 
-  // Effect 1: Loading state assurance timer
+  // Initial fetch on mount - only fetch once
   useEffect(() => {
-    let timer;
-    if (loading) {
-      timer = setTimeout(() => setShowLongLoadingMessage(true), 2500);
-    } else {
-      setShowLongLoadingMessage(false);
-    }
-    return () => clearTimeout(timer);
-  }, [loading]);
-
-  // Effect 2: Initial Fetch & Subscription
-  useEffect(() => {
-    // Start fetching immediately - don't wait for auth to complete
-    // The leaderboard is public data, auth only affects showing "You" badge
     fetchLeaderboard(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    // Setup real-time listener
+  // Real-time updates subscription
+  useEffect(() => {
     const channel = supabase
-      .channel('leaderboard-updates')
+      .channel('leaderboard-live')
       .on('postgres_changes', 
           { event: '*', schema: 'public', table: 'profiles' }, 
           () => fetchLeaderboard(false)
@@ -133,14 +143,6 @@ const Leaderboards = () => {
     };
   }, [fetchLeaderboard]);
 
-  // Effect 3: Refetch user rank when auth state changes
-  useEffect(() => {
-    // When user/session becomes available, refetch to get user rank
-    if (!authLoading && (user || session)) {
-      fetchLeaderboard(false);
-    }
-  }, [authLoading, user, session]);
-
   const getMedalBadge = (rank) => {
     if (rank === 1) return <Crown className="w-5 h-5 text-yellow-400" />;
     if (rank === 2) return <Trophy className="w-5 h-5 text-zinc-300" />;
@@ -148,19 +150,14 @@ const Leaderboards = () => {
     return null;
   };
 
+  // Loading skeleton
   if (loading) {
     return (
       <div className="w-full max-w-3xl mx-auto pb-24 px-4 pt-4">
         <div className="flex items-center justify-between mb-8">
-           <div className="h-10 w-48 bg-zinc-800 rounded-lg animate-pulse" />
-           <div className="h-10 w-28 bg-zinc-800 rounded-xl animate-pulse" />
+          <div className="h-10 w-48 bg-zinc-800 rounded-lg animate-pulse" />
+          <div className="h-10 w-28 bg-zinc-800 rounded-xl animate-pulse" />
         </div>
-        {showLongLoadingMessage && (
-          <div className="mb-6 p-4 bg-emerald-900/20 border border-emerald-500/20 rounded-xl flex items-center gap-3">
-            <RefreshCw className="w-4 h-4 text-emerald-500 animate-spin" />
-            <p className="text-emerald-400 text-sm">Connecting to the league...</p>
-          </div>
-        )}
         <div className="space-y-3">
           {[...Array(5)].map((_, i) => (
             <div key={i} className="h-20 bg-zinc-900/50 rounded-2xl animate-pulse" />
@@ -180,7 +177,7 @@ const Leaderboards = () => {
             <Crown className="w-8 h-8 text-yellow-400" />
             Resolution League
           </h1>
-          <p className="text-zinc-400 text-sm mt-1">Global Leaderboard</p>
+          <p className="text-zinc-400 text-sm mt-1">Top 25 Athletes</p>
         </div>
         <button
           onClick={handleSyncNow}
@@ -199,7 +196,12 @@ const Leaderboards = () => {
             <AlertCircle className="w-5 h-5 text-red-400" />
             <p className="text-red-200 text-sm">{error}</p>
           </div>
-          <button onClick={() => fetchLeaderboard(true)} className="text-xs font-bold text-white bg-red-500/40 px-3 py-1 rounded-md">Retry</button>
+          <button 
+            onClick={() => fetchLeaderboard(true)} 
+            className="text-xs font-bold text-white bg-red-500/40 px-3 py-1 rounded-md hover:bg-red-500/60 transition-colors"
+          >
+            Retry
+          </button>
         </div>
       )}
 
@@ -209,19 +211,21 @@ const Leaderboards = () => {
           <Zap className="w-12 h-12 text-emerald-400 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-white">The League is Empty</h2>
           <p className="text-zinc-400 mt-2 mb-6">Be the first to sync your score and claim #1!</p>
-          <button onClick={handleSyncNow} className="bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold">Sync Now</button>
+          <button onClick={handleSyncNow} className="bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold">
+            Sync Now
+          </button>
         </div>
       )}
 
-      {/* List */}
+      {/* Leaderboard List */}
       <div className="space-y-3">
         {leaderboard.map((profile, index) => {
           const rank = index + 1;
-          const isMe = userRank && userRank.username === profile.username && userRank.score === profile.striven_score;
+          const isMe = user?.id && profile.id === user.id;
 
           return (
             <div
-              key={index}
+              key={profile.id || index}
               className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
                 isMe ? 'bg-emerald-950/30 border-emerald-500/50 ring-1 ring-emerald-500/20' : 'bg-zinc-900/50 border-white/5'
               }`}
@@ -233,12 +237,16 @@ const Leaderboards = () => {
                 <div>
                   <p className={`font-bold ${isMe ? 'text-emerald-400' : 'text-white'}`}>
                     {profile.username || 'Anonymous Athlete'}
-                    {isMe && <span className="ml-2 text-[10px] bg-emerald-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider">You</span>}
+                    {isMe && (
+                      <span className="ml-2 text-[10px] bg-emerald-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                        You
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-xl font-black text-white">{profile.striven_score.toLocaleString()}</p>
+                <p className="text-xl font-black text-white">{profile.striven_score?.toLocaleString() || 0}</p>
                 <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Points</p>
               </div>
             </div>
@@ -246,16 +254,16 @@ const Leaderboards = () => {
         })}
       </div>
 
-      {/* Fixed Sticky footer for your specific rank if you are not in top 50 */}
-      {userRank && userRank.rank > 50 && (
+      {/* Sticky footer for your rank if not in top 25 */}
+      {userRank && !userRank.inTop25 && (
         <div className="fixed bottom-24 left-4 right-4 max-w-3xl mx-auto z-40">
-           <div className="bg-emerald-600 p-4 rounded-2xl flex items-center justify-between shadow-2xl shadow-black">
-              <div className="flex items-center gap-3">
-                <div className="bg-white/20 px-2 py-1 rounded text-white font-bold">#{userRank.rank}</div>
-                <p className="text-white font-bold">Your Rank</p>
-              </div>
-              <p className="text-white font-black text-xl">{userRank.score.toLocaleString()} pts</p>
-           </div>
+          <div className="bg-emerald-600 p-4 rounded-2xl flex items-center justify-between shadow-2xl shadow-black">
+            <div className="flex items-center gap-3">
+              <div className="bg-white/20 px-2 py-1 rounded text-white font-bold">#{userRank.rank}</div>
+              <p className="text-white font-bold">Your Rank</p>
+            </div>
+            <p className="text-white font-black text-xl">{userRank.score?.toLocaleString() || 0} pts</p>
+          </div>
         </div>
       )}
     </div>

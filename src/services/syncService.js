@@ -108,6 +108,16 @@ export const syncToCloud = async (userArg = null) => {
     // Step 2: If no session, guide user to sign in via OAuth
     if (!user) {
       console.log('No active session. Initiating Google sign-in...');
+      
+      // Save current page so we can restore it after OAuth redirect
+      try {
+        const currentPage = localStorage.getItem('striven_last_page') || 'leaderboards';
+        localStorage.setItem('striven_pending_page', currentPage);
+        console.log('📌 Saved pending page:', currentPage);
+      } catch (e) {
+        console.warn('Could not save pending page:', e);
+      }
+      
       // Dynamically import to avoid circular dependency
       const { signInWithGoogle } = await import('./authService');
       // This will redirect to Google - return immediately without awaiting
@@ -165,6 +175,8 @@ export const syncToCloud = async (userArg = null) => {
       }
 
       // Prepare profile data
+      // NOTE: Do NOT include 'email' - it may not exist in the profiles table schema
+      // Only include columns that are confirmed to exist in your Supabase table
       const profileData = {
         id: user.id,
         username: username,
@@ -172,23 +184,47 @@ export const syncToCloud = async (userArg = null) => {
         last_sync: new Date().toISOString()
       };
 
-      console.log('Syncing to cloud:', profileData);
+      console.log('📤 Syncing to cloud:', profileData);
 
-      // Upsert to Supabase profiles table
+      // Upsert to Supabase profiles table with robust error handling
       const { data, error } = await supabase
         .from('profiles')
         .upsert(profileData, {
-          onConflict: 'id'
+          onConflict: 'id',
+          ignoreDuplicates: false // We want to update existing records
         })
         .select();
 
       if (error) {
-        console.error('Supabase upsert error:', error);
-        // Check for RLS policy error
+        console.error('❌ Supabase upsert error:', error);
+        
+        // Handle specific error codes
         if (error.code === '42501') {
-          console.error('RLS Policy Error: Please ensure you have an INSERT policy on the profiles table.');
-          console.error('SQL: CREATE POLICY "Self Insert" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);');
+          console.error('RLS Policy Error: Please ensure you have INSERT/UPDATE policies on the profiles table.');
+          console.error('Run this SQL in Supabase:\n');
+          console.error(`
+CREATE POLICY "Self Insert" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
+CREATE POLICY "Self Update" ON profiles FOR UPDATE USING (auth.uid() = id);
+CREATE POLICY "Public Read" ON profiles FOR SELECT USING (true);
+          `);
+        } else if (error.code === 'PGRST204' || error.message?.includes('schema cache')) {
+          console.error('Schema Cache Error: A column in your query does not exist.');
+          console.error('Check that your profiles table has: id, username, striven_score, last_sync');
+        } else if (error.code === '23505') {
+          // Duplicate key - try update instead
+          console.log('Profile exists, attempting direct update...');
+          const { data: updateData, error: updateError } = await supabase
+            .from('profiles')
+            .update({ striven_score: strivenScore, last_sync: new Date().toISOString() })
+            .eq('id', user.id)
+            .select();
+          
+          if (!updateError) {
+            setSyncCooldown();
+            return { success: true, data: updateData, error: null };
+          }
         }
+        
         return {
           success: false,
           data: null,

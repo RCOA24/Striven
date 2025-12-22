@@ -10,17 +10,30 @@ import { supabase } from '../lib/supabaseClient';
  * @param {string} redirectTo - Optional redirect URL after login
  * @returns {Promise<{data, error}>}
  */
-export const signInWithGoogle = async (redirectTo = window.location.origin) => {
+export const signInWithGoogle = async (redirectTo = null) => {
   try {
+    // Determine the best redirect URL for PWA compatibility
+    // Use the current origin to ensure we return to the installed PWA
+    const isPWA = window.matchMedia('(display-mode: standalone)').matches ||
+                  window.navigator.standalone === true;
+    
+    // For PWAs, always redirect back to the origin (not any specific page)
+    // This helps ensure the OAuth callback returns to the PWA, not the browser
+    const finalRedirectTo = redirectTo || window.location.origin;
+    
+    console.log('🔐 Initiating Google sign-in...', { isPWA, redirectTo: finalRedirectTo });
+    
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: redirectTo,
+        redirectTo: finalRedirectTo,
         queryParams: {
           access_type: 'offline',
           prompt: 'consent',
         },
-        scopes: 'email profile' // Request basic profile info
+        scopes: 'email profile',
+        // Skip the browser tab for PWAs if supported
+        skipBrowserRedirect: false // Set to true if using custom in-app browser
       }
     });
 
