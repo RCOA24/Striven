@@ -16,16 +16,44 @@ import { deleteActivity } from './utils/db';
 import FoodScanner from './pages/FoodScanner'; // NEW: FoodScanner page
 import CalorieCalculator from './pages/CalorieCalculator'; // NEW: Import Calculator
 import Leaderboards from './pages/Leaderboards'; // NEW: Leaderboards
-import { onAuthStateChange, getSession, handleAuthCallback } from './services/authService'; // NEW: Auth service
+// Ensure the curly braces are present and the name is spelled exactly like this:
+import { handleAuthCallback, onAuthStateChange } from './services/authService';
+
 
 // CREATE CONTEXT
 export const AppContext = createContext();
 
 function App() {
-  const [currentPage, setCurrentPage] = useState('dashboard'); // ← 'organizer' for power mode
+  // Persist current page to restore after OAuth redirect
+  const [currentPage, setCurrentPage] = useState(() => {
+    try {
+      return localStorage.getItem('striven_last_page') || 'dashboard';
+    } catch (e) {
+      return 'dashboard';
+    }
+  });
+
+  // Save page on change
+  useEffect(() => {
+    try {
+      localStorage.setItem('striven_last_page', currentPage);
+    } catch (e) {
+      // Ignore storage errors
+    }
+  }, [currentPage]);
   
-  // FIX: Always show intro on load (cleanup in Intro.jsx prevents duplication)
-  const [showIntro, setShowIntro] = useState(true);
+  // FIX: Skip intro if returning from OAuth callback
+  const hasAuthCallback = () => {
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const queryParams = new URLSearchParams(window.location.search);
+    return hashParams.has('access_token') || 
+           hashParams.has('error') ||
+           queryParams.has('code') ||
+           queryParams.has('error');
+  };
+  
+  // FIX: Always show intro on load UNLESS returning from OAuth
+  const [showIntro, setShowIntro] = useState(!hasAuthCallback());
   
   // NEW: Auth State
   const [user, setUser] = useState(null);
@@ -136,8 +164,10 @@ function App() {
         });
         
         // SPRINT 2: Sync data to cloud when user logs in (only once per session)
-        if (userData && !hasSyncedAfterSignIn) {
-          setHasSyncedAfterSignIn(true);
+        // Note: We use a ref or check the state, but since this closure is created once,
+        // we rely on the fact that SIGNED_IN usually happens once.
+        // To be safe, we can check if we just handled a callback.
+        if (userData) {
           import('./services/syncService').then((module) => {
             module.syncToCloud(userData).then(({ success, error, isCooldown }) => {
               if (success) {
@@ -185,7 +215,7 @@ function App() {
       clearTimeout(authTimeout);
       subscription?.unsubscribe();
     };
-  }, [showNotification, hasSyncedAfterSignIn]);
+  }, [showNotification]); // Removed hasSyncedAfterSignIn to prevent re-running auth init
 
   // Handle deleting an activity
   const handleDeleteActivity = async (activityId) => {

@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabaseClient';
 import { getActivities, getFoodLogs, getTodayWorkout } from '../utils/db';
 
 const SYNC_COOLDOWN_KEY = 'striven-sync-cooldown';
-const SYNC_COOLDOWN_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
+const SYNC_COOLDOWN_DURATION = 0; // Instant sync (disabled cooldown)
 
 /**
  * Calculate Striven Score based on local activity data
@@ -138,19 +138,33 @@ export const syncToCloud = async (userArg = null) => {
       // Calculate current score
       const strivenScore = await calculateStrivenScore();
 
-      // Extract username from Google metadata (prefer full_name, then name)
-      // Check both user_metadata (from Supabase session) and direct properties (from App context)
-      const meta = user?.user_metadata || {};
-      const derivedName = (meta.full_name && String(meta.full_name).trim())
-        || (meta.name && String(meta.name).trim())
-        || (user?.name && String(user.name).trim())
-        || (user?.email ? String(user.email).split('@')[0] : '')
-        || '';
-      const username = derivedName || (user?.email ? user.email.split('@')[0] : 'athlete');
-      console.log('Resolved username:', username, 'from metadata:', meta);
+      // Check if profile exists first to preserve username
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', user.id)
+        .single();
 
-      // Prepare profile data - ONLY columns that exist in your profiles table
-      // Schema: id, username, striven_score, last_sync
+      let username;
+      
+      if (existingProfile?.username) {
+        // Keep existing username
+        username = existingProfile.username;
+      } else {
+        // Generate new unique username
+        const meta = user?.user_metadata || {};
+        const baseName = (meta.full_name && String(meta.full_name).trim())
+          || (meta.name && String(meta.name).trim())
+          || (user?.name && String(user.name).trim())
+          || (user?.email ? String(user.email).split('@')[0] : 'athlete');
+        
+        // Clean the name
+        const cleanName = baseName.replace(/[^a-zA-Z0-9]/g, '').substring(0, 15);
+        // Append random digits to ensure uniqueness
+        username = `${cleanName}${Math.floor(1000 + Math.random() * 9000)}`;
+      }
+
+      // Prepare profile data
       const profileData = {
         id: user.id,
         username: username,
@@ -164,12 +178,17 @@ export const syncToCloud = async (userArg = null) => {
       const { data, error } = await supabase
         .from('profiles')
         .upsert(profileData, {
-          onConflict: 'id' // Update if exists, insert if new
+          onConflict: 'id'
         })
         .select();
 
       if (error) {
         console.error('Supabase upsert error:', error);
+        // Check for RLS policy error
+        if (error.code === '42501') {
+          console.error('RLS Policy Error: Please ensure you have an INSERT policy on the profiles table.');
+          console.error('SQL: CREATE POLICY "Self Insert" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);');
+        }
         return {
           success: false,
           data: null,

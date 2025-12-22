@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { Trophy, Crown, Zap, RefreshCw, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { syncToCloud } from '../services/syncService';
 import { AppContext } from '../App';
 
 const Leaderboards = () => {
-  const { user, showNotification } = useContext(AppContext);
+  const { user, showNotification, authLoading } = useContext(AppContext);
 
   const [leaderboard, setLeaderboard] = useState([]);
   const [userRank, setUserRank] = useState(null);
@@ -14,229 +14,153 @@ const Leaderboards = () => {
   const [error, setError] = useState(null);
   const [showLongLoadingMessage, setShowLongLoadingMessage] = useState(false);
 
-  useEffect(() => {
-    let timer;
-    if (loading) {
-      setShowLongLoadingMessage(false);
-      timer = setTimeout(() => setShowLongLoadingMessage(true), 2500); // Show assurance after 2.5s
-    }
-    return () => clearTimeout(timer);
-  }, [loading]);
-
-  const fetchLeaderboard = async () => {
-    setLoading(true);
+  // Memoize fetchLeaderboard so it doesn't change on every render
+  const fetchLeaderboard = useCallback(async (isInitial = false) => {
+    if (isInitial) setLoading(true);
     setError(null);
-
+    
     try {
-      // Add a timeout wrapper for the fetch
-      const fetchPromise = supabase
+      // 1. Get current session to ensure headers are set for RLS
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      // 2. Fetch the top 50 profiles
+      const { data, error: fetchError } = await supabase
         .from('profiles')
         .select('username, striven_score')
         .order('striven_score', { ascending: false })
         .limit(50);
 
-      // Race between fetch and timeout (30 seconds for cold starts)
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Request timed out - please try again')), 30000)
-      );
-
-      // Use .then() on the query builder to ensure it's treated as a promise
-      const { data, error: fetchError } = await Promise.race([
-        fetchPromise.then(res => res), 
-        timeoutPromise
-      ]);
-
       if (fetchError) throw fetchError;
 
       setLeaderboard(data || []);
+      
+      // 3. If user is logged in, fetch their specific rank
+      if (session?.user || user?.id) {
+        const userId = session?.user?.id || user?.id;
+        
+        const { data: userProfile } = await supabase
+          .from('profiles')
+          .select('striven_score, username')
+          .eq('id', userId)
+          .single();
+
+        if (userProfile) {
+          const { count } = await supabase
+            .from('profiles')
+            .select('id', { count: 'exact', head: true })
+            .gt('striven_score', userProfile.striven_score);
+
+          setUserRank({
+            rank: (count || 0) + 1,
+            score: userProfile.striven_score,
+            username: userProfile.username,
+          });
+        }
+      }
     } catch (err) {
-      console.error('Error fetching leaderboard:', err);
-      setError(err.message || 'Failed to load leaderboard');
+      console.error('Leaderboard Fetch Error:', err);
+      // Only set error state if we have no data at all
+      if (leaderboard.length === 0) {
+        setError(err.message || 'Failed to connect to the league');
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
 
+  // Handle Sync Logic
   const handleSyncNow = async () => {
     setSyncing(true);
     try {
-      const { success, error: syncError, isRedirecting, isCooldown } = await syncToCloud();
-      if (success) {
+      const result = await syncToCloud();
+      
+      if (result.success) {
         showNotification({
           type: 'success',
           title: 'Score Synced!',
-          message: 'Your data has been sent to the cloud',
-          duration: 2000,
+          message: 'Your rank has been updated',
+          duration: 3000,
         });
-        await fetchLeaderboard();
-      } else if (isRedirecting) {
-        // OAuth redirect in progress - don't show error, just wait
-        console.log('OAuth redirect initiated, waiting for callback...');
-        // Keep syncing state - page will reload after auth
-        return;
-      } else if (isCooldown) {
-        // Show cooldown message instead of error
+        await fetchLeaderboard(false);
+      } else if (result.isRedirecting) {
+        return; // Page will reload from OAuth
+      } else if (result.isCooldown) {
         showNotification({
           type: 'info',
           title: 'Already Synced',
-          message: syncError?.message || 'Please wait before syncing again',
+          message: result.error?.message,
           duration: 3000,
         });
       } else {
-        throw syncError || new Error('Sync failed');
+        throw result.error;
       }
     } catch (err) {
       showNotification({
         type: 'error',
         title: 'Sync Failed',
-        message: err?.message || 'Could not sync your score',
+        message: err?.message || 'Check your connection',
         duration: 3000,
       });
     } finally {
-      // Always reset syncing state (except for OAuth redirect which returns early)
       setSyncing(false);
     }
   };
 
+  // Effect 1: Loading state assurance timer
   useEffect(() => {
-    // Fetch leaderboard immediately
-    fetchLeaderboard();
+    let timer;
+    if (loading) {
+      timer = setTimeout(() => setShowLongLoadingMessage(true), 2500);
+    } else {
+      setShowLongLoadingMessage(false);
+    }
+    return () => clearTimeout(timer);
+  }, [loading]);
 
-    // Optional: Set up real-time subscription after initial load
-    // Delay subscription to not block initial render
-    const subscriptionTimeout = setTimeout(() => {
-      try {
-        const channel = supabase
-          .channel('profiles-changes')
-          .on(
-            'postgres_changes',
-            { event: '*', schema: 'public', table: 'profiles' },
-            () => {
-              fetchLeaderboard();
-            }
-          )
-          .subscribe((status) => {
-            if (status === 'SUBSCRIBED') {
-              console.log('Leaderboard real-time connected');
-            }
-          });
-        
-        // Store for cleanup
-        window._leaderboardChannel = channel;
-      } catch (err) {
-        console.warn('Real-time subscription failed:', err);
-      }
-    }, 2000); // Delay 2 seconds to let initial fetch complete
+  // Effect 2: Initial Fetch & Subscription
+  useEffect(() => {
+    // DO NOT fetch while auth is still determining if we are logged in
+    if (authLoading) return;
+
+    fetchLeaderboard(true);
+
+    // Setup real-time listener
+    const channel = supabase
+      .channel('leaderboard-updates')
+      .on('postgres_changes', 
+          { event: '*', schema: 'public', table: 'profiles' }, 
+          () => fetchLeaderboard(false)
+      )
+      .subscribe();
 
     return () => {
-      clearTimeout(subscriptionTimeout);
-      if (window._leaderboardChannel) {
-        supabase.removeChannel(window._leaderboardChannel);
-        window._leaderboardChannel = null;
-      }
+      supabase.removeChannel(channel);
     };
-  }, [user?.id]); // Re-fetch when user signs in to ensure RLS policies are satisfied
-
-  // Fetch user rank when user becomes available
-  useEffect(() => {
-    const fetchUserRank = async () => {
-      if (!user?.id) return;
-      
-      try {
-        const { data: userProfile, error: userError } = await supabase
-          .from('profiles')
-          .select('id, username, striven_score')
-          .eq('id', user.id)
-          .single();
-
-        if (!userError && userProfile) {
-          const { count, error: countError } = await supabase
-            .from('profiles')
-            .select('id', { count: 'exact', head: true })
-            .gt('striven_score', userProfile.striven_score);
-
-          if (!countError) {
-            setUserRank({
-              rank: (count || 0) + 1,
-              score: userProfile.striven_score,
-              username: userProfile.username,
-            });
-          }
-        }
-      } catch (err) {
-        console.error('Error fetching user rank:', err);
-      }
-    };
-
-    fetchUserRank();
-  }, [user?.id]);
+  }, [authLoading, fetchLeaderboard]);
 
   const getMedalBadge = (rank) => {
-    const badges = {
-      1: { icon: <Crown className="w-5 h-5 text-yellow-400" /> },
-      2: { icon: <Trophy className="w-5 h-5 text-gray-300" /> },
-      3: { icon: <Trophy className="w-5 h-5 text-amber-700" /> },
-    };
-    return badges[rank];
+    if (rank === 1) return <Crown className="w-5 h-5 text-yellow-400" />;
+    if (rank === 2) return <Trophy className="w-5 h-5 text-zinc-300" />;
+    if (rank === 3) return <Trophy className="w-5 h-5 text-amber-600" />;
+    return null;
   };
 
-  const getDisplayName = (profile) => {
-    // If profile has username from database, use it
-    if (profile.username) {
-      return profile.username;
-    }
-    // Otherwise, use the current user's Google name if available
-    if (user?.name) {
-      return user.name;
-    }
-    // Fallback to email if name not available
-    if (user?.email) {
-      return user.email.split('@')[0];
-    }
-    return 'Athlete';
-  };
-
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="w-full max-w-3xl mx-auto pb-24 px-4 pt-4">
-        {/* Header Skeleton */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-zinc-800 rounded-full animate-pulse" />
-              <div className="h-8 w-48 bg-zinc-800 rounded-lg animate-pulse" />
-            </div>
-            <div className="h-10 w-28 bg-zinc-800 rounded-xl animate-pulse" />
-          </div>
-          <div className="h-4 w-64 bg-zinc-800 rounded animate-pulse" />
+        <div className="flex items-center justify-between mb-8">
+           <div className="h-10 w-48 bg-zinc-800 rounded-lg animate-pulse" />
+           <div className="h-10 w-28 bg-zinc-800 rounded-xl animate-pulse" />
         </div>
-
-        {/* Assurance Message */}
-        <div className={`mb-6 transition-all duration-500 ease-out overflow-hidden ${showLongLoadingMessage ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'}`}>
-          <div className="p-4 bg-emerald-900/20 border border-emerald-500/20 rounded-xl flex items-center gap-3">
-            <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-            <p className="text-emerald-400 text-sm font-medium">
-              Connecting to the league... almost there!
-            </p>
+        {showLongLoadingMessage && (
+          <div className="mb-6 p-4 bg-emerald-900/20 border border-emerald-500/20 rounded-xl flex items-center gap-3">
+            <RefreshCw className="w-4 h-4 text-emerald-500 animate-spin" />
+            <p className="text-emerald-400 text-sm">Connecting to the league...</p>
           </div>
-        </div>
-
-        {/* List Skeletons */}
+        )}
         <div className="space-y-3">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="bg-zinc-900/50 border border-white/5 rounded-2xl p-5 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-zinc-800 rounded-lg animate-pulse" />
-                <div className="space-y-2">
-                  <div className="h-5 w-32 bg-zinc-800 rounded animate-pulse" />
-                  {i === 0 && <div className="h-3 w-12 bg-zinc-800/50 rounded animate-pulse" />}
-                </div>
-              </div>
-              <div className="flex flex-col items-end gap-2">
-                <div className="h-6 w-24 bg-zinc-800 rounded animate-pulse" />
-                <div className="h-3 w-8 bg-zinc-800/50 rounded animate-pulse" />
-              </div>
-            </div>
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="h-20 bg-zinc-900/50 rounded-2xl animate-pulse" />
           ))}
         </div>
       </div>
@@ -244,148 +168,92 @@ const Leaderboards = () => {
   }
 
   return (
-    <div className="w-full max-w-3xl mx-auto pb-24">
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;500;600;700&display=swap');
-        .font-apple { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-      `}</style>
-
+    <div className="w-full max-w-3xl mx-auto pb-32 px-4 font-apple">
+      <style>{`.font-apple { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; }`}</style>
+      
       {/* Header */}
-      <div className="mb-6 px-4 pt-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between pt-6 mb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-white tracking-tight flex items-center gap-2">
             <Crown className="w-8 h-8 text-yellow-400" />
-            <h1 className="text-4xl font-bold text-white font-apple tracking-tight">Resolution League</h1>
-          </div>
-          <button
-            onClick={handleSyncNow}
-            disabled={syncing}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-600/50 text-white font-semibold rounded-xl transition-colors disabled:cursor-not-allowed"
-          >
-            <RefreshCw className={`${syncing ? 'animate-spin' : ''} w-5 h-5`} />
-            {syncing ? 'Syncing...' : 'Sync Now'}
-          </button>
+            Resolution League
+          </h1>
+          <p className="text-zinc-400 text-sm mt-1">Global Leaderboard</p>
         </div>
-        <p className="text-zinc-400 font-medium font-apple mt-1">Compete for the highest Striven Score</p>
+        <button
+          onClick={handleSyncNow}
+          disabled={syncing}
+          className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-900/20"
+        >
+          <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+          {syncing ? 'Syncing...' : 'Sync Score'}
+        </button>
       </div>
 
-      {/* Error State */}
+      {/* Error View */}
       {error && (
-        <div className="px-4 mb-6">
-          <div className="p-4 bg-zinc-900/90 border border-red-500/30 rounded-xl flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />
-            <div className="flex-1">
-              <p className="text-white font-semibold">Error Loading Leaderboard</p>
-              <p className="text-red-300/80 text-sm mt-1">{error}</p>
-              <button
-                onClick={fetchLeaderboard}
-                className="mt-3 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors"
-              >
-                Try Again
-              </button>
-            </div>
+        <div className="p-4 bg-red-900/20 border border-red-500/30 rounded-xl mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-red-400" />
+            <p className="text-red-200 text-sm">{error}</p>
           </div>
+          <button onClick={() => fetchLeaderboard(true)} className="text-xs font-bold text-white bg-red-500/40 px-3 py-1 rounded-md">Retry</button>
         </div>
       )}
 
       {/* Empty State */}
       {leaderboard.length === 0 && !error && (
-        <div className="px-4">
-          <div className="bg-zinc-900 rounded-2xl border border-white/5 p-8 text-center">
-            <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Zap className="w-8 h-8 text-emerald-400" />
-            </div>
-            <h2 className="text-2xl font-bold text-white mb-1 font-apple">The Resolution League Starts Jan 1st</h2>
-            <p className="text-zinc-400 mb-4 font-apple">Be the first to sync your score and claim your place at the top of the leaderboard.</p>
-            <button
-              onClick={handleSyncNow}
-              disabled={syncing || !user}
-              className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-600/50 text-white font-semibold rounded-xl transition-colors"
-            >
-              {user ? (syncing ? 'Syncing...' : 'Be First - Sync Now') : 'Sign In to Join'}
-            </button>
-          </div>
+        <div className="bg-zinc-900 border border-white/5 rounded-3xl p-12 text-center">
+          <Zap className="w-12 h-12 text-emerald-400 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-white">The League is Empty</h2>
+          <p className="text-zinc-400 mt-2 mb-6">Be the first to sync your score and claim #1!</p>
+          <button onClick={handleSyncNow} className="bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold">Sync Now</button>
         </div>
       )}
 
-      {/* Leaderboard List */}
-      {leaderboard.length > 0 && (
-        <div className="px-4 space-y-3">
-          {leaderboard.map((profile, index) => {
-            const rank = index + 1;
-            const medal = getMedalBadge(rank);
-            const isCurrentUser = userRank && userRank.rank === rank;
+      {/* List */}
+      <div className="space-y-3">
+        {leaderboard.map((profile, index) => {
+          const rank = index + 1;
+          const isMe = userRank && userRank.username === profile.username && userRank.score === profile.striven_score;
 
-            if (rank <= 3 && medal) {
-              return (
-                <div
-                  key={index}
-                  className={`bg-zinc-900 rounded-2xl p-5 border border-white/10 flex items-center justify-between ${
-                    isCurrentUser ? 'ring-2 ring-emerald-500' : ''
-                  }`}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-black/30 border border-white/10 text-white">
-                      {medal.icon}
-                    </div>
-                    <div>
-                      <p className="text-white font-semibold text-lg font-apple">{getDisplayName(profile)}</p>
-                      {isCurrentUser && (
-                        <p className="text-emerald-400 text-xs font-medium">You</p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-white font-bold text-2xl font-apple">{profile.striven_score.toLocaleString()}</p>
-                    <p className="text-zinc-500 text-xs">pts</p>
-                  </div>
+          return (
+            <div
+              key={index}
+              className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
+                isMe ? 'bg-emerald-950/30 border-emerald-500/50 ring-1 ring-emerald-500/20' : 'bg-zinc-900/50 border-white/5'
+              }`}
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-black/40 font-bold text-zinc-400">
+                  {getMedalBadge(rank) || `#${rank}`}
                 </div>
-              );
-            }
-
-            return (
-              <div
-                key={index}
-                className={`bg-zinc-900 border border-white/10 rounded-2xl p-5 flex items-center justify-between hover:bg-zinc-800 transition-colors ${
-                  isCurrentUser ? 'ring-2 ring-emerald-500' : ''
-                }`}
-              >
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-black/30 border border-white/10 text-white/70 font-bold text-lg">
-                    #{rank}
-                  </div>
-                  <div>
-                    <p className="text-white font-semibold font-apple">{getDisplayName(profile)}</p>
-                    {isCurrentUser && (
-                      <p className="text-emerald-400 text-xs font-medium">You</p>
-                    )}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-white font-bold text-xl font-apple">{profile.striven_score.toLocaleString()}</p>
-                  <p className="text-zinc-500 text-xs">pts</p>
+                <div>
+                  <p className={`font-bold ${isMe ? 'text-emerald-400' : 'text-white'}`}>
+                    {profile.username || 'Anonymous Athlete'}
+                    {isMe && <span className="ml-2 text-[10px] bg-emerald-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider">You</span>}
+                  </p>
                 </div>
               </div>
-            );
-          })}
-        </div>
-      )}
+              <div className="text-right">
+                <p className="text-xl font-black text-white">{profile.striven_score.toLocaleString()}</p>
+                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Points</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
-      {/* Sticky User Rank Bar */}
-      {userRank && userRank.rank > 50 && user && (
-        <div className="fixed bottom-4 left-0 right-0 z-40 flex justify-center px-4">
-          <div className="bg-zinc-900/90 backdrop-blur-xl rounded-2xl p-4 max-w-3xl w-full border border-white/10 flex items-center justify-between">
-            <div>
-              <p className="text-zinc-400 text-xs">Your Rank</p>
-              <p className="text-white font-bold text-lg font-apple">
-                #{userRank.rank} • {userRank.username || user?.name || user?.email?.split('@')[0] || 'Athlete'}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-zinc-400 text-xs">Score</p>
-              <p className="text-white font-bold text-2xl font-apple">{userRank.score.toLocaleString()}</p>
-            </div>
-          </div>
+      {/* Fixed Sticky footer for your specific rank if you are not in top 50 */}
+      {userRank && userRank.rank > 50 && (
+        <div className="fixed bottom-24 left-4 right-4 max-w-3xl mx-auto">
+           <div className="bg-emerald-600 p-4 rounded-2xl flex items-center justify-between shadow-2xl shadow-black">
+              <div className="flex items-center gap-3">
+                <div className="bg-white/20 px-2 py-1 rounded text-white font-bold">#{userRank.rank}</div>
+                <p className="text-white font-bold">Your Rank</p>
+              </div>
+              <p className="text-white font-black text-xl">{userRank.score.toLocaleString()} pts</p>
+           </div>
         </div>
       )}
     </div>
