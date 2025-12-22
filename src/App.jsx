@@ -24,7 +24,7 @@ export const AppContext = createContext();
 function App() {
   const [currentPage, setCurrentPage] = useState('dashboard'); // ← 'organizer' for power mode
   
-  // Always show intro on every app load
+  // FIX: Always show intro on load (cleanup in Intro.jsx prevents duplication)
   const [showIntro, setShowIntro] = useState(true);
   
   // NEW: Auth State
@@ -249,6 +249,15 @@ function App() {
   // Intro screen
   if (showIntro) {
     return <Intro onComplete={handleIntroComplete} />;
+  }
+
+  // Loading state (handling auth redirect)
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
   }
 
   // Sensor not supported

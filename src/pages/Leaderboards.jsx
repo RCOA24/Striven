@@ -12,6 +12,16 @@ const Leaderboards = () => {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState(null);
+  const [showLongLoadingMessage, setShowLongLoadingMessage] = useState(false);
+
+  useEffect(() => {
+    let timer;
+    if (loading) {
+      setShowLongLoadingMessage(false);
+      timer = setTimeout(() => setShowLongLoadingMessage(true), 2500); // Show assurance after 2.5s
+    }
+    return () => clearTimeout(timer);
+  }, [loading]);
 
   const fetchLeaderboard = async () => {
     setLoading(true);
@@ -25,12 +35,16 @@ const Leaderboards = () => {
         .order('striven_score', { ascending: false })
         .limit(50);
 
-      // Race between fetch and timeout (15 seconds for cold starts)
+      // Race between fetch and timeout (30 seconds for cold starts)
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Request timed out - please try again')), 15000)
+        setTimeout(() => reject(new Error('Request timed out - please try again')), 30000)
       );
 
-      const { data, error: fetchError } = await Promise.race([fetchPromise, timeoutPromise]);
+      // Use .then() on the query builder to ensure it's treated as a promise
+      const { data, error: fetchError } = await Promise.race([
+        fetchPromise.then(res => res), 
+        timeoutPromise
+      ]);
 
       if (fetchError) throw fetchError;
 
@@ -116,9 +130,12 @@ const Leaderboards = () => {
 
     return () => {
       clearTimeout(subscriptionTimeout);
-      window._leaderboardChannel?.unsubscribe();
+      if (window._leaderboardChannel) {
+        supabase.removeChannel(window._leaderboardChannel);
+        window._leaderboardChannel = null;
+      }
     };
-  }, []); // Remove user?.id dependency - leaderboard should load regardless of auth
+  }, [user?.id]); // Re-fetch when user signs in to ensure RLS policies are satisfied
 
   // Fetch user rank when user becomes available
   useEffect(() => {
@@ -181,10 +198,46 @@ const Leaderboards = () => {
 
   if (loading) {
     return (
-      <div className="w-full max-w-3xl mx-auto pb-24">
-        <div className="flex flex-col items-center justify-center h-40 gap-4">
-          <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-zinc-400 text-sm">Loading leaderboard...</p>
+      <div className="w-full max-w-3xl mx-auto pb-24 px-4 pt-4">
+        {/* Header Skeleton */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-zinc-800 rounded-full animate-pulse" />
+              <div className="h-8 w-48 bg-zinc-800 rounded-lg animate-pulse" />
+            </div>
+            <div className="h-10 w-28 bg-zinc-800 rounded-xl animate-pulse" />
+          </div>
+          <div className="h-4 w-64 bg-zinc-800 rounded animate-pulse" />
+        </div>
+
+        {/* Assurance Message */}
+        <div className={`mb-6 transition-all duration-500 ease-out overflow-hidden ${showLongLoadingMessage ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'}`}>
+          <div className="p-4 bg-emerald-900/20 border border-emerald-500/20 rounded-xl flex items-center gap-3">
+            <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+            <p className="text-emerald-400 text-sm font-medium">
+              Connecting to the league... almost there!
+            </p>
+          </div>
+        </div>
+
+        {/* List Skeletons */}
+        <div className="space-y-3">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="bg-zinc-900/50 border border-white/5 rounded-2xl p-5 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-zinc-800 rounded-lg animate-pulse" />
+                <div className="space-y-2">
+                  <div className="h-5 w-32 bg-zinc-800 rounded animate-pulse" />
+                  {i === 0 && <div className="h-3 w-12 bg-zinc-800/50 rounded animate-pulse" />}
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-2">
+                <div className="h-6 w-24 bg-zinc-800 rounded animate-pulse" />
+                <div className="h-3 w-8 bg-zinc-800/50 rounded animate-pulse" />
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );

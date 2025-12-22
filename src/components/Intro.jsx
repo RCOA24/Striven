@@ -11,6 +11,8 @@ const Intro = ({ onComplete }) => {
   const audioRef = useRef(null);
 
   useEffect(() => {
+    let mounted = true;
+
     // --- 1. Audio Setup ---
     const audio = new Audio(AUDIO_URL);
     audio.volume = 0.5;
@@ -18,7 +20,7 @@ const Intro = ({ onComplete }) => {
     
     const playAudio = async () => {
       try {
-        await audio.play();
+        if (mounted) await audio.play();
       } catch (err) {
         // Ignore autoplay blocks
       }
@@ -29,23 +31,34 @@ const Intro = ({ onComplete }) => {
     const sequence = async () => {
       // Small buffer to let the browser paint the initial black screen
       await new Promise(r => requestAnimationFrame(() => setTimeout(r, 500)));
+      if (!mounted) return;
       setStage('loading');
       
       // Allow animations to play
       await new Promise(r => setTimeout(r, 2500));
+      if (!mounted) return;
       setStage('expanding'); 
 
       // Wait for Green Circle Expansion
       await new Promise(r => setTimeout(r, 1000));
+      if (!mounted) return;
       setStage('fading'); 
 
       // Wait for Fade Out
       await new Promise(r => setTimeout(r, 1200));
       
-      if (onComplete) onComplete();
+      if (mounted && onComplete) onComplete();
     };
 
     sequence();
+
+    return () => {
+      mounted = false;
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+    };
   }, [onComplete]);
 
   return (
