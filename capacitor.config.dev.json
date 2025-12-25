@@ -1,7 +1,11 @@
 {
   "appId": "com.striven.app",
-  "appName": "Striven",
+  "appName": "Striven (Dev)",
   "webDir": "dist",
+  "server": {
+    "url": "https://striven.netlify.app/",
+    "cleartext": true
+  },
   "plugins": {
     "App": {
       "deepLinks": [

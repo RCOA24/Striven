@@ -11,10 +11,12 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true,
+    detectSessionInUrl: true, // Handles OAuth callback on web
     storage: window.localStorage,
+    // Note: Same storage key used across web and mobile for session consistency
+    // Mobile uses deep links (leaderboardapp://) while web uses URL detection
     storageKey: 'striven-auth-token',
-    flowType: 'pkce' // More secure for SPAs
+    flowType: 'pkce' // PKCE flow - more secure, sends 'code' in query params instead of tokens in hash
   }
 });
 

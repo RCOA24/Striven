@@ -17,6 +17,7 @@ import FoodScanner from './pages/FoodScanner';
 import CalorieCalculator from './pages/CalorieCalculator';
 import Leaderboards from './pages/Leaderboards';
 import { supabase } from './lib/supabaseClient';
+import { App as CapacitorApp } from '@capacitor/app';
 
 // CREATE CONTEXT
 export const AppContext = createContext();
@@ -234,6 +235,172 @@ function App() {
       subscription?.unsubscribe();
     };
   }, []);
+
+  // Handle Deep Linking for OAuth redirect on mobile
+  useEffect(() => {
+    const handleDeepLink = async (data) => {
+      console.log('\n==========================================');
+      console.log('🔗 DEEP LINK OPENED - APP URL OPEN EVENT');
+      console.log('==========================================');
+      console.log('🔗 Full URL received:', data.url);
+      console.log('🔗 Data object:', JSON.stringify(data, null, 2));
+      
+      try {
+        // Parse the URL to extract both query and hash parameters
+        const url = new URL(data.url);
+        console.log('🔗 URL breakdown:', {
+          scheme: url.protocol,
+          host: url.host,
+          pathname: url.pathname,
+          hash: url.hash,
+          search: url.search,
+          fullHash: url.hash ? url.hash.substring(1) : 'NO HASH',
+          fullSearch: url.search ? url.search.substring(1) : 'NO QUERY'
+        });
+        
+        // Extract parameters from both query string and hash
+        const queryParams = new URLSearchParams(url.search);
+        const hashParams = new URLSearchParams(url.hash.substring(1));
+        
+        // PKCE flow sends code in query params
+        const code = queryParams.get('code');
+        
+        // Legacy implicit flow sends tokens in hash
+        const access_token = hashParams.get('access_token');
+        const refresh_token = hashParams.get('refresh_token');
+        
+        // Errors can be in either query or hash
+        const error_code = queryParams.get('error') || hashParams.get('error');
+        const error_description = queryParams.get('error_description') || hashParams.get('error_description');
+        
+        console.log('🔗 OAuth parameters extracted:');
+        console.log('   - PKCE code present (query):', !!code);
+        console.log('   - access_token present (hash):', !!access_token);
+        console.log('   - refresh_token present (hash):', !!refresh_token);
+        console.log('   - error_code:', error_code || 'none');
+        console.log('   - error_description:', error_description || 'none');
+        
+        if (code) {
+          console.log('   - PKCE code preview:', code.substring(0, 20) + '...');
+        }
+        if (access_token) {
+          console.log('   - access_token preview:', access_token.substring(0, 20) + '...');
+        }
+        if (refresh_token) {
+          console.log('   - refresh_token preview:', refresh_token.substring(0, 20) + '...');
+        }
+        console.log('==========================================\n');
+        
+        // Handle OAuth errors
+        if (error_code) {
+          console.error('❌ OAuth error in deep link:', error_code, error_description);
+          showNotification({
+            type: 'error',
+            title: 'Authentication Failed',
+            message: error_description || 'An error occurred during sign-in.',
+            duration: 5000
+          });
+          return;
+        }
+        
+        // PKCE Flow: Exchange code for session
+        if (code) {
+          console.log('🔑 PKCE flow detected - exchanging code for session...');
+          
+          const { data: sessionData, error } = await supabase.auth.exchangeCodeForSession(code);
+          
+          if (error) {
+            console.error('❌ Error exchanging code for session:', error);
+            showNotification({
+              type: 'error',
+              title: 'Authentication Failed',
+              message: 'Could not complete sign-in. Please try again.',
+              duration: 5000
+            });
+          } else {
+            console.log('✅ PKCE session exchange successful!');
+            console.log('✅ User:', sessionData?.session?.user?.email);
+            
+            // Don't manually update state - let onAuthStateChange handle it
+            
+            showNotification({
+              type: 'success',
+              title: 'Signed In',
+              message: 'Welcome back!',
+              duration: 3000
+            });
+            
+            // Restore pending page if any
+            const pendingPage = getPendingPage();
+            if (pendingPage) {
+              console.log('📍 Restoring pending page:', pendingPage);
+              setCurrentPage(pendingPage);
+              clearPendingPage();
+            }
+          }
+        } 
+        // Legacy Implicit Flow: Use tokens directly (fallback)
+        else if (access_token && refresh_token) {
+          console.log('🔑 Implicit flow detected - setting session from tokens...');
+          
+          // Set the session in Supabase
+          const { data: sessionData, error } = await supabase.auth.setSession({
+            access_token,
+            refresh_token
+          });
+          
+          if (error) {
+            console.error('❌ Error setting session:', error);
+            showNotification({
+              type: 'error',
+              title: 'Authentication Failed',
+              message: 'Could not complete sign-in. Please try again.',
+              duration: 5000
+            });
+          } else {
+            console.log('✅ Session set successfully!');
+            console.log('✅ User:', sessionData?.session?.user?.email);
+            
+            // Don't manually update state - let onAuthStateChange handle it
+            
+            showNotification({
+              type: 'success',
+              title: 'Signed In',
+              message: 'Welcome back!',
+              duration: 3000
+            });
+            
+            // Restore pending page if any
+            const pendingPage = getPendingPage();
+            if (pendingPage) {
+              console.log('📍 Restoring pending page:', pendingPage);
+              setCurrentPage(pendingPage);
+              clearPendingPage();
+            }
+          }
+        } else {
+          console.warn('⚠️ Deep link opened but no code or tokens found in URL');
+        }
+      } catch (error) {
+        console.error('❌ Deep link parsing error:', error);
+        showNotification({
+          type: 'error',
+          title: 'Error',
+          message: 'Could not process authentication callback.',
+          duration: 5000
+        });
+      }
+    };
+
+    // Add the app URL open listener
+    console.log('🎧 Setting up deep link listener...');
+    const listener = CapacitorApp.addListener('appUrlOpen', handleDeepLink);
+    
+    return () => {
+      console.log('🎧 Removing deep link listener');
+      listener.remove();
+    };
+  }, [showNotification, setCurrentPage]);
 
   // Handle deleting an activity
   const handleDeleteActivity = async (activityId) => {

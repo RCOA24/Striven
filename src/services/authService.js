@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabaseClient';
+import { Capacitor } from '@capacitor/core';
 
 /**
  * Authentication Service for Striven
@@ -12,16 +13,45 @@ import { supabase } from '../lib/supabaseClient';
  */
 export const signInWithGoogle = async (redirectTo = null) => {
   try {
+    console.log('\n========================================');
+    console.log('🔐 SIGN IN WITH GOOGLE - DEBUG START');
+    console.log('========================================');
+    
+    // Check if running on native mobile platform
+    const isNativePlatform = Capacitor.isNativePlatform();
+    const platform = Capacitor.getPlatform();
+    
+    console.log('📱 Capacitor.getPlatform():', platform);
+    console.log('📱 Capacitor.isNativePlatform():', isNativePlatform);
+    console.log('🌐 window.Capacitor exists:', !!window.Capacitor);
+    console.log('🌐 Current window.location.href:', window.location.href);
+    console.log('🌐 Current window.location.origin:', window.location.origin);
+    
     // Determine the best redirect URL for PWA compatibility
     // Use the current origin to ensure we return to the installed PWA
     const isPWA = window.matchMedia('(display-mode: standalone)').matches ||
                   window.navigator.standalone === true;
     
-    // For PWAs, always redirect back to the origin (not any specific page)
-    // This helps ensure the OAuth callback returns to the PWA, not the browser
-    const finalRedirectTo = redirectTo || window.location.origin;
+    console.log('📲 isPWA (display-mode check):', isPWA);
     
-    console.log('🔐 Initiating Google sign-in...', { isPWA, redirectTo: finalRedirectTo });
+    // For native mobile apps, use custom scheme deep link
+    // For PWAs/web, use the origin
+    let finalRedirectTo;
+    if (isNativePlatform) {
+      finalRedirectTo = 'leaderboardapp://google-auth';
+      console.log('✅ NATIVE PLATFORM DETECTED - Using deep link');
+      console.log('📱 Platform:', platform);
+      console.log('🔗 Deep Link URL:', finalRedirectTo);
+    } else {
+      finalRedirectTo = redirectTo || window.location.origin;
+      console.log('⚠️ WEB PLATFORM DETECTED - Using web redirect');
+      console.log('🌐 Platform:', platform);
+      console.log('🔗 Web URL:', finalRedirectTo);
+    }
+    
+    console.log('\n🎯 FINAL REDIRECT URL BEING SENT TO SUPABASE:');
+    console.log('   ', finalRedirectTo);
+    console.log('========================================\n');
     
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
