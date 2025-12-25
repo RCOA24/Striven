@@ -11,9 +11,15 @@ node_modules
 dist
 dist-ssr
 *.local
+
+# Environment variables (CRITICAL - Never commit these!)
 .env
 .env.*
 *.env
+.env.local
+.env.development
+.env.production
+.env.test
 
 # Editor directories and files
 .vscode/*
@@ -39,14 +45,30 @@ dist-ssr
 android/build/
 android/app/build/
 android/.gradle/
+android/app/release/
+android/app/debug/
 
 # Local configuration file (contains your local SDK path)
 local.properties
+android/local.properties
 
 # Android Studio settings
 android/.idea/
 android/app/*.iml
 android/*.iml
+.gradle/
+
+# Keystore files (CRITICAL - Contains signing keys!)
+*.jks
+*.keystore
+*.p12
+*.key
+release.keystore
+debug.keystore
+
+# Generated files
+android/app/src/main/assets/public/
+android/app/src/main/res/
 
 # Capacitor specific (usually inside android/app/src/main/assets)
 # Depending on your setup, you might want to ignore the web assets copied over
