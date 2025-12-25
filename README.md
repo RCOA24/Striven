@@ -162,12 +162,12 @@
 <table>
   <tr>
     <td align="center">
-      <img src="assets/desktop-lighthouse.png" alt="Desktop Lighthouse Audit" width="450"/>
+      <img src="assets/StrivenDesktopScore.png" alt="Desktop Lighthouse Audit" width="450"/>
       <br/>
       <em>Desktop Audit - Perfect 100/100 Performance</em>
     </td>
     <td align="center">
-      <img src="assets/mobile-lighthouse.png" alt="Mobile Lighthouse Audit" width="450"/>
+      <img src="assets/StrivenMobileScore.png" alt="Mobile Lighthouse Audit" width="450"/>
       <br/>
       <em>Mobile Audit - 93/100 Performance</em>
     </td>
