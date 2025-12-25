@@ -262,13 +262,14 @@ To run Striven locally, you will need API keys for the external services (Google
 
 ---
 
-## 🔮 Future Enhancements
+## 🔮 Future Implementation
 
-- ☁️ Optional encrypted cloud sync.
-- ⌚ WearOS / WatchOS companion app.
-- 🥗 Detailed macro nutrient breakdown charts.
-- 🏆 Gamification and achievement system.
-
+- 📱 **Native iOS Implementation**:
+  - Porting the platform to iOS using Capacitor for iOS
+  - Implementing Apple Universal Links (the iOS equivalent of our Android Intent Filters) for secure OAuth 2.0 handoffs
+  - Optimizing the UI for Dynamic Island and iOS-specific haptic feedback
+  - Preparing the application for Apple App Store submission
+  
 ---
 
 ## 📄 License
