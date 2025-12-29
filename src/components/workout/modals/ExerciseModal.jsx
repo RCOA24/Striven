@@ -14,16 +14,74 @@ import { fetchExerciseDetails } from '../../../api/exercises';
 const FALLBACK = '/fallback-exercise.gif';
 const SAFETY_PLACEHOLDER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Crect width='300' height='300' fill='%2327272a'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='14' fill='%2371717a'%3ENo Preview%3C/text%3E%3C/svg%3E";
 
-// --- Helper Hook for Scroll Locking ---
-const useScrollLock = (isOpen) => {
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
+// --- ✅ FIXED: ROBUST INSTRUCTION PARSER ---
+const parseInstructions = (input) => {
+  if (!input) return { steps: [], tips: [] };
+
+  let steps = [];
+  let tips = [];
+
+  // 1. Check if it's HTML (contains tags)
+  const isHTML = /<[a-z][\s\S]*>/i.test(input);
+
+  if (isHTML) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(input, 'text/html');
+    
+    // Try to find list items first
+    const listItems = doc.querySelectorAll('li');
+    if (listItems.length > 0) {
+      steps = Array.from(listItems).map((li, i) => ({
+        number: i + 1,
+        action: `Step ${i + 1}`,
+        text: li.textContent.trim()
+      }));
     } else {
-      document.body.style.overflow = 'unset';
+      // If HTML but no list, grab paragraphs
+      const paragraphs = doc.querySelectorAll('p');
+      steps = Array.from(paragraphs)
+        .map((p, i) => ({
+          number: i + 1,
+          action: `Step ${i + 1}`,
+          text: p.textContent.trim()
+        }))
+        .filter(s => s.text.length > 5); // Filter empty p tags
     }
-    return () => { document.body.style.overflow = 'unset'; };
-  }, [isOpen]);
+  } else {
+    // 2. Handle Plain Text (ExerciseDB Standard)
+    // Split by periods, but respect common abbreviations if possible.
+    // We split by a period followed by a space to avoid splitting "approx." or "lbs." too aggressively
+    const rawSentences = input.split(/\. (?=[A-Z])/); 
+
+    steps = rawSentences.map((s, i) => {
+      const cleanText = s.trim().replace(/\.$/, ''); // Remove trailing dot
+      return {
+        number: i + 1,
+        // Smart Action: First 3 words or generic "Step X"
+        action: `Step ${i + 1}`, 
+        text: cleanText + '.' // Add dot back for grammar
+      };
+    }).filter(s => s.text.length > 3);
+  }
+
+  // 3. Extract "Pro Tips" keywords
+  // We look for steps that start with specific words and move them to tips
+  const cleanSteps = [];
+  steps.forEach(step => {
+    const lower = step.text.toLowerCase();
+    if (lower.startsWith('tip:') || lower.startsWith('note:') || lower.includes('avoid:')) {
+      tips.push(step.text.replace(/^(Tip:|Note:|Avoid:)\s*/i, ''));
+    } else {
+      cleanSteps.push({ ...step, number: cleanSteps.length + 1, action: `Step ${cleanSteps.length + 1}` });
+    }
+  });
+
+  // 4. Fallback if parsing failed completely
+  if (cleanSteps.length === 0 && input.length > 0) {
+    cleanSteps.push({ number: 1, action: 'Instruction', text: input });
+  }
+
+  return { steps: cleanSteps, tips };
 };
 
 export default function ExerciseModal({ isOpen, exercise: initialExercise, onClose, onQuickAdd, showToast }) {
@@ -99,74 +157,8 @@ export default function ExerciseModal({ isOpen, exercise: initialExercise, onClo
       };
     }
 
-    // 2. Fallback to Robust String Parsing (from ExerciseModal.jsx)
-    const input = exercise?.description || '';
-    if (!input.trim()) {
-      return {
-        steps: [
-          { number: 1, action: 'Setup', text: 'Position yourself comfortably with proper posture.' },
-          { number: 2, action: 'Execution', text: 'Perform the movement with controlled tempo.' }
-        ],
-        tips: ['Focus on mind-muscle connection', 'Keep core engaged']
-      };
-    }
-
-    let steps = [];
-    let tips = [];
-
-    // Check if it's HTML
-    const isHTML = /<[a-z][\s\S]*>/i.test(input);
-
-    if (isHTML) {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(input, 'text/html');
-      
-      const listItems = doc.querySelectorAll('li');
-      if (listItems.length > 0) {
-        steps = Array.from(listItems).map((li, i) => ({
-          number: i + 1,
-          action: `Step ${i + 1}`,
-          text: li.textContent.trim()
-        }));
-      } else {
-        const paragraphs = doc.querySelectorAll('p');
-        steps = Array.from(paragraphs)
-          .map((p, i) => ({
-            number: i + 1,
-            action: `Step ${i + 1}`,
-            text: p.textContent.trim()
-          }))
-          .filter(s => s.text.length > 5);
-      }
-    } else {
-      // Handle Plain Text (Split by periods)
-      const rawSentences = input.split(/\. (?=[A-Z])/); 
-      steps = rawSentences.map((s, i) => {
-        const cleanText = s.trim().replace(/\.$/, '');
-        return {
-          number: i + 1,
-          action: `Step ${i + 1}`, 
-          text: cleanText + '.' 
-        };
-      }).filter(s => s.text.length > 3);
-    }
-
-    // Extract Tips
-    const cleanSteps = [];
-    steps.forEach(step => {
-      const lower = step.text.toLowerCase();
-      if (lower.startsWith('tip:') || lower.startsWith('note:') || lower.includes('avoid:')) {
-        tips.push(step.text.replace(/^(Tip:|Note:|Avoid:)\s*/i, ''));
-      } else {
-        cleanSteps.push({ ...step, number: cleanSteps.length + 1, action: `Step ${cleanSteps.length + 1}` });
-      }
-    });
-
-    if (cleanSteps.length === 0 && input.length > 0) {
-      cleanSteps.push({ number: 1, action: 'Instruction', text: input });
-    }
-
-    return { steps: cleanSteps, tips };
+    // 2. Fallback to Robust String Parsing
+    return parseInstructions(exercise?.description || '');
   }, [exercise?.description, exercise?.instructions]);
 
   // Media Handlers
