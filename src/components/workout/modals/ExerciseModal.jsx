@@ -14,6 +14,18 @@ import { fetchExerciseDetails } from '../../../api/exercises';
 const FALLBACK = '/fallback-exercise.gif';
 const SAFETY_PLACEHOLDER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Crect width='300' height='300' fill='%2327272a'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='14' fill='%2371717a'%3ENo Preview%3C/text%3E%3C/svg%3E";
 
+// --- Helper Hook for Scroll Locking ---
+const useScrollLock = (isOpen) => {
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => { document.body.style.overflow = 'unset'; };
+  }, [isOpen]);
+};
+
 // --- ✅ FIXED: ROBUST INSTRUCTION PARSER ---
 const parseInstructions = (input) => {
   if (!input) return { steps: [], tips: [] };
