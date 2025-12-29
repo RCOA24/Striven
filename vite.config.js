@@ -21,6 +21,19 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/hf/, ''),
       },
+      // ExerciseDB API proxy for local development
+      // Proxies /api/v1/* to https://exercisedb-api.vercel.app/api/v1/*
+      '/api': {
+        target: 'https://exercisedb-api.vercel.app',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path,
+        configure: (proxy, options) => {
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            console.log('Proxying:', req.method, req.url, '→', options.target + req.url);
+          });
+        }
+      },
     }
   }
 })

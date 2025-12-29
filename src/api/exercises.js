@@ -3,9 +3,12 @@
 /**
  * ExerciseDB API Client
  * Fixes: Broken GIFs with special characters (parentheses, spaces), Retry logic, Caching
+ * Uses centralized API configuration with environment variables
  */
 
-const API_BASE = 'https://exercisedb-api.vercel.app/api/v1';
+import { getApiBaseUrl } from '../config/api.config.js';
+
+const API_BASE = getApiBaseUrl();
 
 // ✅ DEFINE YOUR FALLBACK HERE (Ensure this file exists in your 'public' folder)
 const FALLBACK_GIF = '/fallback-exercise.gif';
