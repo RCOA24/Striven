@@ -87,6 +87,18 @@ export default function ExerciseModal({ isOpen, exercise: initialExercise, onClo
 
   // Memoized Instruction Parsing
   const parsedContent = useMemo(() => {
+    // ✅ Support RapidAPI Array Format directly
+    if (Array.isArray(exercise?.instructions) && exercise.instructions.length > 0) {
+      return {
+        steps: exercise.instructions.map((inst, i) => ({
+          number: i + 1,
+          action: `Step ${i + 1}`,
+          text: inst
+        })),
+        tips: []
+      };
+    }
+
     const html = exercise?.description || '';
     
     if (!html.trim()) {
