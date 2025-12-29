@@ -1,0 +1,23 @@
+[build]
+  publish = "dist"
+  command = "npm run build"
+  functions = "netlify/functions"
+
+[functions]
+  # Use Node.js 18 for serverless functions
+  node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/api/exercisedb-image"
+  to = "/.netlify/functions/exercisedb-image"
+  status = 200
+
+[[redirects]]
+  from = "/api/exercises/*"
+  to = "/.netlify/functions/exercises/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

@@ -1,67 +1,65 @@
-// src/config/api.config.js
-
+﻿// src/config/api.config.js
 /**
  * Centralized API Configuration
  * 
- * This file manages API base URLs using environment variables.
+ * ARCHITECTURE:
+ * - Uses relative paths (/api/exercises) instead of absolute URLs
+ * - Development: Vite proxy forwards to RapidAPI ExerciseDB
+ * - Production: Netlify serverless function handles the proxy
  * 
- * PRODUCTION (Netlify):
- * - Uses relative path '/api' which triggers Netlify proxy
- * - Proxy forwards to https://exercisedb-api.vercel.app/api
- * - This bypasses CORS since requests appear to come from same origin
- * 
- * LOCAL DEVELOPMENT:
- * - Can use '/api' if you set up a local proxy (e.g., Vite proxy)
- * - Or use direct URL 'https://exercisedb-api.vercel.app/api' if API has CORS configured
- * 
- * Environment Variable: VITE_API_BASE_URL
+ * This bypasses CORS because the browser sees same-origin requests.
  */
 
-export const API_CONFIG = {
-  // Base URL for ExerciseDB API
-  // Defaults to '/api' which works with Netlify proxy in production
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
-  
-  // API version
-  version: 'v1',
-  
-  // Full base URL with version
-  get fullBaseURL() {
-    return `${this.baseURL}/${this.version}`;
-  },
-  
-  // Timeout configuration
-  timeout: 10000,
-  
-  // Retry configuration
-  retry: {
-    maxAttempts: 2,
-    initialDelay: 1000,
-    backoffMultiplier: 2
-  },
-  
-  // Cache configuration
-  cache: {
-    ttl: 15 * 60 * 1000, // 15 minutes
-    maxSize: 200,
-    persist: true
-  }
+// ExerciseDB API (RapidAPI) - Proxied through /api/exercises
+export const EXERCISEDB_BASE_URL = '/api/exercises';
+
+// HuggingFace API - Proxied through /api/hf
+export const HUGGINGFACE_BASE_URL = '/api/hf';
+
+// RapidAPI Configuration (for reference, actual key is in env/serverless function)
+export const RAPIDAPI_HOST = 'exercisedb.p.rapidapi.com';
+
+// API Endpoints for ExerciseDB (RapidAPI version)
+export const EXERCISE_ENDPOINTS = {
+  exercises: EXERCISEDB_BASE_URL,
+  exerciseById: (id) => EXERCISEDB_BASE_URL + '/exercise/' + id,
+  bodyPartList: EXERCISEDB_BASE_URL + '/bodyPartList',
+  targetList: EXERCISEDB_BASE_URL + '/targetList',
+  equipmentList: EXERCISEDB_BASE_URL + '/equipmentList',
+  bodyPartExercises: (bodyPart) => EXERCISEDB_BASE_URL + '/bodyPart/' + encodeURIComponent(bodyPart),
+  targetExercises: (target) => EXERCISEDB_BASE_URL + '/target/' + encodeURIComponent(target),
+  equipmentExercises: (equipment) => EXERCISEDB_BASE_URL + '/equipment/' + encodeURIComponent(equipment),
+  searchByName: (name) => EXERCISEDB_BASE_URL + '/name/' + encodeURIComponent(name),
 };
 
-/**
- * Get the API base URL
- * @returns {string} The base URL for API requests
- */
-export const getApiBaseUrl = () => API_CONFIG.fullBaseURL;
-
-/**
- * Build a full API URL
- * @param {string} endpoint - The endpoint path (e.g., '/exercises')
- * @returns {string} The full URL
- */
-export const buildApiUrl = (endpoint) => {
-  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  return `${API_CONFIG.fullBaseURL}${cleanEndpoint}`;
+// Retry configuration
+export const RETRY_CONFIG = {
+  maxAttempts: 3,
+  initialDelay: 1000,
+  backoffMultiplier: 2,
+  maxDelay: 10000,
 };
 
-export default API_CONFIG;
+// Cache configuration  
+export const CACHE_CONFIG = {
+  ttl: 60 * 60 * 1000,
+  maxSize: 500,
+  persist: true,
+  version: 'v5-rapidapi',
+};
+
+// Timeout configuration
+export const TIMEOUT_CONFIG = {
+  default: 15000,
+  long: 30000,
+};
+
+export default {
+  EXERCISEDB_BASE_URL,
+  HUGGINGFACE_BASE_URL,
+  RAPIDAPI_HOST,
+  EXERCISE_ENDPOINTS,
+  RETRY_CONFIG,
+  CACHE_CONFIG,
+  TIMEOUT_CONFIG,
+};

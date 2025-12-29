@@ -35,7 +35,7 @@ export const SafeExerciseImage = React.memo(({ src, alt, className }) => {
         className={className}
         onError={handleError}
         onLoad={handleLoad}
-        loading="lazy"
+        // loading="lazy" // Removed to prevent intervention issues
         decoding="async"
         style={{ 
           background: 'rgba(255,255,255,0.05)',

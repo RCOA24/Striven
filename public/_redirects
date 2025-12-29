@@ -1,8 +1,11 @@
-# Netlify Redirects - Proxy to bypass CORS
-# This proxies all /api/* requests to the Vercel backend
-# The :splat captures everything after /api/ and forwards it
+# Netlify Redirects
 
-/api/*  https://exercisedb-api.vercel.app/api/:splat  200
+# ExerciseDB Image Service - handled by serverless function
+/api/exercisedb-image  /.netlify/functions/exercisedb-image  200
+
+# ExerciseDB API - handled by serverless function (netlify/functions/exercises.js)
+# The function adds RapidAPI headers for authentication
+/api/exercises/*  /.netlify/functions/exercises/:splat  200
 
 # SPA fallback - serve index.html for all routes not matched above
 /*    /index.html   200

@@ -8,11 +8,11 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSwipeable } from 'react-swipeable';
 import { toggleFavorite, isFavorite } from '../../../utils/db';
+import { fetchExerciseDetails } from '../../../api/exercises';
 
 // ✅ FIX 1: Use local fallback GIF
 const FALLBACK = '/fallback-exercise.gif';
 const SAFETY_PLACEHOLDER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Crect width='300' height='300' fill='%2327272a'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='14' fill='%2371717a'%3ENo Preview%3C/text%3E%3C/svg%3E";
-const WGER_API = 'https://wger.de/api/v2';
 
 // --- Helper Hook for Scroll Locking ---
 const useScrollLock = (isOpen) => {
@@ -61,17 +61,21 @@ export default function ExerciseModal({ isOpen, exercise: initialExercise, onClo
     const fetchFullExercise = async () => {
       try {
         setLoading(true);
-        const res = await fetch(`${WGER_API}/exerciseinfo/${initialExercise.id}/`);
-        const data = await res.json();
-
-        setExercise({
-          ...initialExercise,
-          description: data.description || '',
-          images: data.images?.length ? data.images : (initialExercise.images || []),
-          videos: data.videos?.length ? data.videos : (initialExercise.videos || [])
-        });
+        // Use RapidAPI details instead of Wger
+        const data = await fetchExerciseDetails(initialExercise.id);
+        
+        if (data) {
+          setExercise({
+            ...initialExercise,
+            ...data,
+            // Ensure we keep the ID consistent
+            id: initialExercise.id
+          });
+        } else {
+          setExercise(initialExercise);
+        }
       } catch (err) {
-        console.warn('Using basic exercise data');
+        console.warn('Using basic exercise data', err);
         setExercise(initialExercise);
       } finally {
         setLoading(false);
@@ -178,9 +182,6 @@ export default function ExerciseModal({ isOpen, exercise: initialExercise, onClo
     }
   };
 
-  if (!isOpen) return null;
-  if (typeof document === 'undefined') return null; 
-
   // Image State Handling
   const getPrimaryImage = () => exercise?.images?.[imgIdx]?.image || exercise?.previewImage || exercise?.gifUrl || FALLBACK;
   const [displayImage, setDisplayImage] = useState(getPrimaryImage());
@@ -199,6 +200,9 @@ export default function ExerciseModal({ isOpen, exercise: initialExercise, onClo
     }
     setImageLoaded(true);
   };
+
+  if (!isOpen) return null;
+  if (typeof document === 'undefined') return null;
   const hasVideo = exercise?.videos?.length > 0;
   const hasMultipleImages = exercise?.images?.length > 1;
 

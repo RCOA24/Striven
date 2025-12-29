@@ -135,7 +135,10 @@ export const WorkoutModeOverlay = ({
 
   // GIF Handling
   const gifSrc = useMemo(() => {
-    if (currentEx?.gifUrl && currentEx.gifUrl.startsWith('http')) return currentEx.gifUrl;
+    // Allow both absolute (http) and relative (/) paths for local proxy
+    if (currentEx?.gifUrl && (currentEx.gifUrl.startsWith('http') || currentEx.gifUrl.startsWith('/'))) {
+      return currentEx.gifUrl;
+    }
     return FALLBACK_SVG;
   }, [currentEx?.gifUrl]);
 

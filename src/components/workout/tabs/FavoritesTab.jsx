@@ -10,7 +10,7 @@ const FALLBACK_GIF = '/fallback-exercise.gif';
 /**
  * Memoized Favorite Card
  */
-const FavoriteCard = memo(({ item, onOpenModal, onQuickAdd, onUnfavorite }) => {
+const FavoriteCard = memo(React.forwardRef(({ item, onOpenModal, onQuickAdd, onUnfavorite }, ref) => {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
 
@@ -21,6 +21,7 @@ const FavoriteCard = memo(({ item, onOpenModal, onQuickAdd, onUnfavorite }) => {
 
   return (
     <motion.div
+      ref={ref}
       layout
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -42,7 +43,7 @@ const FavoriteCard = memo(({ item, onOpenModal, onQuickAdd, onUnfavorite }) => {
         <img
           src={displayImage}
           alt={item.name}
-          loading="lazy"
+          // loading="lazy"
           className={`w-full h-full object-cover transition-all duration-500 ${
             imageLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105'
           }`}
@@ -116,7 +117,7 @@ const FavoriteCard = memo(({ item, onOpenModal, onQuickAdd, onUnfavorite }) => {
       </div>
     </motion.div>
   );
-});
+}));
 
 const EmptyState = () => (
   <motion.div

@@ -87,7 +87,7 @@ export default function ExerciseCard({ exercise, onClick }) {
             ${imgState.hasError ? 'opacity-40 grayscale-[0.5]' : 'group-hover:scale-110'}
             ${imgState.loaded ? 'opacity-100' : 'opacity-0'}
           `}
-          loading="lazy"
+          // Removed loading="lazy" to prevent intervention issues
           onLoad={handleLoad}
           onError={handleError}
         />

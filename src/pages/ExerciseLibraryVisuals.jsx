@@ -11,9 +11,9 @@ import React, { useState, useEffect, useCallback, useRef, useContext } from 'rea
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Dumbbell, Loader2, AlertCircle, ChevronLeft, ChevronRight, 
-  Timer, ChevronRight as ChevronRightIcon, Search 
+  Timer, ChevronRight as ChevronRightIcon, Search, Sparkles 
 } from 'lucide-react';
-import { fetchExercises, fetchExerciseDetails, getCategories } from '../api/exercises';
+import { fetchExercises, fetchExerciseDetails, getCategories, FREE_TIER_MSG } from '../api/exercises';
 import ExerciseGrid from '../components/ExerciseGrid';
 import ExerciseModal from '../components/ExerciseModal';
 import LicenseModal from '../components/LicenseModal';
@@ -94,8 +94,25 @@ export default function ExerciseLibraryVisuals() {
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
-  // Fetch exercises
+  // ✅ AbortController ref for canceling duplicate/stale requests (Strict Mode fix)
+  const abortControllerRef = useRef(null);
+  const fetchInProgressRef = useRef(false);
+
+  // Fetch exercises with duplicate request prevention
   const fetchPage = useCallback(async (pageNum) => {
+    // Prevent duplicate requests from React Strict Mode double-mounting
+    if (fetchInProgressRef.current) {
+      console.log('Skipping duplicate fetch request');
+      return;
+    }
+    
+    // Cancel any in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+    fetchInProgressRef.current = true;
+    
     setLoading(true);
     setError(null);
 
@@ -105,6 +122,11 @@ export default function ExerciseLibraryVisuals() {
         search: debouncedSearch.trim() || null,
         limit: LIMIT
       });
+
+      // Check if request was aborted
+      if (abortControllerRef.current?.signal.aborted) {
+        return;
+      }
 
       if (result.error) {
         setError(result.error);
@@ -122,15 +144,26 @@ export default function ExerciseLibraryVisuals() {
       setTotalPages(pages);
       setPage(pageNum);
     } catch (err) {
-      setError('Failed to load exercises.');
-      console.error(err);
+      if (err.name !== 'AbortError') {
+        setError(err.message === FREE_TIER_MSG ? FREE_TIER_MSG : 'Failed to load exercises.');
+        console.error(err);
+      }
     } finally {
       setLoading(false);
+      fetchInProgressRef.current = false;
     }
   }, [selectedCategory, debouncedSearch]);
 
   useEffect(() => {
     fetchPage(0);
+    
+    // Cleanup: abort any pending request when dependencies change or unmount
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      fetchInProgressRef.current = false;
+    };
   }, [selectedCategory, debouncedSearch, fetchPage]);
 
   // Keyboard navigation
@@ -154,7 +187,7 @@ export default function ExerciseLibraryVisuals() {
       const full = await fetchExerciseDetails(lightExercise.id);
       setSelectedExercise(full || { ...lightExercise, description: 'Details unavailable.' });
     } catch (err) {
-      setError('Couldn’t load exercise details.');
+      setError(err.message === FREE_TIER_MSG ? FREE_TIER_MSG : 'Couldn’t load exercise details.');
     } finally {
       setLoadingDetails(false);
     }
@@ -278,11 +311,20 @@ export default function ExerciseLibraryVisuals() {
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-2xl mb-8 flex items-center gap-3"
+            className={`border p-4 rounded-2xl mb-8 flex items-start gap-3 ${
+              error === FREE_TIER_MSG 
+                ? 'bg-amber-500/10 border-amber-500/20 text-amber-200' 
+                : 'bg-red-500/10 border-red-500/20 text-red-400'
+            }`}
           >
-            <AlertCircle className="w-5 h-5" />
-            <span className="text-sm font-medium">{error}</span>
-            <button onClick={() => setError(null)} className="ml-auto p-1 hover:bg-red-500/10 rounded">×</button>
+            {error === FREE_TIER_MSG ? <Sparkles className="w-5 h-5 shrink-0 text-amber-400" /> : <AlertCircle className="w-5 h-5 shrink-0" />}
+            <div>
+              <h4 className={`font-bold text-sm mb-1 ${error === FREE_TIER_MSG ? 'text-amber-400' : 'text-red-400'}`}>
+                {error === FREE_TIER_MSG ? 'Free Tier Limit Reached' : 'Error Loading Exercises'}
+              </h4>
+              <p className="text-sm opacity-90 leading-relaxed">{error}</p>
+            </div>
+            <button onClick={() => setError(null)} className="ml-auto p-1 hover:bg-white/5 rounded shrink-0">×</button>
           </motion.div>
         )}
 

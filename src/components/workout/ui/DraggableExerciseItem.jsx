@@ -46,7 +46,7 @@ export const DraggableExerciseItem = ({ exercise, index, onRemove, onDragEnd }) 
               className={`w-full h-full object-cover transition-opacity duration-300 ${
                 imageLoaded ? 'opacity-100' : 'opacity-0'
               }`}
-              loading="lazy"
+              // loading="lazy"
               decoding="async"
               onLoad={() => setImageLoaded(true)}
               onError={() => {
