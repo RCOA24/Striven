@@ -4,26 +4,40 @@
 const RAPIDAPI_HOST = 'exercisedb.p.rapidapi.com';
 const RAPIDAPI_KEY = process.env.VITE_RAPIDAPI_KEY || 'a1ef16478dmshfa2196906761101p1da34ejsn088c64356d48';
 
-export default async (request, context) => {
-  const url = new URL(request.url);
+export const handler = async (event, context) => {
+  // Handle CORS preflight
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+      },
+      body: ''
+    };
+  }
+
+  const { queryStringParameters } = event;
   
   // Get query parameters (exerciseId and resolution)
-  const exerciseId = url.searchParams.get('exerciseId');
-  const resolution = url.searchParams.get('resolution') || '360';
+  const exerciseId = queryStringParameters.exerciseId;
+  const resolution = queryStringParameters.resolution || '360';
   
   if (!exerciseId) {
-    return new Response(JSON.stringify({ error: 'exerciseId is required' }), {
-      status: 400,
+    return {
+      statusCode: 400,
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
       },
-    });
+      body: JSON.stringify({ error: 'exerciseId is required' })
+    };
   }
   
   const targetUrl = `https://${RAPIDAPI_HOST}/image?exerciseId=${exerciseId}&resolution=${resolution}`;
   
-  console.log(`[ExerciseDB Image Proxy] ${request.method} ${targetUrl}`);
+  console.log(`[ExerciseDB Image Proxy] ${event.httpMethod} ${targetUrl}`);
 
   try {
     const response = await fetch(targetUrl, {
@@ -36,38 +50,37 @@ export default async (request, context) => {
 
     if (!response.ok) {
       console.error(`[ExerciseDB Image Proxy] Error: ${response.status}`);
-      return new Response(null, {
-        status: response.status,
+      return {
+        statusCode: response.status,
         headers: {
           'Access-Control-Allow-Origin': '*',
         },
-      });
+        body: ''
+      };
     }
 
     // Stream the image response
     const imageBuffer = await response.arrayBuffer();
     
-    return new Response(imageBuffer, {
-      status: 200,
+    return {
+      statusCode: 200,
       headers: {
         'Content-Type': 'image/gif',
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
-        // Cache images for 30 days (Crucial for free tier limits)
-        'Cache-Control': 'public, max-age=2592000, immutable',
+        'Cache-Control': 'public, max-age=2592000, immutable', // 30 days
       },
-    });
+      body: Buffer.from(imageBuffer).toString('base64'),
+      isBase64Encoded: true
+    };
   } catch (error) {
     console.error('[ExerciseDB Image Proxy] Error:', error);
-    return new Response(null, {
-      status: 500,
+    return {
+      statusCode: 500,
       headers: {
+        'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
       },
-    });
+      body: JSON.stringify({ error: error.message })
+    };
   }
-};
-
-export const config = {
-  path: '/api/exercisedb-image',
 };
