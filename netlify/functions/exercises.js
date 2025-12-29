@@ -4,13 +4,7 @@
 const RAPIDAPI_HOST = 'exercisedb.p.rapidapi.com';
 const RAPIDAPI_KEY = process.env.VITE_RAPIDAPI_KEY || 'a1ef16478dmshfa2196906761101p1da34ejsn088c64356d48';
 
-// netlify/functions/exercises.js
-// Serverless function to proxy RapidAPI ExerciseDB requests
-
-const RAPIDAPI_HOST = 'exercisedb.p.rapidapi.com';
-const RAPIDAPI_KEY = process.env.VITE_RAPIDAPI_KEY || 'a1ef16478dmshfa2196906761101p1da34ejsn088c64356d48';
-
-export const handler = async (event, context) => {
+export const handler = async (event) => {
   // Handle CORS preflight
   if (event.httpMethod === 'OPTIONS') {
     return {
