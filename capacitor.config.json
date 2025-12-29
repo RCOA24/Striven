@@ -3,7 +3,7 @@
   "appName": "Striven",
   "webDir": "dist",
   "server": {
-    "url": "https://your-netlify-site.netlify.app",
+    "url": "https://striven.netlify.app/",
     "cleartext": true
   },
   "plugins": {
