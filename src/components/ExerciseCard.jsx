@@ -1,5 +1,5 @@
 // src/components/ExerciseCard.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Play, Dumbbell, Heart, Sparkles, ImageOff } from 'lucide-react';
 
 // NOTE: Ensure 'fallback-exercise.gif' is inside the 'public' folder
@@ -7,6 +7,8 @@ const FALLBACK_GIF = '/fallback-exercise.gif';
 const SAFETY_PLACEHOLDER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Crect width='300' height='300' fill='%2327272a'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='14' fill='%2371717a'%3ENo Preview%3C/text%3E%3C/svg%3E";
 
 export default function ExerciseCard({ exercise, onClick }) {
+  const imgRef = useRef(null);
+  const [isVisible, setIsVisible] = useState(false);
   
   // HELPER: Force HTTPS. Many APIs send 'http' which fails on modern sites.
   const getSafeUrl = (url) => {
@@ -22,6 +24,25 @@ export default function ExerciseCard({ exercise, onClick }) {
     loaded: false,
     usingFallback: initialSrc === FALLBACK_GIF
   });
+
+  // ✅ OPTIMIZATION: Intersection Observer to only load images when in view
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '100px' } // Load when 100px away
+    );
+
+    if (imgRef.current) {
+      observer.observe(imgRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, []);
 
   // Reset state if the exercise prop changes
   useEffect(() => {
@@ -67,6 +88,7 @@ export default function ExerciseCard({ exercise, onClick }) {
 
   return (
     <div
+      ref={imgRef}
       onClick={() => onClick(exercise)}
       className="group relative bg-gradient-to-br from-white/5 to-white/[0.02] backdrop-blur-xl rounded-2xl overflow-hidden cursor-pointer transition-all hover:scale-[1.02] hover:shadow-2xl hover:shadow-emerald-500/10 border border-white/10 hover:border-emerald-500/30"
     >
@@ -78,19 +100,21 @@ export default function ExerciseCard({ exercise, onClick }) {
           <div className="absolute inset-0 bg-zinc-800 animate-pulse z-10" />
         )}
 
-        {/* 2. The Image */}
-        <img
-          src={imgState.src}
-          alt={exercise.name}
-          referrerPolicy="no-referrer" // Critical for API access
-          className={`w-full h-full object-cover transition-all duration-700 ease-out
-            ${imgState.hasError ? 'opacity-40 grayscale-[0.5]' : 'group-hover:scale-110'}
-            ${imgState.loaded ? 'opacity-100' : 'opacity-0'}
-          `}
-          // Removed loading="lazy" to prevent intervention issues
-          onLoad={handleLoad}
-          onError={handleError}
-        />
+        {/* 2. The Image - Only render src if visible */}
+        {isVisible && (
+          <img
+            src={imgState.src}
+            alt={exercise.name}
+            referrerPolicy="no-referrer" // Critical for API access
+            className={`w-full h-full object-cover transition-all duration-700 ease-out
+              ${imgState.hasError ? 'opacity-40 grayscale-[0.5]' : 'group-hover:scale-110'}
+              ${imgState.loaded ? 'opacity-100' : 'opacity-0'}
+            `}
+            // Removed loading="lazy" to prevent intervention issues
+            onLoad={handleLoad}
+            onError={handleError}
+          />
+        )}
 
         {/* GIF badge only when not fallback/error */}
         {!imgState.hasError && imgState.loaded && !imgState.usingFallback && (

@@ -373,30 +373,11 @@ export const fetchExerciseDetails = async (id, useCache = true) => {
 /**
  * Get body part categories
  * RapidAPI Endpoint: /exercises/bodyPartList
+ * ✅ OPTIMIZATION: Hardcoded to save 1 API call per session
  */
 export const getCategories = async () => {
-  const cacheKey = 'bodyparts';
-  const cached = apiState.getCache(cacheKey);
-  if (cached) return cached;
-  
-  try {
-    const url = buildUrl('/bodyPartList');
-    console.log(`📡 Fetching categories: ${url}`);
-    
-    const res = await fetchWithRetry(url);
-    const data = await res.json();
-    
-    // RapidAPI returns array of strings directly
-    const bodyParts = Array.isArray(data) ? data : [];
-    const cats = ['All', ...bodyParts];
-    
-    apiState.setCache(cacheKey, cats);
-    return cats;
-  } catch (e) {
-    console.error('❌ Categories Error:', e);
-    // Fallback categories
-    return ['All', 'back', 'cardio', 'chest', 'lower arms', 'lower legs', 'neck', 'shoulders', 'upper arms', 'upper legs', 'waist'];
-  }
+  // Static list to save API calls
+  return ['All', 'back', 'cardio', 'chest', 'lower arms', 'lower legs', 'neck', 'shoulders', 'upper arms', 'upper legs', 'waist'];
 };
 
 /**
