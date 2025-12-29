@@ -126,21 +126,24 @@ export default function ExerciseModal({ isOpen, exercise: initialExercise, onClo
 
   // Fetch Details
   useEffect(() => {
-    if (!isOpen || !initialExercise?.id) return;
+    const targetId = initialExercise?.exerciseId || initialExercise?.id;
+    if (!isOpen || !targetId) return;
 
     const fetchFullExercise = async () => {
       try {
         setLoading(true);
         // Use RapidAPI details instead of Wger
-        const data = await fetchExerciseDetails(initialExercise.id);
+        const data = await fetchExerciseDetails(targetId);
         
         if (data) {
-          setExercise({
-            ...initialExercise,
+          setExercise(prev => ({
+            ...prev,
             ...data,
-            // Ensure we keep the ID consistent
-            id: initialExercise.id
-          });
+            // Preserve the ID that was used to fetch if needed, 
+            // but usually we want the API data to take precedence for details.
+            // However, for Favorites, we might want to keep the local ID?
+            // Actually, toggleFavorite handles both.
+          }));
         } else {
           setExercise(initialExercise);
         }
