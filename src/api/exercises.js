@@ -312,8 +312,17 @@ export const fetchExercises = async (page = 0, options = {}) => {
     console.log(`📡 Fetching: ${url}`);
 
     const res = await fetchWithRetry(url);
-    const data = await res.json();
-    
+    const text = await res.text();
+    // Detect HTML error page (e.g. Netlify/Cloudflare/404)
+    if (text.trim().startsWith('<')) {
+      throw new Error('API returned HTML instead of JSON. Please check your network or API proxy.');
+    }
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      throw new Error('API response is not valid JSON.');
+    }
     // RapidAPI returns array directly, not wrapped in { data: [] }
     const allExercises = Array.isArray(data) ? data : (data.data || []);
 
