@@ -87,7 +87,7 @@ export default function ExerciseModal({ isOpen, exercise: initialExercise, onClo
 
   // Memoized Instruction Parsing
   const parsedContent = useMemo(() => {
-    // ✅ Support RapidAPI Array Format directly
+    // 1. Prefer Array Format (RapidAPI)
     if (Array.isArray(exercise?.instructions) && exercise.instructions.length > 0) {
       return {
         steps: exercise.instructions.map((inst, i) => ({
@@ -99,9 +99,9 @@ export default function ExerciseModal({ isOpen, exercise: initialExercise, onClo
       };
     }
 
-    const html = exercise?.description || '';
-    
-    if (!html.trim()) {
+    // 2. Fallback to Robust String Parsing (from ExerciseModal.jsx)
+    const input = exercise?.description || '';
+    if (!input.trim()) {
       return {
         steps: [
           { number: 1, action: 'Setup', text: 'Position yourself comfortably with proper posture.' },
@@ -111,42 +111,63 @@ export default function ExerciseModal({ isOpen, exercise: initialExercise, onClo
       };
     }
 
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    const list = doc.querySelector('ol') || doc.querySelector('ul');
-    const steps = [];
-    const tips = [];
+    let steps = [];
+    let tips = [];
 
-    if (list) {
-      Array.from(list.children)
-        .filter(li => li.tagName === 'LI')
-        .forEach((li, i) => {
-          const text = li.textContent.trim();
-          const splitIdx = text.indexOf(':');
-          const action = splitIdx > -1 ? text.substring(0, splitIdx) : `Step ${i + 1}`;
-          const detail = splitIdx > -1 ? text.substring(splitIdx + 1) : text;
-          steps.push({ number: i + 1, action: action.trim(), text: detail.trim() });
-        });
+    // Check if it's HTML
+    const isHTML = /<[a-z][\s\S]*>/i.test(input);
+
+    if (isHTML) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(input, 'text/html');
+      
+      const listItems = doc.querySelectorAll('li');
+      if (listItems.length > 0) {
+        steps = Array.from(listItems).map((li, i) => ({
+          number: i + 1,
+          action: `Step ${i + 1}`,
+          text: li.textContent.trim()
+        }));
+      } else {
+        const paragraphs = doc.querySelectorAll('p');
+        steps = Array.from(paragraphs)
+          .map((p, i) => ({
+            number: i + 1,
+            action: `Step ${i + 1}`,
+            text: p.textContent.trim()
+          }))
+          .filter(s => s.text.length > 5);
+      }
     } else {
-      doc.querySelectorAll('p').forEach((p, i) => {
-        const txt = p.textContent.trim();
-        if (txt.length > 10 && !/tip|note|warning/i.test(txt)) {
-          steps.push({ number: i + 1, action: 'Instruction', text: txt });
-        }
-      });
+      // Handle Plain Text (Split by periods)
+      const rawSentences = input.split(/\. (?=[A-Z])/); 
+      steps = rawSentences.map((s, i) => {
+        const cleanText = s.trim().replace(/\.$/, '');
+        return {
+          number: i + 1,
+          action: `Step ${i + 1}`, 
+          text: cleanText + '.' 
+        };
+      }).filter(s => s.text.length > 3);
     }
 
-    doc.querySelectorAll('p, li').forEach(el => {
-      const txt = el.textContent.trim();
-      if (/tip|note|avoid|mistake|important|pro|common/i.test(txt)) {
-        tips.push(txt.replace(/tip:|note:/i, '').trim());
+    // Extract Tips
+    const cleanSteps = [];
+    steps.forEach(step => {
+      const lower = step.text.toLowerCase();
+      if (lower.startsWith('tip:') || lower.startsWith('note:') || lower.includes('avoid:')) {
+        tips.push(step.text.replace(/^(Tip:|Note:|Avoid:)\s*/i, ''));
+      } else {
+        cleanSteps.push({ ...step, number: cleanSteps.length + 1, action: `Step ${cleanSteps.length + 1}` });
       }
     });
 
-    return {
-      steps: steps.length ? steps : [{ number: 1, action: 'Info', text: 'Refer to the video or image for form.' }],
-      tips
-    };
-  }, [exercise?.description]);
+    if (cleanSteps.length === 0 && input.length > 0) {
+      cleanSteps.push({ number: 1, action: 'Instruction', text: input });
+    }
+
+    return { steps: cleanSteps, tips };
+  }, [exercise?.description, exercise?.instructions]);
 
   // Media Handlers
   const nextImg = () => {
