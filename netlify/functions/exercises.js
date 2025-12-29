@@ -55,26 +55,19 @@ export const handler = async (event) => {
     
     console.log(`Proxying ${path} to ${targetUrl}`);
 
-    const response = await fetch(targetUrl, {
-      method: event.httpMethod,
-      headers: {
-        'x-rapidapi-host': RAPIDAPI_HOST,
-        'x-rapidapi-key': RAPIDAPI_KEY,
-        'Content-Type': 'application/json',
-      },
-    });
-    
-    const data = await response.text();
-    // Try to parse as JSON, otherwise return error
-    let isJson = false;
-    let jsonData = null;
+    let response, data;
     try {
-      jsonData = JSON.parse(data);
-      isJson = true;
-    } catch (e) {
-      isJson = false;
-    }
-    if (!isJson) {
+      response = await fetch(targetUrl, {
+        method: event.httpMethod,
+        headers: {
+          'x-rapidapi-host': RAPIDAPI_HOST,
+          'x-rapidapi-key': RAPIDAPI_KEY,
+          'Content-Type': 'application/json',
+        },
+      });
+      data = await response.text();
+    } catch (err) {
+      console.error('Upstream fetch failed:', err);
       return {
         statusCode: 502,
         headers: {
@@ -82,7 +75,37 @@ export const handler = async (event) => {
           'Access-Control-Allow-Origin': '*',
           'Cache-Control': 'no-cache',
         },
-        body: JSON.stringify({ error: 'Invalid response from upstream API', details: data.slice(0, 200) })
+        body: JSON.stringify({ error: 'Could not reach upstream API', details: err.message })
+      };
+    }
+
+    // Detect HTML error page
+    if (data.trim().startsWith('<')) {
+      console.error('Upstream API returned HTML:', data.slice(0, 200));
+      return {
+        statusCode: 502,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'no-cache',
+        },
+        body: JSON.stringify({ error: 'Upstream API returned HTML (likely a 404, 502, or misconfigured proxy).', details: data.slice(0, 200) })
+      };
+    }
+    // Try to parse as JSON
+    let jsonData = null;
+    try {
+      jsonData = JSON.parse(data);
+    } catch (e) {
+      console.error('Upstream API returned invalid JSON:', data.slice(0, 200));
+      return {
+        statusCode: 502,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'no-cache',
+        },
+        body: JSON.stringify({ error: 'Upstream API returned invalid JSON.', details: data.slice(0, 200) })
       };
     }
     return {
