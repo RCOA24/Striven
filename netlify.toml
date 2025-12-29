@@ -13,6 +13,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/exercises"
+  to = "/.netlify/functions/exercises"
+  status = 200
+
+[[redirects]]
   from = "/api/exercises/*"
   to = "/.netlify/functions/exercises/:splat"
   status = 200

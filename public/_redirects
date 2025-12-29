@@ -5,6 +5,7 @@
 
 # ExerciseDB API - handled by serverless function (netlify/functions/exercises.js)
 # The function adds RapidAPI headers for authentication
+/api/exercises    /.netlify/functions/exercises         200
 /api/exercises/*  /.netlify/functions/exercises/:splat  200
 
 # SPA fallback - serve index.html for all routes not matched above
