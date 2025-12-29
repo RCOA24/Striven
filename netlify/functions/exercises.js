@@ -65,7 +65,26 @@ export const handler = async (event) => {
     });
     
     const data = await response.text();
-    
+    // Try to parse as JSON, otherwise return error
+    let isJson = false;
+    let jsonData = null;
+    try {
+      jsonData = JSON.parse(data);
+      isJson = true;
+    } catch (e) {
+      isJson = false;
+    }
+    if (!isJson) {
+      return {
+        statusCode: 502,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'no-cache',
+        },
+        body: JSON.stringify({ error: 'Invalid response from upstream API', details: data.slice(0, 200) })
+      };
+    }
     return {
       statusCode: response.status,
       headers: {
@@ -73,7 +92,7 @@ export const handler = async (event) => {
         'Access-Control-Allow-Origin': '*',
         'Cache-Control': response.ok ? 'public, max-age=3600' : 'no-cache',
       },
-      body: data
+      body: JSON.stringify(jsonData)
     };
   } catch (error) {
     console.error(error);
