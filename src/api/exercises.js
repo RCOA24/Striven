@@ -376,8 +376,32 @@ export const fetchExerciseDetails = async (id, useCache = true) => {
  * ✅ OPTIMIZATION: Hardcoded to save 1 API call per session
  */
 export const getCategories = async () => {
-  // Static list to save API calls
-  return ['All', 'back', 'cardio', 'chest', 'lower arms', 'lower legs', 'neck', 'shoulders', 'upper arms', 'upper legs', 'waist'];
+  // 1. Try localStorage cache first
+  const cacheKey = 'bodyPartsList';
+  const cached = localStorage.getItem(cacheKey);
+  if (cached) {
+    try {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length > 0) return ['All', ...parsed];
+    } catch {}
+  }
+
+  // 2. Use mock data in development
+  if (import.meta.env && import.meta.env.DEV) {
+    try {
+      const resp = await fetch('/mock_bodyParts.json');
+      const data = await resp.json();
+      if (Array.isArray(data)) {
+        localStorage.setItem(cacheKey, JSON.stringify(data));
+        return ['All', ...data];
+      }
+    } catch {}
+  }
+
+  // 3. Fallback to static list (and cache it)
+  const fallback = ['back', 'cardio', 'chest', 'lower arms', 'lower legs', 'neck', 'shoulders', 'upper arms', 'upper legs', 'waist'];
+  localStorage.setItem(cacheKey, JSON.stringify(fallback));
+  return ['All', ...fallback];
 };
 
 /**
