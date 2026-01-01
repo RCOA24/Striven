@@ -194,15 +194,15 @@ const HistoryModal = ({
 
                     <div className="grid grid-cols-3 gap-1 mt-3 pt-3 border-t border-white/5 text-[10px] text-zinc-400 uppercase tracking-wide text-center">
                         <div className="flex flex-col">
-                            <span className="font-bold text-white">{todayStats.protein}g</span>
+                            <span className="font-bold text-white">{(todayStats.protein || 0).toFixed(1)}g</span>
                             <span>Protein</span>
                         </div>
                         <div className="flex flex-col border-l border-white/5">
-                            <span className="font-bold text-white">{todayStats.carbs}g</span>
+                            <span className="font-bold text-white">{(todayStats.carbs || 0).toFixed(1)}g</span>
                             <span>Carbs</span>
                         </div>
                         <div className="flex flex-col border-l border-white/5">
-                            <span className="font-bold text-white">{todayStats.fat}g</span>
+                            <span className="font-bold text-white">{(todayStats.fat || 0).toFixed(1)}g</span>
                             <span>Fat</span>
                         </div>
                     </div>
@@ -295,19 +295,19 @@ const HistoryModal = ({
                                             <div className="px-3 pb-3 flex items-center gap-2 text-[10px]">
                                                 {item.protein > 0 && (
                                                     <div className="px-2 py-1 rounded-md bg-blue-500/10 border border-blue-500/20">
-                                                        <span className="text-blue-400 font-bold">{Math.round(item.protein)}g</span>
+                                                        <span className="text-blue-400 font-bold">{(item.protein || 0).toFixed(1)}g</span>
                                                         <span className="text-blue-400/60 ml-0.5">P</span>
                                                     </div>
                                                 )}
                                                 {item.carbs > 0 && (
                                                     <div className="px-2 py-1 rounded-md bg-yellow-500/10 border border-yellow-500/20">
-                                                        <span className="text-yellow-400 font-bold">{Math.round(item.carbs)}g</span>
+                                                        <span className="text-yellow-400 font-bold">{(item.carbs || 0).toFixed(1)}g</span>
                                                         <span className="text-yellow-400/60 ml-0.5">C</span>
                                                     </div>
                                                 )}
                                                 {item.fat > 0 && (
                                                     <div className="px-2 py-1 rounded-md bg-rose-500/10 border border-rose-500/20">
-                                                        <span className="text-rose-400 font-bold">{Math.round(item.fat)}g</span>
+                                                        <span className="text-rose-400 font-bold">{(item.fat || 0).toFixed(1)}g</span>
                                                         <span className="text-rose-400/60 ml-0.5">F</span>
                                                     </div>
                                                 )}
