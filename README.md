@@ -350,6 +350,10 @@ CapApp.addListener('appUrlOpen', (data) => {
 | **Status Bar** | N/A | Capacitor Status Bar (color customization) |
 
 ---
+
+## 🧩 Tech Stack
+
+| Category | Technology | Purpose |
 |----------|------------|---------|
 | **Frontend** | React 18.3+ (Vite) | Fast, component-based UI with HMR |
 | **Mobile Runtime** | Capacitor 8.0 | Native Android app wrapper with plugin APIs |
@@ -357,6 +361,7 @@ CapApp.addListener('appUrlOpen', (data) => {
 | **State Management** | React Context API, Custom Hooks | Global state for auth, notifications, tracking |
 | **Local Database** | Dexie.js (IndexedDB) | Client-side storage for workouts, steps, food logs |
 | **Cloud Backend** | Supabase (PostgreSQL) | Authentication, leaderboard database, real-time sync |
+| **Edge Functions** | Supabase Edge Functions (Deno) | Serverless AI proxy with CORS handling |
 | **Authentication** | Supabase Auth (PKCE Flow) | OAuth 2.0 with Google provider |
 | **AI Vision** | Google Gemini API | Food recognition and macro estimation |
 | **Fallback AI** | Hugging Face Inference API | Secondary food classification |
@@ -366,6 +371,7 @@ CapApp.addListener('appUrlOpen', (data) => {
 | **Maps** | Leaflet, React Leaflet | Live location tracking and route mapping |
 | **Geolocation** | Capacitor Geolocation Plugin | Native GPS access on Android |
 | **Camera** | Capacitor Camera Plugin | Food photo capture |
+| **PWA** | Service Workers, Web Manifest | Offline capability and installability |
 
 ---
 
