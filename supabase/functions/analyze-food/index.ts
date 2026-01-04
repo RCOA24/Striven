@@ -1,8 +1,10 @@
 // @ts-ignore - Deno URL import resolved at edge runtime
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+// import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
 // Provide minimal typings so VS Code TypeScript understands Deno
 declare const Deno: {
   env: { get(name: string): string | undefined };
+  serve(handler: (req: Request) => Promise<Response> | Response): void;
 };
 
 const ALLOWED_ORIGINS = new Set<string>([
@@ -20,6 +22,9 @@ function buildCorsHeaders(req: Request): Record<string, string> {
   };
   if (ALLOWED_ORIGINS.has(origin)) {
     headers["Access-Control-Allow-Origin"] = origin;
+  } else {
+    // Fallback for development or other origins
+    headers["Access-Control-Allow-Origin"] = "*";
   }
   return headers;
 }
@@ -215,7 +220,7 @@ function handleCors(req: Request): Response | null {
   return null;
 }
 
-serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
   // Handle CORS
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
@@ -229,9 +234,9 @@ serve(async (req: Request) => {
   }
 
   try {
-    const { image, imageType } = await req.json();
+    const body = await req.json().catch(() => null);
 
-    if (!image) {
+    if (!body || !body.image) {
       return new Response(
         JSON.stringify({ error: "Missing image in request body" }),
         {
@@ -240,6 +245,8 @@ serve(async (req: Request) => {
         }
       );
     }
+
+    const { image, imageType } = body;
 
     // Analyze food with Gemini
     const result = await analyzeWithGemini(
