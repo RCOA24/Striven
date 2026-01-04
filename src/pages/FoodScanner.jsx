@@ -4,6 +4,7 @@ import { saveFoodLog, getFoodLogs, getNutritionProfile, deleteFoodLog, saveWater
 import { analyzeFood } from '../utils/foodApi';
 import { supabase } from '../lib/supabaseClient'; // NEW: For edge functions
 import { AppContext } from '../App';
+import { getBackendUrl } from '../apiConfig';
 
 // Components
 import ScannerViewfinder from '../components/food/ScannerViewfinder';
@@ -27,17 +28,23 @@ async function analyzeWithEdgeFunction(blob, onStatus) {
 
   if (onStatus) onStatus("Consulting Gemini AI...");
 
-  // Call edge function
-  const { data, error } = await supabase.functions.invoke('analyze-food', {
-    body: {
+  // Call Netlify function
+  const baseUrl = getBackendUrl();
+  const response = await fetch(`${baseUrl}/.netlify/functions/analyze-food`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
       image: base64Data,
       imageType: blob.type || 'image/jpeg'
-    }
+    })
   });
 
-  if (error) {
-    throw new Error(error.message || 'Edge function error');
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || `Analysis failed: ${response.status}`);
   }
+
+  const data = await response.json();
 
   if (onStatus) onStatus("Parsing AI results...");
 

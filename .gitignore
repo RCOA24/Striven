@@ -74,3 +74,5 @@ android/app/src/main/res/
 # Depending on your setup, you might want to ignore the web assets copied over
 # But usually, Capacitor manages this. 
 # Ideally, don't ignore 'public' inside android, let Capacitor handle sync.
+# Local Netlify folder
+.netlify

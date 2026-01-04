@@ -16,10 +16,11 @@ const MicroNutrientRow = ({ label, value, unit }) => (
 );
 
 const ScannerResults = ({ result, onReset, onSave }) => {
-  // Guard: don't render if result is null/undefined
-  if (!result) return null;
+  const initialItems = useMemo(() => {
+    if (!result) return [];
+    return result.items || [result];
+  }, [result]);
 
-  const initialItems = useMemo(() => result.items || [result], [result]);
   const [selectedIndices, setSelectedIndices] = useState([]);
 
   // Reset selection when result changes
@@ -62,6 +63,10 @@ const ScannerResults = ({ result, onReset, onSave }) => {
         onSave(selectedItems);
     }
   };
+
+  // Guard: don't render if result is null/undefined
+  // Must be AFTER hooks to prevent "Rendered fewer hooks than expected" error
+  if (!result) return null;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-start sm:items-center justify-center pointer-events-none p-2 xs:p-3 sm:p-4 pt-4 pb-24 sm:pb-4">

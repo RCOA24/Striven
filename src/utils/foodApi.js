@@ -165,15 +165,12 @@ async function fetchNutritionFromOFF(searchTerm, displayName, onStatus) {
 // 2. PRIMARY: GOOGLE GEMINI (Optimized)
 // ==========================================
 async function analyzeWithGemini(imageBlob, onStatus) {
-  const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
-  if (!apiKey) throw new Error("Missing Google API Key");
-
   if (onStatus) onStatus("Optimizing image quality...");
   
   // 1. Process image first for better AI readability
   const processedBlob = await processImageForAI(imageBlob);
 
-  if (onStatus) onStatus("Consulting Gemini AI...");
+  if (onStatus) onStatus("Consulting Secure AI Service...");
 
   const base64Data = await new Promise((resolve) => {
     const reader = new FileReader();
@@ -181,93 +178,23 @@ async function analyzeWithGemini(imageBlob, onStatus) {
     reader.readAsDataURL(processedBlob);
   });
 
-  // 2. Filipino Nutritionist Expert Prompt (Dual-Naming Strategy + Summary)
-  const promptText = `
-    You are a Filipino Nutritionist AI Expert specializing in both Filipino and global cuisine.
-    
-    ANALYZE this food image and identify EACH DISTINCT ITEM visible. Pay special attention to:
-    - Filipino dishes: Distinguish cultural specifics (e.g., "Chicken Joy" vs generic "Fried Chicken", "Sinigang" vs generic "Meat Stew")
-    - Rice & Sauce: Filipino meals often combine white rice + sauce-heavy dishes (adobo, sinigang, etc.). Detect rice separately!
-    - Hidden calories: Cooking oil/butter in sauces, coconut milk, fried preparations
-    
-    For EACH food item detected, return:
-    - display_name: The culturally-specific or local name (e.g., "Tortang Talong", "Lumpia", "Tokwa't Baboy")
-    - search_term: The English/generic equivalent for database lookup (e.g., "Eggplant Omelet", "Spring Roll", "Fried Tofu and Pork")
-    - portion_desc: e.g., "1 plate (200g rice)", "1 serving"
-    - calories, protein, carbs, fat: For ONE serving of this item
-    
-    Also include a brief paragraph field named "summary" explaining the meal in natural language for the user (e.g., describing a silog combination: rice + egg + meat), and highlight sodium and hidden fats if relevant.
-    
-    Return ONLY a raw JSON object (no markdown). Do NOT include any explanatory text, code fences, or additional commentary.
-    
-    If NOT food: {"is_food": false}
-    
-    If IS food:
-    {
-      "is_food": true,
-      "summary": "Short descriptive overview of the meal",
-      "items": [
-        {
-          "display_name": "Food Name (e.g. Sinigang na Baboy)",
-          "search_term": "English/generic equivalent (e.g. Pork Stew)",
-          "portion_desc": "1 bowl (300g)",
-          "calories": 250,
-          "protein": 20,
-          "carbs": 15,
-          "fat": 12,
-          "confidence": 0.9
-        }
-      ]
-    }
-  `;
-
   await rateLimiter.wait();
-  const response = await fetchWithRetry(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: promptText },
-            { inline_data: { mime_type: "image/jpeg", data: base64Data } }
-          ]
-        }]
-      })
-    }
-  );
+  
+  // Call Netlify Function
+  const response = await fetch('/.netlify/functions/analyze-food', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image: base64Data })
+  });
 
-  if (!response.ok) throw new Error(`Gemini API Error: ${response.statusText}`);
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || `AI Service Error: ${response.status}`);
+  }
 
   if (onStatus) onStatus("Parsing AI results...");
 
-  const data = await response.json();
-  // Try multiple candidates for robustness
-  const parts = data.candidates?.flatMap(c => c.content?.parts || []) || [];
-  let rawText = "";
-  for (const p of parts) {
-    if (p.text && p.text.includes('{')) { rawText = p.text; break; }
-  }
-  if (!rawText && parts[0]?.text) rawText = parts[0].text;
-
-  // Clean markdown/code fences and extract JSON block or array
-  const clean = (rawText || "").replace(/```json|```/g, '').trim();
-  let jsonStr = null;
-  const objMatch = clean.match(/\{[\s\S]*\}/);
-  const arrMatch = clean.match(/\[[\s\S]*\]/);
-  if (objMatch) jsonStr = objMatch[0];
-  else if (arrMatch) jsonStr = arrMatch[0];
-  else throw new Error("Invalid JSON from Gemini");
-
-  let result;
-  try {
-    result = JSON.parse(jsonStr);
-  } catch (e) {
-    // Attempt to fix trailing commas or invalid quotes
-    const fixed = jsonStr.replace(/,\s*([}\]])/g, '$1');
-    result = JSON.parse(fixed);
-  }
+  const result = await response.json();
   
   if (!result.is_food) throw new Error("Gemini could not identify food");
   

@@ -5,6 +5,7 @@ import { saveNutritionProfile, getNutritionProfile } from '../utils/db';
 import BodyDetailsStep from '../components/calculator/BodyDetailsStep';
 import LifestyleStep from '../components/calculator/LifestyleStep';
 import ResultsStep from '../components/calculator/ResultsStep';
+import useAiTips from '../hooks/useAiTips';
 
 const CalorieCalculator = () => {
   const { setCurrentPage } = useContext(AppContext);
@@ -18,9 +19,10 @@ const CalorieCalculator = () => {
     goal: 'maintain'
   });
   const [result, setResult] = useState(null);
-  const [aiTips, setAiTips] = useState('');
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState('');
+  
+  // Use custom hook for AI tips
+  const { generateTips, loading: aiLoading, tips: aiTips, setTips: setAiTips, error: aiError } = useAiTips();
+  
   const [lastPayload, setLastPayload] = useState(null);
   const [hasExistingProfile, setHasExistingProfile] = useState(false);
   const [validationError, setValidationError] = useState('');
@@ -126,51 +128,6 @@ const CalorieCalculator = () => {
     setStep(3);
   };
 
-  const fetchAiTips = async (payload) => {
-    const proxyUrl = import.meta.env.VITE_AI_TIPS_URL;
-    const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
-    // Prefer proxy to avoid exposing keys; fallback to direct only if proxy is absent and key exists.
-    if (!proxyUrl && !apiKey) {
-      setAiTips('');
-      return;
-    }
-    setAiLoading(true);
-    setAiError('');
-    try {
-      const prompt = `You are a concise fitness & nutrition coach. Provide 3 short bullet tips personalized for this user. Keep each bullet under 18 words.
-User: ${payload.gender}, age ${payload.age}, height ${payload.height}cm, weight ${payload.weight}kg
-Goal: ${payload.goal}
-Activity factor: ${payload.activity}
-Daily target: ${payload.target} kcal | Protein ${payload.macros.protein}g | Carbs ${payload.macros.carbs}g | Fats ${payload.macros.fats}g | Water ${payload.water}ml
-Focus on: meal composition, hydration, and one habit to improve recovery. Avoid generic advice.`;
-
-      const requestBody = proxyUrl
-        ? { prompt }
-        : {
-            contents: [{ parts: [{ text: prompt }] }]
-          };
-
-      const resp = await fetch(
-        proxyUrl || `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestBody)
-        }
-      );
-      if (!resp.ok) throw new Error('AI service unavailable');
-      const data = await resp.json();
-      const text = proxyUrl
-        ? data.text || ''
-        : data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      setAiTips((text || '').trim());
-    } catch (err) {
-      setAiError('Could not load AI tips.');
-      setAiTips('');
-    } finally {
-      setAiLoading(false);
-    }
-  };
 
   const handleSaveAndTrack = async () => {
     if (!result) return;
@@ -268,7 +225,7 @@ Focus on: meal composition, hydration, and one habit to improve recovery. Avoid 
             aiTips={aiTips}
             aiLoading={aiLoading}
             aiError={aiError}
-            onRefreshTips={() => lastPayload && fetchAiTips(lastPayload)}
+            onRefreshTips={() => lastPayload && generateTips(lastPayload)}
             onSaveAndTrack={handleSaveAndTrack}
             onReset={reset}
           />
