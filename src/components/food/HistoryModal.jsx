@@ -30,6 +30,17 @@ const HistoryModal = ({
         })();
     }, []);
 
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
   const toggleDate = (date) => {
     setExpandedDates(prev => ({
       ...prev,
@@ -46,8 +57,8 @@ const HistoryModal = ({
   const glassesConsumed = Math.floor(waterIntake / glassSize);
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-start sm:items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in p-3 sm:p-4 pt-4 sm:pt-0">
-      <div className="bg-zinc-900 w-full max-w-md rounded-3xl flex flex-col shadow-2xl border border-white/10 max-h-[92vh] sm:max-h-[80vh] animate-in zoom-in-95 duration-200 overflow-hidden mt-0 sm:mt-0">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in p-3 sm:p-4">
+      <div className="bg-zinc-900 w-full max-w-md rounded-3xl flex flex-col shadow-2xl border border-white/10 max-h-[85dvh] sm:max-h-[80vh] animate-in zoom-in-95 duration-200 overflow-hidden">
         <div className="flex items-center justify-between p-6 border-b border-white/5 flex-shrink-0">
           <h2 className="text-xl font-bold text-white">Food & Water</h2>
           <button onClick={onClose} className="p-2 bg-white/5 rounded-full hover:bg-white/10 active:scale-95 transition-colors">
@@ -55,7 +66,7 @@ const HistoryModal = ({
           </button>
         </div>
         
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto overscroll-contain">
             <div className="px-6 pt-6 pb-2 space-y-4">
                                 {/* AI Tips (if available) */}
                                 {aiTips && (
